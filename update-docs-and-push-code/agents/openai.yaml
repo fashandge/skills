@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update Docs and Push Code"
+  short_description: "Update relevant docs, then commit and push code changes."
+  default_prompt: "Use update-docs-and-push-code to update docs for the current changes, commit relevant files, and push the branch."

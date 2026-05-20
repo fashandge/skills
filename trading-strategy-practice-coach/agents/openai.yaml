@@ -1,0 +1,4 @@
+interface:
+  display_name: "Trading Strategy Practice Coach"
+  short_description: "Practice trading systems from your notes"
+  default_prompt: "Use $trading-strategy-practice-coach to help me understand and practice this trading-strategy note."

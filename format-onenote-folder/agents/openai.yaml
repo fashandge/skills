@@ -1,0 +1,4 @@
+interface:
+  display_name: "Format OneNote Folder"
+  short_description: "Mirror-format OneNote folders safely"
+  default_prompt: "Use $format-onenote-folder to format Strategy/ into Strategy-formatted/ while preserving the folder structure."
