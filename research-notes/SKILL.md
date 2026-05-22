@@ -107,7 +107,7 @@ notes-search search "agent memory systems" --engine qmd --mode query
 **Sort and limit guidance:**
 - Use `--sort time` only when the user asks about "recent", "latest", or time-sensitive topics
 - Use `--sort relevance` (default) for depth and quality
-- **Per-query `--limit`:** Set `--limit` to at least 2–3x the requested top-N on each individual query. For "top 10" requests, use `--limit 20` or `--limit 30` per query. The top-N cap is applied AFTER union, not within any single query. Broad sub-concept queries (e.g., `NAND`, `HBM`, `CPO`) often return 30+ hits; use `--limit 30` for these to avoid losing relevant notes that rank lower in one query but would rank highly in the union.
+- **Per-query `--limit`:** Always use `--limit 30` on every query for "top 10" requests (3x the requested N). The top-N cap is applied AFTER union, not within any single query. Using a generous per-query limit ensures that notes at positions 10-20 in any given query still enter the candidate pool — these often rank higher in the union when combined with other query signals.
 - For large-scale research, use `--limit 100` or higher to get a broad candidate pool
 
 ### Step 4: Union and Deduplicate
