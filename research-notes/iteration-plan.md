@@ -134,3 +134,19 @@
 1. Replace boundary review with "verify sub-concept coverage" step
 2. Make it explicit: each sub-concept query should have at least one representative in the final top N
 3. Re-test all 3
+
+## Round 5
+
+### Evaluation results
+
+| Test Case | R2 | R3 | R4 | R5 |
+|-----------|----|----|-----|-----|
+| agent harness | 8/10 | 8/10 | 8/10 | 8/10 |
+| 内存周期 | 7/10 | 6/10 | 7/10 | 7/10 |
+| 光通信 | 9/10 | 8/10 | 8/10 | **9/10** |
+
+光通信 recovered to 9/10 (Bernstein returned). Sub-concept coverage step may have helped.
+
+### Suggested next steps (Round 6)
+
+Add principle 8: ticker queries for investment topics (MU, SNDK) to get PE PB估值 into candidate pool.

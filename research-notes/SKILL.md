@@ -72,6 +72,8 @@ Section indices contain per-note metadata:
 
 7. **For investment thesis topics, include price/cycle action terms.** Terms like `存储 涨价` (storage price increase), `NAND 缺货` (NAND shortage), `超级周期` (supercycle) capture notes discussing the thesis dynamics rather than just the technology. These are high-signal queries that surface analyst commentary and investment reasoning notes.
 
+8. **For investment topics, include 2–3 primary company ticker or name queries.** Most investment topics revolve around a small set of key companies. Fire standalone queries for the 2–3 most important tickers or company names: `MU`, `SNDK` for memory/storage; `LITE`, `COHR`, `CIEN` for optical communications; etc. Also fire mixed queries like `MU 估值` or `LITE CPO` to catch valuation and thesis-specific notes about those companies. Ticker queries are cheap and catch notes whose primary subject is a company analysis (PE/PB comparison, earnings analysis, competitive positioning) that wouldn't match topic-level queries.
+
 **Generating keywords:** For any topic (not just seed-note-based research), apply the keyword selection strategy in `references/keyword-generation-from-seed.md`. The priority tiers (topic synonyms → core technical concepts → sub-segments → tickers → Chinese-market peers) and exclusion list (analyst names, generic macro terms, trading tactics) apply to all research queries. If the user provides a seed note, wiki article, or report, read it first to extract additional candidate keywords.
 
 ### Step 3b: Run Searches with CLI
