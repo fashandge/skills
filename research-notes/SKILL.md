@@ -21,12 +21,24 @@ Use when the user asks to:
 
 ## Research Workflow
 
-This workflow has **two parallel data sources**: index browsing and keyword search. **Both must be used** — run them concurrently (read section indices in parallel with search queries), then merge results in the union step.
+This workflow has **two modes**:
+
+1. **Default mode: index + search.** Use two parallel data sources: index browsing and keyword search. Run them concurrently (read section indices in parallel with search queries), then merge results in the union step.
+2. **Search-only mode: skip index.** If the user explicitly asks to skip the index, avoid index browsing, use only `notes-search`, and say in the final answer that index coverage was intentionally skipped.
 
 - **Index browsing** gives complete coverage of relevant folders and catches notes that use different vocabulary than any search query. It also provides note-type metadata and one-line summaries for quick relevance assessment without reading the full note.
 - **Keyword search** catches notes scattered across OTHER folders that index browsing wouldn't surface, and provides BM25 scores for ranking.
 
-Neither alone is sufficient. The index misses notes in unexpected folders; search misses notes that use synonyms not in any query.
+In default mode, neither source alone is sufficient. The index misses notes in unexpected folders; search misses notes that use synonyms not in any query.
+
+Use **search-only mode** when the user's prompt contains instructions such as:
+- "skip index"
+- "search only"
+- "just use notes-search"
+- "don't browse the index"
+- "use the search engine only"
+
+When using search-only mode, compensate by running a broader query sweep than usual: add extra synonyms, title variants, bilingual terms, ticker/company variants when relevant, and sub-concepts. For top-N requests, still apply the final top-N cap only after unioning and deduping all search-query results.
 
 ### Track A: Index Browsing
 
@@ -148,17 +160,21 @@ notes-search search "agent memory systems" --engine qmd --mode query
 
 ### Step 4: Union, Deduplicate, and Rerank
 
-You now have candidates from **two sources**: index browsing (Track A) and keyword search (Track B). These are **unioned**, not intersected — a note appearing in *either* source is a candidate.
+You now have candidates from one or two sources:
+- **Default mode:** index browsing (Track A) and keyword search (Track B)
+- **Search-only mode:** keyword search (Track B) only
 
-1. **Union all candidates** — concatenate filepaths from every search query's results AND from index selections into one list. Do NOT filter to notes that appeared in multiple queries; that defeats the purpose of running synonym/sub-term sweeps.
+Candidates are **unioned**, not intersected — a note appearing in *any* enabled source is a candidate.
+
+1. **Union all candidates** — concatenate filepaths from every search query's results and, in default mode, from index selections into one list. Do NOT filter to notes that appeared in multiple queries; that defeats the purpose of running synonym/sub-term sweeps.
 2. **Dedupe by filepath** — collapse exact-path duplicates. For each note, track:
-   - Which source(s) it came from: index-only, search-only, or both
+   - Which source(s) it came from: index-only, search-only, or both. In search-only mode, every candidate is search-only.
    - Which search queries it matched and its best BM25 score
-   - Its summary from the index (if available)
+   - Its summary from the index, if available and if index browsing was enabled
 3. **Filter out generic and cross-sector notes.** Before ranking, remove or demote two categories:
    - **Generic meta-notes** whose primary subject is not any specific topic: watchlists, portfolio summaries, PEG/valuation screens, glossaries, and other broad reference notes that mention many topics. A note titled "Watchlist Competitive Landscape" will match queries for memory, optical, AI, etc. — but it's not *about* any of those topics.
    - **Cross-sector notes** whose primary subject is a DIFFERENT or BROADER sector but that mention the research topic as one of several areas. For example, a note about the entire semiconductor supply chain that mentions optical communications should rank below notes specifically about optical communications. A note about "AI infrastructure" that mentions memory should rank below notes specifically about memory cycles. The research topic should be the note's PRIMARY subject, not a secondary mention.
-4. **Rerank the merged pool.** Notes from different sources have different signals — use all available:
+4. **Rerank the merged pool.** Use all available signals:
    - **Appeared in both sources** — strong relevance signal. A note selected from the index AND matched by search queries is almost certainly on-topic.
    - **Title relevance:** Does the note's title directly reference the research topic or its core concepts? Notes with topic keywords in the title are almost always more relevant than notes that only mention the topic in passing within the body.
    - **Best `bm25_score`** across queries (lower is better in this CLI). For index-only notes that have no BM25 score, use title and summary relevance instead.
@@ -167,7 +183,7 @@ You now have candidates from **two sources**: index browsing (Track A) and keywo
    - Note type (prefer `personal synthesis` and `research paper` for depth)
    - Recency — for time-sorted asks ("latest", "recent"), sort by `frontmatter_sort_time` or `file_mtime` across the unioned set, NOT within a single query's results
 5. **Apply top-N cap AFTER union** — if the user asked for "latest 10" or "top N", apply the cap to the unioned/deduped/reranked list. Never apply `--limit N` to a single query and call that the answer.
-6. **Verify sub-concept coverage.** After selecting the top N, check that each core sub-concept from your query plan has at least one representative in the list. For example, if you ran queries for CPO, silicon photonics, 光模块, and 光互连, verify that the top 10 includes notes covering each of these angles — not just notes that happened to match the broadest query. If a sub-concept query returned a strong result (top 3 of that query with a good BM25 score) but no note from that sub-concept made the final list, replace the weakest entry in the top N with the best result from the underrepresented sub-concept. This prevents the broadest queries from monopolizing the top N and ensures the final list covers the topic's full breadth. **Also check that index-only notes got fair consideration** — if the index surfaced relevant notes that no search query matched, at least one should appear in the top N if its summary is clearly on-topic.
+6. **Verify sub-concept coverage.** After selecting the top N, check that each core sub-concept from your query plan has at least one representative in the list. For example, if you ran queries for CPO, silicon photonics, 光模块, and 光互连, verify that the top 10 includes notes covering each of these angles — not just notes that happened to match the broadest query. If a sub-concept query returned a strong result (top 3 of that query with a good BM25 score) but no note from that sub-concept made the final list, replace the weakest entry in the top N with the best result from the underrepresented sub-concept. This prevents the broadest queries from monopolizing the top N and ensures the final list covers the topic's full breadth. **In default mode, also check that index-only notes got fair consideration** — if the index surfaced relevant notes that no search query matched, at least one should appear in the top N if its summary is clearly on-topic.
 7. **Select notes to read** — pick the top candidates (may be dozens or hundreds for large research)
 
 ### Step 5: Read Relevant Notes (Batched)
@@ -278,10 +294,36 @@ Even though the user asked for just 10 notes, **do not** run a single query and 
 
 The same pattern applies for bilingual topics — add Chinese synonym queries alongside English ones before unioning.
 
+### Search-only: "Find the top 10 notes about CPU stock investment, skip index"
+
+When the user explicitly asks to skip the index, do not read `root_index.md` or section indices.
+
+1. Run a broader-than-usual set of search queries with generous per-query limits:
+   ```bash
+   notes-search search "CPU 投资" --limit 30 --json
+   notes-search search "CPU stock" --limit 30 --json
+   notes-search search "服务器 CPU" --limit 30 --json
+   notes-search search "server CPU" --limit 30 --json
+   notes-search search "CPU demand" --limit 30 --json
+   notes-search search "CPU 需求" --limit 30 --json
+   notes-search search "Intel investment" --limit 30 --json
+   notes-search search "AMD investment" --limit 30 --json
+   notes-search search "ARM CPU" --limit 30 --json
+   notes-search search "QCOM CPU" --limit 30 --json
+   notes-search search "CPU 芯片" --limit 30 --json
+   notes-search search "AI CPU" --limit 30 --json
+   ```
+2. Union all search results, dedupe by filepath, and rerank by title relevance, best BM25 score, number of matched queries, sub-concept coverage, note depth, and recency if relevant.
+3. Filter generic meta-notes and cross-sector notes whose primary subject is not CPU stock investment.
+4. Verify coverage across the major CPU angles surfaced by the query plan (for example AMD, Intel, ARM, QCOM, server CPU demand, AI inference/agentic AI).
+5. Read the selected notes and synthesize as usual.
+6. In the final answer, include a brief coverage note such as: "Search-only mode used; index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered."
+
 ## Output Format
 
 When presenting research findings:
 - Lead with the main insight or answer
 - Support with specific evidence from notes (cite note titles)
 - Note the breadth of coverage (e.g., "Based on 20 notes from your vault...")
+- If search-only mode was used, mention that index browsing was intentionally skipped
 - Highlight any gaps or areas with limited coverage
