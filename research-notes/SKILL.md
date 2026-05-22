@@ -54,7 +54,7 @@ Section indices contain per-note metadata:
 
 `notes-search` treats multi-word queries as **AND** — every word must appear in the note for it to match. It is not OR, not phrase match. This shapes how to design queries.
 
-**The default is always multiple queries, then union + dedupe.** This applies even to seemingly simple asks like "latest 10 notes about X" or "top N notes on Y". A single query — no matter how well-chosen — only surfaces notes containing that exact term. Notes using a synonym (光互连 vs 光通信), the other language (optical communications vs 光通信), or a sub-concept (CPO, silicon photonics, EML) will be missed. **Never satisfy a research request with a single `notes-search` call.** Run at least 3–5 separate queries covering synonyms, both languages, and key sub-terms, then union and dedupe results before applying any `--limit` or top-N cap.
+**The default is always multiple queries, then union + dedupe.** This applies even to seemingly simple asks like "latest 10 notes about X" or "top N notes on Y". A single query — no matter how well-chosen — only surfaces notes containing that exact term. Notes using a synonym (光互连 vs 光通信), the other language (optical communications vs 光通信), or a sub-concept (CPO, silicon photonics, EML) will be missed. **Never satisfy a research request with a single `notes-search` call.** Run at least 5–8 separate queries (10–15 for broad or bilingual investment topics) covering synonyms, both languages, and key sub-terms, then union and dedupe results before applying any `--limit` or top-N cap.
 
 **Core principles:**
 
@@ -68,7 +68,11 @@ Section indices contain per-note metadata:
 
 5. **For compound Chinese terms, also search with meaningful word splits.** CJK unigram tokenization inserts spaces between every character, so a compound like `内存周期` is indexed as `内 存 周 期` — four separate unigram tokens. FTS will match it, but only if all four characters appear near each other. In practice, `内存` and `周期` may appear in different parts of a note (e.g., "内存需求" in one paragraph and "超级周期" in another). Searching `内存 周期` (two words, AND semantics) catches these notes while `内存周期` (four unigrams that must all appear) may miss them or rank them poorly. **Always run both**: the unsplit compound as one query, and a space-split version breaking it into meaningful Chinese words as another query. More examples: `光通信` + `光 通信`, `存储周期` + `存储 周期`, `人工智能` + `人工 智能`. Use your knowledge of Chinese word boundaries to split — don't split into single characters.
 
-**Generating keywords from a seed note/wiki:** If the user provides a seed note, wiki article, or report on the topic, read it first to extract candidate keywords before searching. For the detailed keyword selection strategy (priority tiers, what to include vs. exclude, example query plans), refer to `references/keyword-generation-from-seed.md`.
+6. **Give each core sub-concept its own standalone single-term query.** Don't only use sub-concepts as narrowing qualifiers (e.g. `光通信 CPO`); also run `CPO` alone. A standalone query for a sub-concept catches notes where that sub-concept is the primary subject. For memory/storage topics, fire standalone queries for each of: `DRAM`, `HBM`, `NAND`. For optical communications, fire standalone queries for `CPO`, `silicon photonics`, `光模块`. For any topic, identify 3–5 core sub-concepts and give each its own query.
+
+7. **For investment thesis topics, include price/cycle action terms.** Terms like `存储 涨价` (storage price increase), `NAND 缺货` (NAND shortage), `超级周期` (supercycle) capture notes discussing the thesis dynamics rather than just the technology. These are high-signal queries that surface analyst commentary and investment reasoning notes.
+
+**Generating keywords:** For any topic (not just seed-note-based research), apply the keyword selection strategy in `references/keyword-generation-from-seed.md`. The priority tiers (topic synonyms → core technical concepts → sub-segments → tickers → Chinese-market peers) and exclusion list (analyst names, generic macro terms, trading tactics) apply to all research queries. If the user provides a seed note, wiki article, or report, read it first to extract additional candidate keywords.
 
 ### Step 3b: Run Searches with CLI
 
@@ -112,13 +116,15 @@ You will have results from multiple `notes-search` calls (Step 3) plus index sec
 
 1. **Union all candidates** — concatenate filepaths from every query's results and from index sections into one list. Do NOT filter to notes that appeared in multiple queries; that defeats the purpose of running synonym/sub-term sweeps.
 2. **Dedupe by filepath** — collapse exact-path duplicates. Track which queries each note matched (useful for relevance signal).
-3. **Prioritize** — rank candidates by:
-   - Number of queries the note matched (notes hit by multiple queries are often more central)
-   - Best `bm25_score` across queries (lower is better in this CLI)
+3. **Filter out generic meta-notes.** Before ranking, remove or demote notes whose primary subject is clearly not the research topic. Common false positives include: watchlists, portfolio summaries, PEG/valuation screens, competitive landscapes, glossaries, and other broad reference notes that mention many topics and therefore match many queries. A note titled "Watchlist Competitive Landscape" or "Watchlist Stocks with PEG Below 1" will match queries for memory, optical, AI, etc. — but it's not *about* any of those topics. Demote these below notes whose titles directly reference the research topic.
+4. **Prioritize** — rank candidates by:
+   - **Title relevance:** Does the note's title directly reference the research topic or its core concepts? Notes with topic keywords in the title are almost always more relevant than notes that only mention the topic in passing within the body.
+   - **Note type:** Prefer `personal synthesis` and `research paper` for depth; demote short clippings and generic reference notes.
+   - **Best `bm25_score`** across queries (lower is better in this CLI).
+   - **Number of queries matched** — useful as a tiebreaker, but NOT the primary signal. Generic notes match many queries because they're broad, not because they're central to the topic.
    - Recency — for time-sorted asks ("latest", "recent"), sort by `frontmatter_sort_time` or `file_mtime` across the unioned set, NOT within a single query's results
-   - Note type (prefer `personal synthesis` and `research paper` for depth)
-4. **Apply top-N cap AFTER union** — if the user asked for "latest 10" or "top N", apply the cap to the unioned/deduped/sorted list. Never apply `--limit N` to a single query and call that the answer.
-5. **Select notes to read** — pick the top candidates (may be dozens or hundreds for large research)
+5. **Apply top-N cap AFTER union** — if the user asked for "latest 10" or "top N", apply the cap to the unioned/deduped/sorted list. Never apply `--limit N` to a single query and call that the answer.
+6. **Select notes to read** — pick the top candidates (may be dozens or hundreds for large research)
 
 ### Step 5: Read Relevant Notes (Batched)
 
