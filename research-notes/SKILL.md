@@ -56,23 +56,37 @@ Section indices contain per-note metadata:
 
 **The default is always multiple queries, then union + dedupe.** This applies even to seemingly simple asks like "latest 10 notes about X" or "top N notes on Y". A single query — no matter how well-chosen — only surfaces notes containing that exact term. Notes using a synonym (光互连 vs 光通信), the other language (optical communications vs 光通信), or a sub-concept (CPO, silicon photonics, EML) will be missed. **Never satisfy a research request with a single `notes-search` call unless prompted to do so.** Run at least 5–8 separate queries (10–15 for broad or bilingual investment topics) covering synonyms, both languages, and key sub-terms, then union and dedupe results before applying any `--limit` or top-N cap.
 
-**Core principles:**
+**How to build the query list — follow these steps in order:**
 
-1. **Run multiple narrow queries, not one long one.** A query like `光通信 CPO silicon photonics` only matches notes containing *all three* terms, missing notes that use 光互连 instead of 光通信, or InP-focused notes that never mention silicon photonics. Use 1–2 carefully chosen terms per query and iterate.
+1. **Identify the research topic and its framing.** The user's prompt has two parts: the *subject* (e.g., 内存, 光通信, agent harness) and the *framing* (e.g., 周期/cycle, 产业趋势/industry trends, engineering). Both matter. A request about "内存周期" is about memory *cycles* specifically — not memory in general. Keep the framing in mind throughout.
 
-2. **Search both Chinese and English keywords for the same topic, in separate queries.** The vault contains notes in both languages. For an industry like optical communications, run `光通信` and `optical communications` as separate queries — each surfaces a different population of notes.
+2. **List topic-name synonyms in both languages.** Write down every way the topic is named — Chinese, English, abbreviations. Include synonyms of both the *subject* and the *framing*. For 内存周期: the subject (内存/存储/memory) and the framing (周期/cycle/supercycle/超级周期) combine into: 内存周期, 存储周期, memory cycle, 存储超级周期, memory supercycle. For 光通信产业趋势: 光通信, 光互连, optical communications, optical networking.
 
-3. **Mixed Chinese + English in one query is fine — even useful — when the English term is a technical term-of-art that Chinese authors leave untranslated.** Chinese investment/tech notes routinely keep English acronyms inline (CPO, InP, HBM, EML, ZR+, hyperscaler capex, silicon photonics) because translation loses precision. Queries like `光通信 CPO`, `存储 HBM`, `硅光 InP` usefully narrow to Chinese-language notes engaging with the English vocabulary.
+3. **For each compound Chinese term, also create a word-split variant.** CJK unigram tokenization indexes `内存周期` as `内 存 周 期` — four separate tokens. In practice, `内存` and `周期` may appear in different parts of a note. Searching `内存 周期` (two words, AND) catches these. **Always run both**: the unsplit compound and the meaningful word-split. More examples: `光通信` + `光 通信`, `存储周期` + `存储 周期`, `人工智能` + `人工 智能`. Split at word boundaries, not into single characters.
 
-4. **Avoid pairing a Chinese term with its direct English translation** in the same query (e.g. `光通信 optical communications`, `硅光 silicon photonics`, `光互连 optical interconnect`). Authors pick one or the other for the same concept, so the AND constraint will return near-empty.
+4. **Identify 3–5 core sub-concepts.** These are the major sub-segments or technical pillars of the topic. For memory/storage: DRAM, HBM, NAND. For optical communications: CPO, silicon photonics, 光模块, 硅光. For agent harness: harness engineering, agent loop, coding agent.
 
-5. **For compound Chinese terms, also search with meaningful word splits.** CJK unigram tokenization inserts spaces between every character, so a compound like `内存周期` is indexed as `内 存 周 期` — four separate unigram tokens. FTS will match it, but only if all four characters appear near each other. In practice, `内存` and `周期` may appear in different parts of a note (e.g., "内存需求" in one paragraph and "超级周期" in another). Searching `内存 周期` (two words, AND semantics) catches these notes while `内存周期` (four unigrams that must all appear) may miss them or rank them poorly. **Always run both**: the unsplit compound as one query, and a space-split version breaking it into meaningful Chinese words as another query. More examples: `光通信` + `光 通信`, `存储周期` + `存储 周期`, `人工智能` + `人工 智能`. Use your knowledge of Chinese word boundaries to split — don't split into single characters.
+5. **Qualify sub-concept queries based on how specific the research framing is.** The decision depends on the *framing* part of the topic (周期, 产业趋势, engineering, etc.):
+   - **Specific framing (e.g., 周期/cycle, 估值/valuation, 缺货/shortage):** The framing narrows what the user cares about — they don't want all notes mentioning the sub-concept, only those discussing it in that specific context. Pair each sub-concept with the framing: `HBM 周期`, `HBM cycle`, `NAND 周期`, `NAND cycle`, `NAND supercycle`, `DRAM 周期`, `DRAM cycle`. Bare `HBM` or `NAND` would flood results with notes about the technology in general (specs, products, supply chain) that have nothing to do with cycles.
+   - **General framing (e.g., 产业趋势/industry trends, 产业链/value chain, landscape):** The framing is broad enough that any note primarily about a sub-concept is likely relevant. Use sub-concepts standalone: `CPO`, `silicon photonics`, `光模块`, `硅光`. A note about CPO is inherently a note about optical communications industry trends.
+   - **Rule of thumb:** If the framing term would meaningfully filter out irrelevant notes when paired with the sub-concept, pair them. If the sub-concept alone already implies the topic, use it bare.
 
-6. **Give each core sub-concept its own standalone single-term query.** Don't only use sub-concepts as narrowing qualifiers (e.g. `光通信 CPO`); also run `CPO` alone. A standalone query for a sub-concept catches notes where that sub-concept is the primary subject. For memory/storage topics, fire standalone queries for each of: `DRAM`, `HBM`, `NAND`. For optical communications, fire standalone queries for `CPO`, `silicon photonics`, `光模块`. For any topic, identify 3–5 core sub-concepts and give each its own query.
+6. **Do NOT add ticker-specific queries unless the research topic is about that ticker or company.** A request about "内存周期" is about the memory cycle thesis, not about MU or SK Hynix specifically. Ticker queries (MU, SNDK, 000XXXX) pull in earnings notes, price targets, and portfolio commentary that mention the ticker but aren't about the cycle thesis. Only add tickers when the user's topic names a specific company or stock.
 
-7. **For investment thesis topics, include price/cycle action terms.** Terms like `存储 涨价` (storage price increase), `NAND 缺货` (NAND shortage), `超级周期` (supercycle) capture notes discussing the thesis dynamics rather than just the technology. These are high-signal queries that surface analyst commentary and investment reasoning notes.
+7. **Compile the final query list.** You should have:
+   - 2–4 topic-synonym queries (step 2), each with word-split variants (step 3)
+   - 3–5 qualified sub-concept queries (step 5), in both languages where applicable
+   - Total: ~10–15 queries for bilingual investment topics, ~5–8 for focused technical topics
 
-**Generating keywords:** For any topic (not just seed-note-based research), apply the keyword selection strategy in `references/keyword-generation-from-seed.md`. The priority tiers (topic synonyms → core technical concepts → sub-segments → tickers → Chinese-market peers) and exclusion list (analyst names, generic macro terms, trading tactics) apply to all research queries. If the user provides a seed note, wiki article, or report, read it first to extract additional candidate keywords.
+**Query construction principles:**
+
+1. **Run multiple narrow queries, not one long one.** A query like `光通信 CPO silicon photonics` only matches notes containing *all three* terms. Use 1–2 carefully chosen terms per query.
+
+2. **Search both Chinese and English keywords in separate queries.** The vault contains notes in both languages. `光通信` and `optical communications` surface different populations.
+
+3. **Mixed Chinese + English in one query is fine when the English term is a term-of-art that Chinese authors leave untranslated.** Queries like `光通信 CPO`, `存储 HBM`, `硅光 InP` usefully narrow to Chinese-language notes engaging with the English vocabulary.
+
+4. **Avoid pairing a Chinese term with its direct English translation** in the same query (e.g. `光通信 optical communications`). Authors pick one or the other, so AND returns near-empty.
 
 ### Step 3b: Run Searches with CLI
 

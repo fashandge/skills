@@ -7,8 +7,8 @@ Pick keywords in this priority order. Local search is cheap, so **err on the sid
 1. **Topic name + direct synonyms (both languages)** — the canonical labels for the topic itself (光通信 / 光互连 / 光互联 / optical communications / optical networking). Always include both Chinese and English.
 2. **Core technical concepts unique to the topic** — terms-of-art whose meaning is the topic (CPO, LPO/NPO, silicon photonics, 硅光, 光模块, InP, EML, CW laser, FAU, Photonics-SOI). A note using these is almost certainly on-topic.
 3. **Sub-segments / adjacent technologies that drive the topic** — narrower than the topic but still topic-defining (1.6T, ZR+, DCI for optical; HBM, NAND for storage). Include only if they're rarely used outside the topic.
-4. **For investment topics: tickers and primary public companies in the topic** — the small set of stocks the topic *is about* (LITE, COHR, CIEN, GLW, AAOI, TSEM, AXTI, FN for optical). A note about LITE is a note about optical comms.
-5. **Chinese-market peers and component vendors**, if the vault has Chinese-language coverage (中际旭创, 新易盛, Soitec/SLOIY).
+4. **For investment topics: tickers and primary public companies in the topic** — but ONLY when the research topic is specifically about that company or ticker. A request about "光通信产业趋势" is about the industry, not about LITE or COHR individually — ticker queries would pull in earnings notes and price targets that aren't about the industry trend. Add tickers only when the user's topic names a specific company (e.g., "research my notes on Coherent Corp") or when the topic IS the stock (e.g., "MU investment thesis").
+5. **Chinese-market peers and component vendors** — same restriction as tier 4: only when the topic is about those specific companies (中际旭创, 新易盛, Soitec/SLOIY).
 
 ## What to Exclude
 
