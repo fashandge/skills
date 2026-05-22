@@ -55,3 +55,27 @@
 2. Add explicit guidance: each core sub-concept gets a standalone query
 3. Fix ranking: title-relevance to topic > query-count; add noise filtering
 4. Broaden keyword-from-seed reference to apply to all queries, not just seed-based
+
+### Round 2 evaluation results
+
+| Test Case | Verdict | Expected Found | Baseline | Improvement | Notes |
+|-----------|---------|---------------|----------|-------------|-------|
+| agent harness | PARTIAL PASS | 8/10 | 9/10 (bg) | No noise (was: tangential note) | Missing: 腾讯汤道生, OpenAI-Cursor-Anthropic |
+| 内存周期 | PARTIAL PASS | 7/10 | 3/10 | +4 titles, no Watchlist noise | Missing: PE PB估值, SanDisk NAND, MU SNDK扩产 |
+| 光通信产业趋势 | PASS | 9/10 | 4/10 | +5 titles, no noise | Missing only: CMOS Process |
+
+**Key improvements:**
+- Noise filtering works: Watchlist, PEG Screen, Glossary all eliminated from top 10
+- Standalone sub-concept queries work: CPO元年, HBM/NAND notes now appearing
+- Bilingual coverage improved across all 3 tests
+
+**Remaining gaps:**
+1. 内存周期 still missing 3 expected notes — likely ranking issue, not query coverage
+2. agent harness missing 2 expected notes — ranking pushes Meta-Harness and I Improved 15 LLMs above them
+3. 光通信 missing CMOS Process — may be a ranking issue
+
+### Suggested next steps
+
+1. Investigate whether the 3 missing 内存周期 notes are in the candidate pool (query issue) or ranked too low (ranking issue)
+2. Consider adding guidance about preferring notes that discuss the topic thesis/dynamics over notes about individual companies
+3. Consider whether "title relevance" ranking guidance is too aggressive — it may push notes with topic keywords in title above notes that are more thesis-central but have less keyword-dense titles

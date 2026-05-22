@@ -107,7 +107,7 @@ notes-search search "agent memory systems" --engine qmd --mode query
 **Sort and limit guidance:**
 - Use `--sort time` only when the user asks about "recent", "latest", or time-sensitive topics
 - Use `--sort relevance` (default) for depth and quality
-- When the user says "top N notes", set `--limit N`
+- **Per-query `--limit`:** Set `--limit` to at least 2–3x the requested top-N on each individual query. For "top 10" requests, use `--limit 20` or `--limit 30` per query. The top-N cap is applied AFTER union, not within any single query. Broad sub-concept queries (e.g., `NAND`, `HBM`, `CPO`) often return 30+ hits; use `--limit 30` for these to avoid losing relevant notes that rank lower in one query but would rank highly in the union.
 - For large-scale research, use `--limit 100` or higher to get a broad candidate pool
 
 ### Step 4: Union and Deduplicate
@@ -118,8 +118,8 @@ You will have results from multiple `notes-search` calls (Step 3) plus index sec
 2. **Dedupe by filepath** — collapse exact-path duplicates. Track which queries each note matched (useful for relevance signal).
 3. **Filter out generic meta-notes.** Before ranking, remove or demote notes whose primary subject is clearly not the research topic. Common false positives include: watchlists, portfolio summaries, PEG/valuation screens, competitive landscapes, glossaries, and other broad reference notes that mention many topics and therefore match many queries. A note titled "Watchlist Competitive Landscape" or "Watchlist Stocks with PEG Below 1" will match queries for memory, optical, AI, etc. — but it's not *about* any of those topics. Demote these below notes whose titles directly reference the research topic.
 4. **Prioritize** — rank candidates by:
-   - **Title relevance:** Does the note's title directly reference the research topic or its core concepts? Notes with topic keywords in the title are almost always more relevant than notes that only mention the topic in passing within the body.
-   - **Note type:** Prefer `personal synthesis` and `research paper` for depth; demote short clippings and generic reference notes.
+   - **Title relevance:** Does the note's title directly reference the research topic or its core concepts? Notes with topic keywords in the title are almost always more relevant than notes that only mention the topic in passing within the body. For thesis topics (e.g., 内存周期, 光通信产业趋势), notes whose titles reference thesis dynamics (cycles, pricing, expansion, valuation, shortage, supercycle — 周期, 涨价, 扩产, 估值, 缺货, 超级周期) should rank above notes that are merely descriptive or taxonomic (industry overview, product catalog, company list).
+   - **Note type:** Prefer `personal synthesis`, `research paper`, and focused analyst commentary for depth. Demote generic reference notes (industry overviews, product catalogs, glossaries) and short single-fact clippings.
    - **Best `bm25_score`** across queries (lower is better in this CLI).
    - **Number of queries matched** — useful as a tiebreaker, but NOT the primary signal. Generic notes match many queries because they're broad, not because they're central to the topic.
    - Recency — for time-sorted asks ("latest", "recent"), sort by `frontmatter_sort_time` or `file_mtime` across the unioned set, NOT within a single query's results
