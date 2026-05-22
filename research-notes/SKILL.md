@@ -21,11 +21,9 @@ Use when the user asks to:
 
 ## Research Workflow
 
-### Step 1: Check the Index (do NOT skip)
+### Step 1: Check the Index
 
-**Always start here**, even for simple "top N" requests. The section index surfaces notes that keyword search might miss — notes whose titles use unexpected phrasing, notes about company-level analysis (valuations, earnings) that don't contain the topic's keywords, and notes filed under a topic folder but using tangential terminology.
-
-Read the root index to find relevant sections:
+Start by reading the root index to find relevant sections:
 
 ```bash
 cat ~/notes/index/raw/root_index.md
@@ -37,9 +35,9 @@ The root index lists sections with:
 - Section themes
 - Representative notes with wiki-links
 
-### Step 2: Drill into Section Indices (do NOT skip)
+### Step 2: Drill into Section Indices
 
-For relevant sections, read the section index for detailed note listings. **Add all notes from the relevant section index to the candidate pool** — these are pre-categorized as on-topic and should be included alongside search results in the union step (Step 4).
+For relevant sections, read the section index for detailed note listings:
 
 ```bash
 # Example: read a section index
@@ -124,7 +122,6 @@ You will have results from multiple `notes-search` calls (Step 3) plus index sec
    - **Best `bm25_score`** across queries (lower is better in this CLI).
    - **Number of queries matched** — a useful signal but not dominant. Notes that match 3+ queries are often central, but a note matching only 1 query can still be highly relevant if its BM25 score is strong and its title is on-topic.
    - Note type (prefer `personal synthesis` and `research paper` for depth)
-   - **Diversity of perspective:** When choosing among notes with similar relevance, prefer a final list that covers diverse angles — different languages (Chinese vs English), different source types (industry leader commentary vs technical deep dive vs analyst report vs valuation analysis), and different sub-topics. A set of 10 notes covering 5 distinct angles is more valuable than 10 notes all covering the same angle.
    - Recency — for time-sorted asks ("latest", "recent"), sort by `frontmatter_sort_time` or `file_mtime` across the unioned set, NOT within a single query's results
 5. **Apply top-N cap AFTER union** — if the user asked for "latest 10" or "top N", apply the cap to the unioned/deduped/sorted list. Never apply `--limit N` to a single query and call that the answer.
 6. **Verify sub-concept coverage.** After selecting the top N, check that each core sub-concept from your query plan has at least one representative in the list. For example, if you ran queries for CPO, silicon photonics, 光模块, and 光互连, verify that the top 10 includes notes covering each of these angles — not just notes that happened to match the broadest query. If a sub-concept query returned a strong result (top 3 of that query with a good BM25 score) but no note from that sub-concept made the final list, replace the weakest entry in the top N with the best result from the underrepresented sub-concept. This prevents the broadest queries from monopolizing the top N and ensures the final list covers the topic's full breadth.
