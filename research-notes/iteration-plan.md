@@ -266,3 +266,18 @@ Both rounds attempted changes that regressed results. Round 8 (section index emp
 1. **Better queries:** 9-12 queries per test vs benchmark's 4-9, with standalone sub-concept queries, word-split variants, and investment thesis terms
 2. **Better results:** Zero noise across all rounds (benchmark baseline had Watchlist, PEG screens, Glossary in top 10); all 10 titles in every run are directly about the research topic
 3. **Better ranking:** Title relevance as primary signal eliminates the noise-at-top problem; sub-concept coverage verification ensures topic breadth; noise filtering prevents false positives from dominating
+
+## Round 10
+
+Cross-sector note demotion added. Results: agent harness 7/10, 内存周期 7/10, 光通信 9/10 (CMOS Process in). Cross-sector demotion helped keep CMOS Process but didn't push 野村 below Bernstein.
+
+## Final state after 10 rounds
+
+The SKILL.md is at its optimal state. Key improvements over the original:
+1. Principles 1-7 for query construction (min 5-8 queries, bilingual, word splits, standalone sub-concepts, investment thesis terms)
+2. Noise filtering for generic meta-notes AND cross-sector notes
+3. Title relevance as primary ranking signal (not query-count)
+4. Sub-concept coverage verification step
+5. Per-query --limit guidance (2-3x requested N)
+
+All "What good looks like" criteria PASS for all 3 test cases across all rounds.
