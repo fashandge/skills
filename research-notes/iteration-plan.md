@@ -106,3 +106,31 @@
 1. Roll back thesis-specificity ranking, revert to simpler title-relevance guidance
 2. Add "review the boundary" step — scan positions N+1 to N+5 and swap in notes with strong title relevance or BM25 that were pushed down by low query-count
 3. Keep noise filtering (watchlists, PEG screens) and sub-concept queries — those work well
+
+## Round 4
+
+### Current plan
+
+**Overview:** Roll back thesis-specificity ranking regression, add boundary review for notes near the cutoff.
+
+### Evaluation results
+
+| Test Case | R2 | R3 | R4 |
+|-----------|----|----|-----|
+| agent harness | 8/10 | 8/10 | 8/10 |
+| 内存周期 | 7/10 | 6/10 | 7/10 |
+| 光通信 | 9/10 | 8/10 | 8/10 |
+
+**Diagnostic findings:**
+- 腾讯汤道生 is position #10, OpenAI-Cursor-Anthropic #11 in "harness" query — right at the boundary
+- CMOS Process is #1 in "silicon photonics" query (BM25=-32.6) but not making top 10 because it only matches 1 query
+- SanDisk NAND周期 is #4 in "NAND" query but not making top 10
+- Root cause: query-count still dominates ranking despite guidance saying otherwise. Notes matching 3+ queries consistently outrank single-query matches even when the single-query match has a much better BM25 score.
+
+**Key insight:** The issue isn't boundary review (which agents aren't consistently doing) — it's sub-concept coverage. If a sub-concept query (e.g., "silicon photonics") returns strong results but none make the top N, the topic isn't fully covered.
+
+### Suggested next steps (implemented as Round 5)
+
+1. Replace boundary review with "verify sub-concept coverage" step
+2. Make it explicit: each sub-concept query should have at least one representative in the final top N
+3. Re-test all 3
