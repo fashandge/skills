@@ -86,9 +86,11 @@ These are upper bounds — only select notes that are genuinely relevant based o
 
 #### Step B1: Construct Search Queries
 
-`notes-search` treats multi-word queries as **AND** — every word must appear in the note for it to match. It is not OR, not phrase match. This shapes how to design queries.
+For normal keyword searches, `notes-search` treats multi-word queries as **AND** — every word must appear in the note for it to match. It is not OR, not phrase match. This shapes how to design queries.
 
 **The default is always multiple queries, then union + dedupe.** This applies even to seemingly simple asks like "latest 10 notes about X" or "top N notes on Y". A single query — no matter how well-chosen — only surfaces notes containing that exact term. Notes using a synonym (光互连 vs 光通信), the other language (optical communications vs 光通信), or a sub-concept (CPO, silicon photonics, EML) will be missed. **Never satisfy a research request with a single `notes-search` call unless prompted to do so.** Run at least 5–8 separate queries (10–15 for broad or bilingual investment topics) covering synonyms, both languages, and key sub-terms, then union and dedupe results before applying any `--limit` or top-N cap.
+
+**Advanced FTS5 syntax is an exception, not the default.** The FTS5 engine supports full FTS5 query syntax, but use it only when the user's prompt includes explicit search-query constraints that are awkward to express with ordinary multi-query sweeps, such as excluding titles containing a keyword or key phrase. Example: for "CPU investment but exclude quick screen notes", pair each normal query with an FTS5 exclusion such as `NOT (title:"quick screen")`. Always wrap field filters in parentheses, e.g. `(title:memory cycle)` or `(title:"memory cycle")`, so they parse robustly. For syntax details, read `references/fts5-search-syntax.md`; otherwise keep using the multi-query workflow above.
 
 **How to build the query list — follow these steps in order:**
 
