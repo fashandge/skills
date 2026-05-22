@@ -118,13 +118,14 @@ You will have results from multiple `notes-search` calls (Step 3) plus index sec
 2. **Dedupe by filepath** — collapse exact-path duplicates. Track which queries each note matched (useful for relevance signal).
 3. **Filter out generic meta-notes.** Before ranking, remove or demote notes whose primary subject is clearly not the research topic. Common false positives include: watchlists, portfolio summaries, PEG/valuation screens, competitive landscapes, glossaries, and other broad reference notes that mention many topics and therefore match many queries. A note titled "Watchlist Competitive Landscape" or "Watchlist Stocks with PEG Below 1" will match queries for memory, optical, AI, etc. — but it's not *about* any of those topics. Demote these below notes whose titles directly reference the research topic.
 4. **Prioritize** — rank candidates by:
-   - **Title relevance:** Does the note's title directly reference the research topic or its core concepts? Notes with topic keywords in the title are almost always more relevant than notes that only mention the topic in passing within the body. For thesis topics (e.g., 内存周期, 光通信产业趋势), notes whose titles reference thesis dynamics (cycles, pricing, expansion, valuation, shortage, supercycle — 周期, 涨价, 扩产, 估值, 缺货, 超级周期) should rank above notes that are merely descriptive or taxonomic (industry overview, product catalog, company list).
-   - **Note type:** Prefer `personal synthesis`, `research paper`, and focused analyst commentary for depth. Demote generic reference notes (industry overviews, product catalogs, glossaries) and short single-fact clippings.
+   - **Title relevance:** Does the note's title directly reference the research topic or its core concepts? Notes with topic keywords in the title are almost always more relevant than notes that only mention the topic in passing within the body.
    - **Best `bm25_score`** across queries (lower is better in this CLI).
-   - **Number of queries matched** — useful as a tiebreaker, but NOT the primary signal. Generic notes match many queries because they're broad, not because they're central to the topic.
+   - **Number of queries matched** — a useful signal but not dominant. Notes that match 3+ queries are often central, but a note matching only 1 query can still be highly relevant if its BM25 score is strong and its title is on-topic.
+   - Note type (prefer `personal synthesis` and `research paper` for depth)
    - Recency — for time-sorted asks ("latest", "recent"), sort by `frontmatter_sort_time` or `file_mtime` across the unioned set, NOT within a single query's results
 5. **Apply top-N cap AFTER union** — if the user asked for "latest 10" or "top N", apply the cap to the unioned/deduped/sorted list. Never apply `--limit N` to a single query and call that the answer.
-6. **Select notes to read** — pick the top candidates (may be dozens or hundreds for large research)
+6. **Review the boundary.** After selecting the top N, scan candidates at positions N+1 through N+5. If any of those candidates have stronger title relevance or a better BM25 score on a core query than the weakest entry in the top N, swap them in. This catches notes that only matched one query (so query-count pushed them down) but are clearly on-topic — e.g., a note titled "CMOS Process and Its Role in Silicon Photonics" ranking below position 10 for a 光通信 query, or "SanDisk NAND周期復苏" ranking below position 10 for a 内存周期 query.
+7. **Select notes to read** — pick the top candidates (may be dozens or hundreds for large research)
 
 ### Step 5: Read Relevant Notes (Batched)
 

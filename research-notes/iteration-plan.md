@@ -79,3 +79,30 @@
 1. Investigate whether the 3 missing 内存周期 notes are in the candidate pool (query issue) or ranked too low (ranking issue)
 2. Consider adding guidance about preferring notes that discuss the topic thesis/dynamics over notes about individual companies
 3. Consider whether "title relevance" ranking guidance is too aggressive — it may push notes with topic keywords in title above notes that are more thesis-central but have less keyword-dense titles
+
+## Round 3
+
+### Current plan
+
+**Overview:** Add thesis-specificity ranking and better per-query limits.
+
+**Details:**
+1. Clarify per-query --limit should be 2-3x requested top-N
+2. Add thesis dynamics ranking (cycle, pricing, expansion keywords)
+3. Re-test all 3
+
+### Evaluation results
+
+| Test Case | R2 | R3 | Trend |
+|-----------|----|----|-------|
+| agent harness | 8/10 | 8/10 | same |
+| 内存周期 | 7/10 | 6/10 | WORSE |
+| 光通信 | 9/10 | 8/10 | WORSE |
+
+**Root cause:** Thesis-specificity ranking was too prescriptive and cycle-focused. Hurt 光通信 (industry trends ≠ cycle dynamics) and didn't help 内存周期. "Demote generic reference notes" was too aggressive — demoted valuable analyst reports (Bernstein深度研报) and pushed tangential personal opinion notes up.
+
+### Suggested next steps (implemented as Round 4)
+
+1. Roll back thesis-specificity ranking, revert to simpler title-relevance guidance
+2. Add "review the boundary" step — scan positions N+1 to N+5 and swap in notes with strong title relevance or BM25 that were pushed down by low query-count
+3. Keep noise filtering (watchlists, PEG screens) and sub-concept queries — those work well
