@@ -143,8 +143,8 @@ notes-search search "agent memory systems" --engine qmd --mode query
 ```
 
 **Sort and limit guidance:**
-- Use `--sort time` when the user asks about "recent", "latest", or time-sensitive topics
 - Use `--sort relevance` (default) for depth and quality
+- Use `--sort time` only when the user asks about "recent", "latest", or time-sensitive topics
 - When the user says "top N notes", set `--limit N`
 - For large-scale research, use `--limit 100` or higher to get a broad candidate pool
 
