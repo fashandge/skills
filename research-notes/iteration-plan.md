@@ -150,3 +150,32 @@
 ### Suggested next steps (Round 6)
 
 Add principle 8: ticker queries for investment topics (MU, SNDK) to get PE PB估值 into candidate pool.
+
+## Round 6
+
+### Evaluation results
+
+| Test Case | R5 | R6 |
+|-----------|-----|-----|
+| agent harness | 8/10 | 7/10 (WORSE) |
+| 内存周期 | 7/10 | 6/10 (WORSE) |
+| 光通信 | 9/10 | 9/10 (same, but CMOS Process appeared, Bernstein dropped) |
+
+**Root cause:** Ticker query guidance (principle 8) caused regression:
+- Agent harness agent misapplied it (fired "CLAUDE.md AGENTS.md" query)
+- 内存周期 agent fired "MU" but PE PB估值 uses "美光" not "MU" in title
+- 光通信 ticker queries didn't hurt but didn't help either
+
+**Decision:** Roll back principle 8 (ticker queries). The sub-concept coverage step DID help 光通信 (CMOS Process finally appeared).
+
+### Analysis of achievable ceiling
+
+Best results across all rounds:
+- agent harness: 8/10 consistently (Rounds 2-5). All "What good looks like" criteria PASS.
+- 内存周期: 7/10 consistently (Rounds 2, 4, 5). Most criteria PASS. Persistent gaps:
+  - PE PB估值: NOT in any candidate pool (needs very specific query)
+  - SanDisk NAND周期: in pool but consistently ranked 11-15
+  - MU SNDK要扩产: in pool but ranked low
+- 光通信: 9/10 consistently (Rounds 2, 5, 6). All criteria PASS. Only CMOS Process or Bernstein missing (one appears, the other drops).
+
+The remaining gaps are at the margin of what SKILL.md guidance alone can control — LLM ranking non-determinism causes ±1-2 note variations between runs.
