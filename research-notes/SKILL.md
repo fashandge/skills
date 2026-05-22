@@ -21,9 +21,18 @@ Use when the user asks to:
 
 ## Research Workflow
 
-### Step 1: Check the Index
+This workflow has **two parallel data sources**: index browsing and keyword search. **Both must be used** — run them concurrently (read section indices in parallel with search queries), then merge results in the union step.
 
-Start by reading the root index to find relevant sections:
+- **Index browsing** gives complete coverage of relevant folders and catches notes that use different vocabulary than any search query. It also provides note-type metadata and one-line summaries for quick relevance assessment without reading the full note.
+- **Keyword search** catches notes scattered across OTHER folders that index browsing wouldn't surface, and provides BM25 scores for ranking.
+
+Neither alone is sufficient. The index misses notes in unexpected folders; search misses notes that use synonyms not in any query.
+
+### Track A: Index Browsing
+
+#### Step A1: Identify Relevant Sections
+
+Read the root index to find sections related to the research topic:
 
 ```bash
 cat ~/notes/index/raw/root_index.md
@@ -35,13 +44,15 @@ The root index lists sections with:
 - Section themes
 - Representative notes with wiki-links
 
-### Step 2: Drill into Section Indices
+Scan for sections whose folder name, themes, or representative notes relate to the topic. Include adjacent sections — for CPU investment, check not only `AI Chips & Foundry` but also sub-folders like `AMD/`, `INTC/`, `ARM/`, and related sections like `macro analysis/AI/`.
 
-For relevant sections, read the section index for detailed note listings:
+#### Step A2: Select Candidates from Section Indices
+
+For each relevant section, read the section index:
 
 ```bash
 # Example: read a section index
-cat ~/notes/index/raw/section_indices/raw-ai-agent-harness.md
+cat ~/notes/index/raw/section_indices/raw-investment-candidates-ai-chips-foundry.md
 ```
 
 Section indices contain per-note metadata:
@@ -50,7 +61,18 @@ Section indices contain per-note metadata:
 - Type: `note`, `clipping`, `research paper`, `personal synthesis`, etc.
 - Summary: one-line summary of the note
 
-### Step 3: Construct Search Queries
+**Scan summaries and titles to select candidates.** Pick notes whose title or summary is relevant to the research topic — even if they wouldn't match any keyword search. This is the index's main advantage: it catches vocabulary mismatches (e.g., a note titled "AMD FA 大涨的部分原因" is about a CPU company's stock but wouldn't match "CPU" searches).
+
+**Adaptive index budget.** How many candidates to select from the index depends on the requested top-N:
+- **N ≤ 15:** select up to **2×N** candidates from index summaries
+- **15 < N ≤ 50:** select up to **1.5×N** candidates (rounded up)
+- **N > 50:** select up to **N** candidates
+
+These are upper bounds — only select notes that are genuinely relevant based on their summary. The budget is generous because deduplication with search results will shrink the pool, and having more index candidates improves recall for notes that search would miss.
+
+### Track B: Keyword Search
+
+#### Step B1: Construct Search Queries
 
 `notes-search` treats multi-word queries as **AND** — every word must appear in the note for it to match. It is not OR, not phrase match. This shapes how to design queries.
 
@@ -88,7 +110,7 @@ Section indices contain per-note metadata:
 
 4. **Avoid pairing a Chinese term with its direct English translation** in the same query (e.g. `光通信 optical communications`). Authors pick one or the other, so AND returns near-empty.
 
-### Step 3b: Run Searches with CLI
+#### Step B2: Run Searches with CLI
 
 Use the search CLI for keyword or semantic search:
 
@@ -124,23 +146,28 @@ notes-search search "agent memory systems" --engine qmd --mode query
 - **Per-query `--limit`:** Set `--limit` to at least 2–3x the requested top-N on each individual query. For "top 10" requests, use `--limit 20` or `--limit 30` per query. The top-N cap is applied AFTER union, not within any single query. Broad sub-concept queries (e.g., `NAND`, `HBM`, `CPO`) often return 30+ hits; use `--limit 30` for these to avoid losing relevant notes that rank lower in one query but would rank highly in the union.
 - For large-scale research, use `--limit 100` or higher to get a broad candidate pool
 
-### Step 4: Union and Deduplicate
+### Step 4: Union, Deduplicate, and Rerank
 
-You will have results from multiple `notes-search` calls (Step 3) plus index sections (Steps 1–2). These are **unioned**, not intersected — a note appearing in *any* query's results is a candidate.
+You now have candidates from **two sources**: index browsing (Track A) and keyword search (Track B). These are **unioned**, not intersected — a note appearing in *either* source is a candidate.
 
-1. **Union all candidates** — concatenate filepaths from every query's results and from index sections into one list. Do NOT filter to notes that appeared in multiple queries; that defeats the purpose of running synonym/sub-term sweeps.
-2. **Dedupe by filepath** — collapse exact-path duplicates. Track which queries each note matched (useful for relevance signal).
+1. **Union all candidates** — concatenate filepaths from every search query's results AND from index selections into one list. Do NOT filter to notes that appeared in multiple queries; that defeats the purpose of running synonym/sub-term sweeps.
+2. **Dedupe by filepath** — collapse exact-path duplicates. For each note, track:
+   - Which source(s) it came from: index-only, search-only, or both
+   - Which search queries it matched and its best BM25 score
+   - Its summary from the index (if available)
 3. **Filter out generic and cross-sector notes.** Before ranking, remove or demote two categories:
    - **Generic meta-notes** whose primary subject is not any specific topic: watchlists, portfolio summaries, PEG/valuation screens, glossaries, and other broad reference notes that mention many topics. A note titled "Watchlist Competitive Landscape" will match queries for memory, optical, AI, etc. — but it's not *about* any of those topics.
    - **Cross-sector notes** whose primary subject is a DIFFERENT or BROADER sector but that mention the research topic as one of several areas. For example, a note about the entire semiconductor supply chain that mentions optical communications should rank below notes specifically about optical communications. A note about "AI infrastructure" that mentions memory should rank below notes specifically about memory cycles. The research topic should be the note's PRIMARY subject, not a secondary mention.
-4. **Prioritize** — rank candidates by:
+4. **Rerank the merged pool.** Notes from different sources have different signals — use all available:
+   - **Appeared in both sources** — strong relevance signal. A note selected from the index AND matched by search queries is almost certainly on-topic.
    - **Title relevance:** Does the note's title directly reference the research topic or its core concepts? Notes with topic keywords in the title are almost always more relevant than notes that only mention the topic in passing within the body.
-   - **Best `bm25_score`** across queries (lower is better in this CLI).
-   - **Number of queries matched** — a useful signal but not dominant. Notes that match 3+ queries are often central, but a note matching only 1 query can still be highly relevant if its BM25 score is strong and its title is on-topic.
+   - **Best `bm25_score`** across queries (lower is better in this CLI). For index-only notes that have no BM25 score, use title and summary relevance instead.
+   - **Summary relevance** (for index-sourced notes): The section index provides a one-line summary — use it to judge topical fit for notes that search didn't surface.
+   - **Number of search queries matched** — a useful signal but not dominant.
    - Note type (prefer `personal synthesis` and `research paper` for depth)
    - Recency — for time-sorted asks ("latest", "recent"), sort by `frontmatter_sort_time` or `file_mtime` across the unioned set, NOT within a single query's results
-5. **Apply top-N cap AFTER union** — if the user asked for "latest 10" or "top N", apply the cap to the unioned/deduped/sorted list. Never apply `--limit N` to a single query and call that the answer.
-6. **Verify sub-concept coverage.** After selecting the top N, check that each core sub-concept from your query plan has at least one representative in the list. For example, if you ran queries for CPO, silicon photonics, 光模块, and 光互连, verify that the top 10 includes notes covering each of these angles — not just notes that happened to match the broadest query. If a sub-concept query returned a strong result (top 3 of that query with a good BM25 score) but no note from that sub-concept made the final list, replace the weakest entry in the top N with the best result from the underrepresented sub-concept. This prevents the broadest queries from monopolizing the top N and ensures the final list covers the topic's full breadth.
+5. **Apply top-N cap AFTER union** — if the user asked for "latest 10" or "top N", apply the cap to the unioned/deduped/reranked list. Never apply `--limit N` to a single query and call that the answer.
+6. **Verify sub-concept coverage.** After selecting the top N, check that each core sub-concept from your query plan has at least one representative in the list. For example, if you ran queries for CPO, silicon photonics, 光模块, and 光互连, verify that the top 10 includes notes covering each of these angles — not just notes that happened to match the broadest query. If a sub-concept query returned a strong result (top 3 of that query with a good BM25 score) but no note from that sub-concept made the final list, replace the weakest entry in the top N with the best result from the underrepresented sub-concept. This prevents the broadest queries from monopolizing the top N and ensures the final list covers the topic's full breadth. **Also check that index-only notes got fair consideration** — if the index surfaced relevant notes that no search query matched, at least one should appear in the top N if its summary is clearly on-topic.
 7. **Select notes to read** — pick the top candidates (may be dozens or hundreds for large research)
 
 ### Step 5: Read Relevant Notes (Batched)
@@ -183,31 +210,59 @@ After gathering information (directly or via batch summaries):
 
 ### Small research: "Research what my notes say about agent harnesses"
 
+**Track A (index):** N is open-ended, treat as ~20. Budget: 2×20 = 40 index candidates.
 1. Read `~/notes/index/raw/root_index.md` → find `raw/AI/Agent/harness` section (21 notes)
-2. Read `~/notes/index/raw/section_indices/raw-ai-agent-harness.md` → get note summaries
-3. Run `notes-search search "agent harness" --limit 50` for additional matches
-4. Combine and dedupe → ~30 unique candidates
-5. Check sizes: `wc -c` → total ~60KB, fits in one batch
-6. Read all 30 notes directly
-7. Synthesize findings into a research summary
+2. Read `~/notes/index/raw/section_indices/raw-ai-agent-harness.md` → scan summaries, select all 21 (all relevant to topic)
+
+**Track B (search):** Run in parallel with Track A.
+3. Run `notes-search search "agent harness" --limit 30 --json`, `"coding agent"`, `"agent loop"`, etc.
+
+**Merge:**
+4. Union index candidates + search results, dedupe → ~30 unique candidates
+5. Rerank using BM25 scores (search hits) + summary relevance (index hits)
+6. Check sizes: `wc -c` → total ~60KB, fits in one batch
+7. Read all notes, synthesize
+
+### Top-N research: "Find the top 10 posts about CPU stock investment"
+
+**Track A (index):** N=10, budget: 2×10 = 20 index candidates.
+1. Read root index → find `raw/investment/candidates/AI Chips & Foundry` (74 notes), plus sub-sections for AMD, INTC, ARM, QCOM
+2. Read section indices → scan all 74 summaries, select ~20 whose title/summary relates to CPU investment (e.g., "AMD FA 大涨的部分原因" wouldn't match "CPU" searches but IS about a CPU company)
+
+**Track B (search):** Run in parallel with Track A.
+3. Run 10–13 queries: `"CPU 投资"`, `"CPU stock"`, `"服务器 CPU"`, `"server CPU"`, `"CPU demand"`, `"CPU 需求"`, `"Intel investment"`, `"AMD investment"`, `"ARM CPU"`, `"CPU 芯片"`, etc.
+
+**Merge:**
+4. Union ~20 index candidates + ~60 search hits, dedupe by filepath → ~50 unique
+5. Rerank: notes in both sources rank highest; then by title relevance + BM25 + summary; filter out generic watchlist/glossary notes
+6. Verify sub-concept coverage (AMD, Intel, ARM, QCOM each represented)
+7. Take top 10
 
 ### Large research: "Research my top 100 notes on investment"
 
-1. Read root index → find investment-related sections
-2. Read section indices for those sections
-3. Run `notes-search search "investment" --limit 100 --json` for top 100 by relevance
-4. Combine and dedupe → ~100 candidates
-5. Check sizes: `wc -c` → total ~400KB
-6. Split into 5 batches of ~80KB each
-7. Process batch 1: read notes, extract key findings with citations
-8. Process batches 2-5 similarly
-9. Merge batch summaries, then synthesize final research summary
+**Track A (index):** N=100, budget: N = 100 index candidates.
+1. Read root index → find all investment-related sections (candidates, macro analysis, trading strategy, etc.)
+2. Read section indices for those sections → select ~100 most relevant by summary
+
+**Track B (search):** Run in parallel.
+3. Run `notes-search search "investment" --limit 100 --json` plus topic-specific queries
+
+**Merge:**
+4. Union index + search, dedupe → ~150 candidates
+5. Rerank, take top 100
+6. Check sizes: `wc -c` → total ~400KB → split into 5 batches of ~80KB
+7. Process each batch, merge summaries, synthesize
 
 ### Recent-focused: "What are my latest 10 notes on AI agents?"
 
-Even though the user asked for just 10 notes, **do not** run a single query and cap at 10 — that misses notes using synonym terms. Instead:
+Even though the user asked for just 10 notes, **do not** run a single query and cap at 10 — that misses notes using synonym terms.
 
-1. Run multiple time-sorted queries in parallel, each with a generous limit (e.g., 30):
+**Track A (index):** N=10, budget: 2×10 = 20 index candidates.
+1. Read root index → find `raw/AI/Agent` and sub-sections
+2. Read section indices → select ~20 notes, noting their timestamps for recency sorting
+
+**Track B (search):** Run in parallel with Track A.
+3. Run multiple time-sorted queries, each with `--sort time --limit 30 --json`:
    ```bash
    notes-search search "AI agents" --sort time --limit 30 --json
    notes-search search "agent" --sort time --limit 30 --json
@@ -215,9 +270,11 @@ Even though the user asked for just 10 notes, **do not** run a single query and 
    notes-search search "agent harness" --sort time --limit 30 --json
    notes-search search "LLM agent" --sort time --limit 30 --json
    ```
-2. Union results, dedupe by filepath, sort the unioned set by `frontmatter_sort_time` (fallback `file_mtime`) descending
-3. Take the top 10 from the unioned sorted list — that is the answer
-4. (Optional) Read section indices for additional context if synthesizing
+
+**Merge:**
+4. Union index + search, dedupe by filepath
+5. Sort the unioned set by `frontmatter_sort_time` (fallback `file_mtime`) descending
+6. Take the top 10 from the unioned sorted list
 
 The same pattern applies for bilingual topics — add Chinese synonym queries alongside English ones before unioning.
 
