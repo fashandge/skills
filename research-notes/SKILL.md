@@ -61,11 +61,13 @@ A bare "research X" or "find notes about X" stays console-only. When the user's 
 
 #### Step A1: Identify Relevant Sections
 
-Read the root index to find sections related to the research topic:
+Read the root index to find sections related to the research topic. **Use the Read tool** (not `cat`) so the full file is loaded without rtk rewriting or any output truncation:
 
-```bash
-cat ~/notes/index/raw/root_index.md
 ```
+Read ~/notes/index/raw/root_index.md
+```
+
+The root index is ~1100 lines; the Read tool's default 2000-line limit covers it. Do not pipe it through `cat`, `head`, or any shell tool — the rtk PreToolUse hook rewrites `cat` to `rtk read`, and any caller that wraps the output (subagent summaries, etc.) may clip it.
 
 The root index lists sections with:
 - Folder prefix (e.g., `raw/AI/Agent/harness`)
@@ -77,12 +79,13 @@ Scan for sections whose folder name, themes, or representative notes relate to t
 
 #### Step A2: Select Candidates from Section Indices
 
-For each relevant section, read the section index:
+For each relevant section, read the section index with the **Read tool** (not `cat`):
 
-```bash
-# Example: read a section index
-cat ~/notes/index/raw/section_indices/raw-investment-candidates-ai-chips-foundry.md
 ```
+Read ~/notes/index/raw/section_indices/raw-investment-candidates-ai-chips-foundry.md
+```
+
+Largest section indices are ~1100 lines, within the Read tool's default 2000-line limit. Same reason as the root index: avoid `cat`/`head` so nothing in the rewrite/wrap chain can truncate the file.
 
 Section indices contain per-note metadata:
 - Path: exact file path
