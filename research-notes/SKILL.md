@@ -238,11 +238,13 @@ Group notes so each batch stays under ~80KB (~20K tokens). Order batches so high
 
 After gathering information (directly or via batch summaries):
 1. If batched: merge batch summaries first, noting which batches covered which sub-topics
-2. Identify key themes and insights across notes
-3. Note any contradictions or nuances
-4. Cite specific notes when making claims
-5. Synthesize a coherent answer or research summary
-6. Report coverage (e.g., "Based on 45 notes across 3 batches from your vault...")
+2. Identify key themes and insights across notes; note any contradictions or nuances
+3. Lead with the main insight or answer
+4. Support with specific evidence from notes — cite note titles when making claims
+5. Report coverage breadth (e.g., "Based on 45 notes across 3 batches from your vault...")
+6. Highlight any gaps or areas with limited coverage
+7. If search-only mode was used, mention that index browsing was intentionally skipped
+8. If wiki output mode was active (Step 7), also report the wiki's final file path returned by `/wiki`, so the user can open the persisted article
 
 ### Step 7: Persist as Wiki (Conditional)
 
@@ -252,16 +254,18 @@ Console output happens first — the user always sees the synthesis in the respo
 
 Delegate to the `/wiki` skill via the Skill tool rather than writing the wiki file directly. `/wiki` owns folder selection, title uniqueness, frontmatter, the `[[#Heading]]` TOC format, and the References section convention — reimplementing any of that here would drift.
 
-Invoke `/wiki` with a prompt that includes **all three** of the following, so `/wiki` does not have to recall material from conversation context:
+**Keep the invocation prompt deliberately slim.** The synthesis was just printed in this same turn, so it is already the most recent assistant content in the conversation; `/wiki`'s Step 1 ("Review the current conversation for relevant answers, analysis, and references") will pull from it via recency. Inlining the synthesis again duplicates content and dilutes `/wiki`'s own SKILL.md instructions in its attention budget — which empirically produces worse articles than calling `/wiki` fresh in a follow-up turn. The slim handoff approximates that follow-up-turn behavior while keeping the workflow single-shot.
 
-1. **Research topic and synthesized body.** State the original research topic in one line, then include the full Step 6 synthesis — themes, insights, contradictions, citations — as the wiki's main content. This is the most important payload: without it, `/wiki` would have to recall the synthesis from conversation, which loses detail.
+Invoke `/wiki` with a prompt containing only:
 
-2. **Source notes list.** Every note read in Step 5, with its vault path and (where available) one-line description of why it's relevant. `/wiki` uses this directly to populate the References section. Format each entry so `/wiki` can drop it into the `## 参考资料` section with minimal transformation, e.g.:
+1. **Topic pointer.** One line stating the research topic and instructing `/wiki` to base the article on the synthesis just printed above in this conversation. Do **not** re-inline the synthesis.
+
+2. **Source notes list.** Every note read in Step 5, with its vault path and (where available) one-line description of why it's relevant. This is the one item `/wiki` cannot reliably reconstruct from recency — Step 5 note paths are scattered across earlier tool results. Format each entry so `/wiki` can drop it into the `## 参考资料` section with minimal transformation:
    ```
    - [[<note title>]] — <why it's relevant to this research>
    ```
 
-3. **Coverage note (if applicable).** If search-only mode was used, pass that flag so `/wiki` includes the standard caveat ("index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered") in the wiki body or overview.
+3. **Coverage caveat (only if search-only mode was used).** Pass a single-sentence flag so `/wiki` includes the standard caveat ("index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered") in the wiki body or overview. Omit entirely when default mode was used.
 
 Do **not** pass a title hint or folder suggestion — `/wiki` derives the title from the body content per its uniqueness rules, and picks the folder via its own `find ~/notes/wiki -type d` check. Leave both decisions entirely to `/wiki`.
 
@@ -370,19 +374,9 @@ The trigger phrase "save it as a wiki" activates wiki output mode (in addition t
 
 1. Run Steps 1–6 as usual: index browsing + multi-query search on `内存周期`, `存储周期`, `memory cycle`, `memory supercycle`, `HBM 周期`, `NAND 周期`, `DRAM 周期`, etc.; union, dedupe, rerank; read the top candidates; produce a synthesis.
 2. Print the console synthesis as usual — the user always sees this first.
-3. **Step 7**: Invoke `/wiki` via the Skill tool with a prompt containing:
-   - Research topic: "memory cycle thesis" — followed by the full Step 6 synthesis (themes, contradictions, citations)
+3. **Step 7**: Invoke `/wiki` via the Skill tool with a slim prompt containing:
+   - Topic pointer: one line — "Write a wiki for the research on the memory cycle thesis just synthesized above in this conversation." Do **not** re-inline the synthesis; `/wiki` picks it up from conversation recency.
    - Source notes list: each note read in Step 5, formatted as `- [[<title>]] — <relevance>`
-   - Coverage note: none (default mode was used, not search-only)
+   - Coverage caveat: omitted (default mode was used, not search-only)
    - No title or folder hint — `/wiki` derives both itself
 4. When `/wiki` returns the new file path, append it to the console output so the user can open the persisted article.
-
-## Output Format
-
-When presenting research findings:
-- Lead with the main insight or answer
-- Support with specific evidence from notes (cite note titles)
-- Note the breadth of coverage (e.g., "Based on 20 notes from your vault...")
-- If search-only mode was used, mention that index browsing was intentionally skipped
-- Highlight any gaps or areas with limited coverage
-- If wiki output mode was active (Step 7), also report the wiki's final file path returned by `/wiki`, so the user can open the persisted article
