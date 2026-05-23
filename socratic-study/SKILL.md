@@ -1,6 +1,14 @@
 ---
 name: socratic-study
-description: Guide the user through deep study of provided learning material (Obsidian notes, URLs, PDFs, or other files) using the Socratic method, preceded by a meta-learning phase. Use when the user wants to truly understand and operationalize a body of material — e.g. "study this note Socratically", "tutor me through this wiki", "/socratic-study <file or url>", or hands over one or more articles asking to learn from them. Differs from `socratic-tutor`: this skill is *material-driven* (input = documents), whereas `socratic-tutor` is *topic-driven* (input = a topic name).
+description: >
+  Guide the user through deep study of provided learning material (Obsidian
+  notes, URLs, PDFs, or other files) using the Socratic method, preceded by a
+  meta-learning phase. Use when the user wants to truly understand and
+  operationalize a body of material -- e.g. "study this note Socratically",
+  "tutor me through this wiki", "/socratic-study <file or url>", or hands over
+  one or more articles asking to learn from them. Differs from
+  `socratic-tutor`: this skill is *material-driven* (input = documents),
+  whereas `socratic-tutor` is *topic-driven* (input = a topic name).
 ---
 
 # Socratic Study (Material-Driven Tutor)
