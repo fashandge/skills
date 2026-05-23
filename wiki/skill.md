@@ -7,6 +7,8 @@ description: Generate a wiki article in the user's Obsidian vault. Use when the 
 
 Generate structured wiki articles in the user's Obsidian vault at `~/notes/wiki/`.
 
+> **Obsidian syntax**: This skill's defaults stay conservative — frontmatter, wikilinks, tables, plain prose. For richer Obsidian-specific syntax (callouts, embeds, block IDs, highlights, footnotes, Mermaid), consult the `obsidian-markdown` skill as a reference. Reach for **callouts** (`> [!abstract]`, `> [!note]`, `> [!warning]`) when the Overview block or a key-insight call-out would read better than a plain blockquote, and for **section embeds** (`![[Note Name#Heading]]`) when surfacing a source paragraph verbatim is clearer than paraphrasing it.
+
 ## When to Use This Skill
 
 Trigger when user:
