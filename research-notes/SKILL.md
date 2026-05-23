@@ -1,6 +1,6 @@
 ---
 name: research-notes
-description: Use when the user asks to research a topic, find information, or answer questions using their local Obsidian notes vault
+description: Use when the user asks to research a topic, find information, or answer questions using their local Obsidian notes vault, or wants research findings written up as a wiki article in their vault
 ---
 
 # research-notes
@@ -39,6 +39,23 @@ Use **search-only mode** when the user's prompt contains instructions such as:
 - "use the search engine only"
 
 When using search-only mode, compensate by running a broader query sweep than usual: add extra synonyms, title variants, bilingual terms, ticker/company variants when relevant, and sub-concepts. For top-N requests, still apply the final top-N cap only after unioning and deduping all search-query results.
+
+### Output Destinations
+
+Independent of the two search modes above, there is a second axis: **where the findings go**.
+
+1. **Console (default).** The synthesis is written to the response only. Right for quick lookups, exploratory questions, and any prompt that doesn't ask for a persisted artifact.
+2. **Wiki (opt-in).** After the normal console synthesis, the findings are also persisted as a wiki article in the user's Obsidian vault by delegating to the `/wiki` skill. See **Step 7: Persist as Wiki** below for the handoff details.
+
+Use **wiki output** when the user's prompt contains instructions such as:
+- "save as a wiki" / "save it as a wiki"
+- "write up" / "write it up" the findings
+- "turn it into a wiki" / "turn this into a wiki article"
+- "then `/wiki` it" / "and `/wiki` the result"
+- "document what my notes say about …"
+- "create a wiki article on …" (when paired with research)
+
+A bare "research X" or "find notes about X" stays console-only. When the user's intent is ambiguous, default to console — do not auto-promote to a wiki, since the vault should not fill up with throwaway summaries.
 
 ### Track A: Index Browsing
 
@@ -224,6 +241,29 @@ After gathering information (directly or via batch summaries):
 5. Synthesize a coherent answer or research summary
 6. Report coverage (e.g., "Based on 45 notes across 3 batches from your vault...")
 
+### Step 7: Persist as Wiki (Conditional)
+
+Run this step **only when the user's prompt triggered wiki output mode** (see **Output Destinations** above). Otherwise, the workflow ends at Step 6.
+
+Console output happens first — the user always sees the synthesis in the response. The wiki is an *additional* artifact, not a replacement.
+
+Delegate to the `/wiki` skill via the Skill tool rather than writing the wiki file directly. `/wiki` owns folder selection, title uniqueness, frontmatter, the `[[#Heading]]` TOC format, and the References section convention — reimplementing any of that here would drift.
+
+Invoke `/wiki` with a prompt that includes **all three** of the following, so `/wiki` does not have to recall material from conversation context:
+
+1. **Research topic and synthesized body.** State the original research topic in one line, then include the full Step 6 synthesis — themes, insights, contradictions, citations — as the wiki's main content. This is the most important payload: without it, `/wiki` would have to recall the synthesis from conversation, which loses detail.
+
+2. **Source notes list.** Every note read in Step 5, with its vault path and (where available) one-line description of why it's relevant. `/wiki` uses this directly to populate the References section. Format each entry so `/wiki` can drop it into the `## 参考资料` section with minimal transformation, e.g.:
+   ```
+   - [[<note title>]] — <why it's relevant to this research>
+   ```
+
+3. **Coverage note (if applicable).** If search-only mode was used, pass that flag so `/wiki` includes the standard caveat ("index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered") in the wiki body or overview.
+
+Do **not** pass a title hint or folder suggestion — `/wiki` derives the title from the body content per its uniqueness rules, and picks the folder via its own `find ~/notes/wiki -type d` check. Leave both decisions entirely to `/wiki`.
+
+After `/wiki` returns, append its reported file path to the console output so the user knows where the artifact landed.
+
 ## Example Usage
 
 ### Small research: "Research what my notes say about agent harnesses"
@@ -321,6 +361,19 @@ When the user explicitly asks to skip the index, do not read `root_index.md` or 
 5. Read the selected notes and synthesize as usual.
 6. In the final answer, include a brief coverage note such as: "Search-only mode used; index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered."
 
+### Wiki output: "Research the memory cycle thesis and save it as a wiki"
+
+The trigger phrase "save it as a wiki" activates wiki output mode (in addition to the default index + search mode).
+
+1. Run Steps 1–6 as usual: index browsing + multi-query search on `内存周期`, `存储周期`, `memory cycle`, `memory supercycle`, `HBM 周期`, `NAND 周期`, `DRAM 周期`, etc.; union, dedupe, rerank; read the top candidates; produce a synthesis.
+2. Print the console synthesis as usual — the user always sees this first.
+3. **Step 7**: Invoke `/wiki` via the Skill tool with a prompt containing:
+   - Research topic: "memory cycle thesis" — followed by the full Step 6 synthesis (themes, contradictions, citations)
+   - Source notes list: each note read in Step 5, formatted as `- [[<title>]] — <relevance>`
+   - Coverage note: none (default mode was used, not search-only)
+   - No title or folder hint — `/wiki` derives both itself
+4. When `/wiki` returns the new file path, append it to the console output so the user can open the persisted article.
+
 ## Output Format
 
 When presenting research findings:
@@ -329,3 +382,4 @@ When presenting research findings:
 - Note the breadth of coverage (e.g., "Based on 20 notes from your vault...")
 - If search-only mode was used, mention that index browsing was intentionally skipped
 - Highlight any gaps or areas with limited coverage
+- If wiki output mode was active (Step 7), also report the wiki's final file path returned by `/wiki`, so the user can open the persisted article
