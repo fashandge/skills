@@ -21,10 +21,11 @@ Use when the user asks to:
 
 ## Research Workflow
 
-This workflow has **two modes**:
+This workflow has **three modes**:
 
 1. **Default mode: index + search.** Use two parallel data sources: index browsing and keyword search. Run them concurrently (read section indices in parallel with search queries), then merge results in the union step.
 2. **Search-only mode: skip index.** If the user explicitly asks to skip the index, avoid index browsing, use only `notes-search`, and say in the final answer that index coverage was intentionally skipped.
+3. **Agent-engine mode: delegate retrieval to the AI agent search engine.** If the user explicitly asks to use the agent engine, skip index browsing and skip the multi-query FTS5 sweep. Instead, make a single call to `notes-search search "<topic>" --engine agent --json` and treat its results as the full candidate set. See **Track C** below.
 
 - **Index browsing** gives complete coverage of relevant folders and catches notes that use different vocabulary than any search query. It also provides note-type metadata and one-line summaries for quick relevance assessment without reading the full note.
 - **Keyword search** catches notes scattered across OTHER folders that index browsing wouldn't surface, and provides BM25 scores for ranking.
@@ -39,6 +40,15 @@ Use **search-only mode** when the user's prompt contains instructions such as:
 - "use the search engine only"
 
 When using search-only mode, compensate by running a broader query sweep than usual: add extra synonyms, title variants, bilingual terms, ticker/company variants when relevant, and sub-concepts. For top-N requests, still apply the final top-N cap only after unioning and deduping all search-query results.
+
+Use **agent-engine mode** when the user's prompt contains instructions such as:
+- "use the agent engine"
+- "use the AI agent search engine"
+- "use --engine agent"
+- "use agent search"
+- "delegate the search to the agent engine"
+
+In agent-engine mode, the agent engine has already done its own multi-query retrieval and ranking internally, so do **not** read the index and do **not** run any additional `notes-search` queries (FTS5 or QMD). Make exactly one `notes-search search "<topic>" --engine agent --json` call, parse the returned note list, then jump directly to Step 5 (Read Relevant Notes) on those notes. See **Track C** for details.
 
 ### Output Destinations
 
@@ -180,7 +190,28 @@ notes-search search "agent memory systems" --engine qmd --mode query
 - **Per-query `--limit`:** Set `--limit` to at least 2–3x the requested top-N on each individual query. For "top 10" requests, use `--limit 20` or `--limit 30` per query. The top-N cap is applied AFTER union, not within any single query. Broad sub-concept queries (e.g., `NAND`, `HBM`, `CPO`) often return 30+ hits; use `--limit 30` for these to avoid losing relevant notes that rank lower in one query but would rank highly in the union.
 - For large-scale research, use `--limit 100` or higher to get a broad candidate pool
 
+### Track C: Agent-Engine Retrieval (agent-engine mode only)
+
+In agent-engine mode, skip Tracks A and B entirely and run a single agent-engine call:
+
+```bash
+notes-search search "<research topic>" --engine agent --json
+```
+
+Guidance:
+
+- Pass the user's research topic as the query string. Phrase it naturally (e.g., "memory cycle thesis", "CPU stock investment"); the agent engine handles its own keyword expansion.
+- For time-sensitive asks ("latest", "recent"), add `--sort time`.
+- For folder-scoped asks, add `--folder <prefix>`.
+- **For top-N asks ("top 20", "most recent 50", "find me 30 notes about..."), pass `--limit <N>`** to the agent engine call so it returns at most N notes. Example: `notes-search search "华为韬定律" --engine agent --json --limit 20`. Unlike default/search-only modes (where `--limit` is per-query and the cap is applied after unioning), in agent-engine mode `--limit` IS the final cap — the agent engine returns the ranked list directly. If the user does not specify a count, omit `--limit` and let the engine choose.
+- The agent engine returns its own ranked list with titles and paths. Treat that list as the final candidate set — no union, no extra reranking, no extra FTS5/QMD queries.
+- If the user asked for a top-N, prefer passing `--limit N` to the agent engine call (see above) rather than slicing the returned list after the fact.
+- Then proceed directly to **Step 5** (Read Relevant Notes) on those notes, followed by **Step 6** (Synthesize) and, if applicable, **Step 7** (Persist as Wiki).
+- In the final synthesis, mention that retrieval was delegated to the agent search engine and that index browsing plus FTS5/QMD sweeps were intentionally skipped.
+
 ### Step 4: Union, Deduplicate, and Rerank
+
+This step applies only to **default mode** and **search-only mode**. In **agent-engine mode**, skip this step — the agent engine has already produced a ranked list.
 
 You now have candidates from one or two sources:
 - **Default mode:** index browsing (Track A) and keyword search (Track B)
@@ -243,7 +274,7 @@ After gathering information (directly or via batch summaries):
 4. Support with specific evidence from notes — cite note titles when making claims
 5. Report coverage breadth (e.g., "Based on 45 notes across 3 batches from your vault...")
 6. Highlight any gaps or areas with limited coverage
-7. If search-only mode was used, mention that index browsing was intentionally skipped
+7. If search-only mode was used, mention that index browsing was intentionally skipped. If agent-engine mode was used, mention that retrieval was delegated to the `--engine agent` search and that index browsing plus FTS5/QMD sweeps were intentionally skipped.
 8. If wiki output mode was active (Step 7), also report the wiki's final file path returned by `/wiki`, so the user can open the persisted article
 
 ### Step 7: Persist as Wiki (Conditional)
@@ -367,6 +398,20 @@ When the user explicitly asks to skip the index, do not read `root_index.md` or 
 4. Verify coverage across the major CPU angles surfaced by the query plan (for example AMD, Intel, ARM, QCOM, server CPU demand, AI inference/agentic AI).
 5. Read the selected notes and synthesize as usual.
 6. In the final answer, include a brief coverage note such as: "Search-only mode used; index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered."
+
+### Agent-engine: "Find the top 10 notes about CPU stock investment, use the agent engine"
+
+The trigger phrase "use the agent engine" activates agent-engine mode. Skip the index and skip multi-query FTS5 sweeps.
+
+1. Make exactly one call, passing `--limit 10` since the user asked for the top 10:
+   ```bash
+   notes-search search "CPU stock investment" --engine agent --json --limit 10
+   ```
+   For asks like "top 20", use `--limit 20`; for "most recent 50", use `--limit 50 --sort time`. If no count is specified, omit `--limit`.
+2. Parse the returned JSON. Treat the returned entries as the candidate set.
+3. Jump to Step 5: estimate sizes with `wc -c`, batch if needed, read the notes.
+4. Synthesize in Step 6 as usual.
+5. In the final answer, include a brief note: "Retrieval delegated to `--engine agent`; index browsing and FTS5/QMD sweeps were intentionally skipped."
 
 ### Wiki output: "Research the memory cycle thesis and save it as a wiki"
 
