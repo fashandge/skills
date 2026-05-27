@@ -1,6 +1,6 @@
 ---
 name: research-notes
-description: Use when the user asks to research a topic, find information, or answer questions using their local Obsidian notes vault, or wants research findings written up as a wiki article in their vault
+description: Use when the user asks to research a topic, find information, list matching notes, or answer questions using their local Obsidian notes vault, including lookup-only requests for top/latest/relevant note titles and paths or JSON-only result lists, or when the user wants research findings written up as a wiki article in their vault
 ---
 
 # research-notes
@@ -66,6 +66,23 @@ Use **wiki output** when the user's prompt contains instructions such as:
 - "create a wiki article on …" (when paired with research)
 
 A bare "research X" or "find notes about X" stays console-only. When the user's intent is ambiguous, default to console — do not auto-promote to a wiki, since the vault should not fill up with throwaway summaries.
+
+### Output Shape: Lookup-Only Mode
+
+Use **lookup-only mode** when the user asks to find/list top, latest, or relevant notes but explicitly says not to synthesize or read/analyze the contents. Trigger phrases include:
+- "just list titles"
+- "return titles with paths"
+- "without any synthesis"
+- "do not include snippets"
+- "JSON only"
+- "exact shape"
+
+In lookup-only mode, still perform the normal retrieval, union, dedupe, rerank, and top-N selection rules for the chosen search mode. Then stop at the selected note list:
+- Do **not** read the full note bodies in Step 5.
+- Do **not** synthesize themes, takeaways, or evidence.
+- Output only the fields the user requested. If no schema is specified, use title and vault-relative path.
+- If the user requests JSON-only, the final answer must be valid JSON with no Markdown, commentary, rankings, scores, snippets, or prose outside the JSON.
+- If the user requests "latest", sort the unioned candidate set by `frontmatter_sort_time` or `file_mtime` before applying the final top-N cap.
 
 ### Track A: Index Browsing
 
@@ -206,6 +223,7 @@ Guidance:
 - **For top-N asks ("top 20", "most recent 50", "find me 30 notes about..."), pass `--limit <N>`** to the agent engine call so it returns at most N notes. Example: `notes-search search "华为韬定律" --engine agent --json --limit 20`. Unlike default/search-only modes (where `--limit` is per-query and the cap is applied after unioning), in agent-engine mode `--limit` IS the final cap — the agent engine returns the ranked list directly. If the user does not specify a count, omit `--limit` and let the engine choose.
 - The agent engine returns its own ranked list with titles and paths. Treat that list as the final candidate set — no union, no extra reranking, no extra FTS5/QMD queries.
 - If the user asked for a top-N, prefer passing `--limit N` to the agent engine call (see above) rather than slicing the returned list after the fact.
+- **The returned list is the Step 5 reading list** — every entry must be read there. Don't shrink it here on filename/folder priors; see Step 5 for the full rule.
 - Then proceed directly to **Step 5** (Read Relevant Notes) on those notes, followed by **Step 6** (Synthesize) and, if applicable, **Step 7** (Persist as Wiki).
 - In the final synthesis, mention that retrieval was delegated to the agent search engine and that index browsing plus FTS5/QMD sweeps were intentionally skipped.
 
@@ -237,11 +255,14 @@ Candidates are **unioned**, not intersected — a note appearing in *any* enable
    - Recency — for time-sorted asks ("latest", "recent"), sort by `frontmatter_sort_time` or `file_mtime` across the unioned set, NOT within a single query's results
 5. **Apply top-N cap AFTER union** — if the user asked for "latest 10" or "top N", apply the cap to the unioned/deduped/reranked list. Never apply `--limit N` to a single query and call that the answer.
 6. **Verify sub-concept coverage.** After selecting the top N, check that each core sub-concept from your query plan has at least one representative in the list. For example, if you ran queries for CPO, silicon photonics, 光模块, and 光互连, verify that the top 10 includes notes covering each of these angles — not just notes that happened to match the broadest query. If a sub-concept query returned a strong result (top 3 of that query with a good BM25 score) but no note from that sub-concept made the final list, replace the weakest entry in the top N with the best result from the underrepresented sub-concept. This prevents the broadest queries from monopolizing the top N and ensures the final list covers the topic's full breadth. **In default mode, also check that index-only notes got fair consideration** — if the index surfaced relevant notes that no search query matched, at least one should appear in the top N if its summary is clearly on-topic.
-7. **Select notes to read** — pick the top candidates (may be dozens or hundreds for large research)
+7. **Stop for lookup-only mode** — if the user asked only for titles/paths/JSON and no synthesis, output the selected list now using the requested shape.
+8. **Select notes to read** — for synthesis mode, pick the top candidates (may be dozens or hundreds for large research)
 
 ### Step 5: Read Relevant Notes (Batched)
 
 For small sets, read all notes directly. For large sets, batch by file size to stay within context limits.
+
+**Read what was selected — don't drop candidates by filename prior.** When the candidate set was chosen by Step 4 (default/search-only) or by the agent engine (Track C), every note on the list earned its slot. Do not skip notes mid-Step-5 based on filename, folder, or guessed redundancy ("looks like a clipping", "the analytical notes probably already cover this"). If the total is large, batch by `wc -c` and read across multiple batches — that is what batching is for. The only acceptable skip reason is a concrete observation made *after* reading: byte-identical duplicate, empty file, etc. This rule is especially load-bearing in **agent-engine mode**, where dropping notes by prior amounts to reranking the agent's output — which Track C forbids.
 
 **1. Estimate sizes** of candidate notes:
 
