@@ -17,6 +17,7 @@ Gather evidence in this order, using parallel shell/tool reads where possible:
 4. **Chronicle or other ambient activity logs**, if enabled. Use these only for discovery; confirm important details in the source system when possible.
 5. **Existing assets** so recommendations reuse or extend rather than duplicate:
    - Skills under the active skills directory, usually `~/skills/`
+   - Claude Code skills, especially project-local `.claude/skills/` and user-level `~/.claude/skills/`
    - Project `AGENTS.md`, `CLAUDE.md`, and `docs/`
    - Custom agents or subagent configs, if the environment exposes them
    - Codex automations under `$CODEX_HOME/automations` or `~/.codex/automations`
@@ -31,7 +32,7 @@ Only act on a candidate when all of these are true:
 - It occurred at least twice, or is clearly likely to recur and costly to repeat.
 - It has stable inputs, a repeatable procedure, and a clear output or stopping condition.
 - Packaging would materially improve speed, quality, consistency, or reliability.
-- It is not already adequately covered by an existing skill, project doc, custom agent, or automation.
+- It is not already adequately covered by an existing Codex skill, Claude Code skill, project doc, custom agent, or automation.
 
 Look broadly across coding, research, writing, planning, communication, operations, analysis, and personal administration. Skip work that is one-off, ambiguous, too sensitive, poorly evidenced, or better handled by ordinary ad hoc debugging.
 
@@ -39,29 +40,33 @@ Look broadly across coding, research, writing, planning, communication, operatio
 
 - **Extend existing**: use when the workflow is already mostly covered and only needs a mode, edge case, or pointer.
 - **Project doc**: use for repo-specific guidance that should not pollute the global skill list. Add it to project `AGENTS.md`, `CLAUDE.md`, or `docs/` and reference it from agent instructions.
-- **Skill**: use for reusable cross-project or frequently invoked workflows with stable procedures.
+- **Skill**: use for reusable cross-project or frequently invoked workflows with stable procedures, only when no existing Codex or Claude Code skill already covers the workflow.
 - **Custom subagent**: use for bounded specialist investigation or repeat delegation roles.
 - **Automation**: use for scheduled checks, recurring reports, reminders, monitors, or proactive follow-ups. Use Codex automations for Codex-managed routines, and LaunchAgents/cron for local scheduled scripts when the user explicitly wants local scheduling.
 - **Skip**: use when the evidence or repeatability is not strong enough.
 
-Prefer project docs over global skills for single-repo debugging guides. Prefer extending over duplicating.
+Prefer project docs over global skills for single-repo debugging guides. Prefer extending over duplicating. Treat Claude Code skills as first-class existing assets: if a workflow is already captured in `.claude/skills/`, do not create a parallel Codex skill. Recommend using, referencing, or lightly extending the Claude skill or the project docs instead.
 
 ## Workflow
 
 1. **Gather evidence** with parallel local reads:
    - Session scan: query Codex SQLite/session JSONL and list recent rollout paths.
    - Memory/project scan: read relevant memories, ambient suggestions, and project instruction files.
-   - Asset scan: inventory existing skills, project docs, automations, cron jobs, LaunchAgents, and recent git commits.
+   - Asset scan: inventory existing Codex skills, Claude Code skills (`.claude/skills/` and `~/.claude/skills/`), project docs, automations, cron jobs, LaunchAgents, and recent git commits.
 2. **Read key files** identified during the scan to deepen understanding of repeated patterns. Focus on rollout summaries, project docs, and commit clusters rather than reading every raw session in full.
-3. **Produce a compact shortlist** before creating anything:
+3. **Check for redundant skill coverage** before proposing a new skill:
+   - Search the relevant project for `.claude/skills/*`, `AGENTS.md`, `CLAUDE.md`, and `docs/`.
+   - If a Claude Code skill already covers the workflow, mark the recommendation as `Extend existing` or `Skip`, not `Skill`.
+   - Only create a Codex skill that overlaps a Claude skill when the existing skill is inaccessible from the user's intended Codex workflow and a lightweight pointer or project-doc reference would not solve the problem.
+4. **Produce a compact shortlist** before creating anything:
 
    | Repeated workflow | Supporting evidence & dates | Frequency / confidence | Recommended form | Why it is or is not worth creating |
    |---|---|---|---|---|
 
-4. **Pause only when needed**. If the user asked to approve the shortlist first, or the next step would create sensitive, broad, or potentially noisy assets, ask before creating. Otherwise, proceed to create only high-confidence missing items.
-5. **Create only high-confidence missing items.** Keep them narrow, practical, source-aware, and easy to validate.
-6. **Validate created assets**. Validate skills with the skill validator when available. For project docs, verify the file is referenced from the relevant `AGENTS.md` or `CLAUDE.md`. For automations, inspect the saved automation definition.
-7. **Finish with**:
+5. **Pause only when needed**. If the user asked to approve the shortlist first, or the next step would create sensitive, broad, or potentially noisy assets, ask before creating. Otherwise, proceed to create only high-confidence missing items.
+6. **Create only high-confidence missing items.** Keep them narrow, practical, source-aware, and easy to validate.
+7. **Validate created assets**. Validate skills with the skill validator when available. For project docs, verify the file is referenced from the relevant `AGENTS.md` or `CLAUDE.md`. For automations, inspect the saved automation definition.
+8. **Finish with**:
    - what was created or extended
    - what was deliberately skipped
    - what needs more evidence before packaging
@@ -69,6 +74,7 @@ Prefer project docs over global skills for single-repo debugging guides. Prefer 
 ## Creation Rules
 
 - If creating or updating a skill, follow the local `skill-creator` skill.
+- Before creating a Codex skill, explicitly check for overlapping Claude Code skills in the relevant project and user-level skill folders. Do not mirror a Claude local skill just to make a Codex-global copy.
 - If creating an automation, use the Codex automation tool rather than writing raw schedules by hand.
 - If adding project-specific guidance, place it in the project docs and point to it from `AGENTS.md` or the project instructions file.
 - Avoid speculative, overlapping, or broad "debug anything" assets.
