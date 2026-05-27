@@ -16,8 +16,8 @@ Show a 10-day rolling summary of USPS Informed Delivery mail from the local cach
 ```
 
 This fetches any new unprocessed emails first (so the cache is fresh), then renders the full 10-day summary with two sections:
-- **IMPORTANT MAIL** (count) — government, banks, financial, insurance, utilities, healthcare, legal, tax, DMV, courts, IRS
-- **OTHER MAIL** (count) — marketing, promotions, flyers, advertisements
+- **IMPORTANT MAIL** (count) — government, banks (statements/notices only), insurance, utilities, healthcare, legal, tax, DMV, courts, IRS, plus blank/illegible envelopes (these are typically official mail)
+- **OTHER MAIL** (count) — marketing, promotions, flyers, advertisements, poster/oversized glossy mailers (including bank promotions like Chase deposit/credit card offers)
 
 Each piece shows: date, sender name, recipient name, brief description, and the scanned image via `MEDIA:` path.
 
