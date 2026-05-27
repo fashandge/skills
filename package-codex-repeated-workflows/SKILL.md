@@ -9,12 +9,18 @@ Use this skill to convert recent repeated work into the smallest useful reusable
 
 ## Evidence Order
 
-Use available evidence in this order:
+Gather evidence in this order, using parallel shell/tool reads where possible:
 
-1. Recent Codex sessions and task summaries from the last 30 days, or all available history if shorter.
-2. Codex memories, project memories, rollout summaries, and archived sessions that reveal patterns across sessions.
-3. Chronicle or other ambient activity logs, if enabled. Use these only for discovery; confirm important details in the source system when possible.
-4. Existing skills, custom agents, project docs, and automations, so the recommendation reuses or extends what already exists.
+1. **Recent Codex sessions** from the last 30 days, or all available history if shorter. Start with `~/.codex/state_5.sqlite` (`threads` table), `~/.codex/session_index.jsonl`, `~/.codex/history.jsonl`, `~/.codex/sessions/`, and `~/.codex/archived_sessions/`. Session titles and first user messages are often enough for clustering; rollout files add details for high-value candidates.
+2. **Codex memories and summaries**: inspect Codex automation memories, project memories, rollout summaries, ambient suggestions, and any relevant `MEMORY.md` files exposed by local agent tools. These reveal repeated feedback, project context, and user preferences across sessions.
+3. **Git and project history**: run `git log --oneline --since="30 days ago"` across active projects when useful, especially under `~/projects/`. Commit messages reveal repeated task shapes such as "add metric", "fix ranking", "update summary", or "debug refetch".
+4. **Chronicle or other ambient activity logs**, if enabled. Use these only for discovery; confirm important details in the source system when possible.
+5. **Existing assets** so recommendations reuse or extend rather than duplicate:
+   - Skills under the active skills directory, usually `~/skills/`
+   - Project `AGENTS.md`, `CLAUDE.md`, and `docs/`
+   - Custom agents or subagent configs, if the environment exposes them
+   - Codex automations under `$CODEX_HOME/automations` or `~/.codex/automations`
+   - Local scheduled jobs: `crontab -l` and `~/Library/LaunchAgents/`
 
 Prefer local sources over web search. Do not inspect sensitive sources beyond what is needed to identify workflow shape.
 
@@ -32,36 +38,30 @@ Look broadly across coding, research, writing, planning, communication, operatio
 ## Choose The Smallest Form
 
 - **Extend existing**: use when the workflow is already mostly covered and only needs a mode, edge case, or pointer.
-- **Project doc**: use for repo-specific guidance that should not pollute the global skill list.
+- **Project doc**: use for repo-specific guidance that should not pollute the global skill list. Add it to project `AGENTS.md`, `CLAUDE.md`, or `docs/` and reference it from agent instructions.
 - **Skill**: use for reusable cross-project or frequently invoked workflows with stable procedures.
 - **Custom subagent**: use for bounded specialist investigation or repeat delegation roles.
-- **Automation**: use for scheduled checks, recurring reports, reminders, monitors, or proactive follow-ups.
+- **Automation**: use for scheduled checks, recurring reports, reminders, monitors, or proactive follow-ups. Use Codex automations for Codex-managed routines, and LaunchAgents/cron for local scheduled scripts when the user explicitly wants local scheduling.
 - **Skip**: use when the evidence or repeatability is not strong enough.
 
 Prefer project docs over global skills for single-repo debugging guides. Prefer extending over duplicating.
 
 ## Workflow
 
-1. Build a compact evidence table from recent sessions and memories:
-   - date
-   - project or source
-   - task title or first user request
-   - candidate workflow label
-   - notes on recurrence
-2. Inventory existing assets:
-   - skills under the active skills directory
-   - project `AGENTS.md`, `CLAUDE.md`, and relevant `docs/`
-   - custom agents, if the environment exposes any
-   - Codex automations under `$CODEX_HOME/automations` or `~/.codex/automations`
-3. Produce a compact shortlist before creating anything. Include:
-   - repeated workflow
-   - supporting evidence and dates
-   - frequency/confidence
-   - recommended form: skill, subagent, automation, extend existing, project doc, or skip
-   - why it is or is not worth creating
-4. Create only high-confidence missing items. Keep them narrow, practical, source-aware, and easy to validate.
-5. Validate created skills with the skill validator when available. For project docs, verify the file is referenced from the relevant `AGENTS.md` or `CLAUDE.md`.
-6. Finish with:
+1. **Gather evidence** with parallel local reads:
+   - Session scan: query Codex SQLite/session JSONL and list recent rollout paths.
+   - Memory/project scan: read relevant memories, ambient suggestions, and project instruction files.
+   - Asset scan: inventory existing skills, project docs, automations, cron jobs, LaunchAgents, and recent git commits.
+2. **Read key files** identified during the scan to deepen understanding of repeated patterns. Focus on rollout summaries, project docs, and commit clusters rather than reading every raw session in full.
+3. **Produce a compact shortlist** before creating anything:
+
+   | Repeated workflow | Supporting evidence & dates | Frequency / confidence | Recommended form | Why it is or is not worth creating |
+   |---|---|---|---|---|
+
+4. **Pause only when needed**. If the user asked to approve the shortlist first, or the next step would create sensitive, broad, or potentially noisy assets, ask before creating. Otherwise, proceed to create only high-confidence missing items.
+5. **Create only high-confidence missing items.** Keep them narrow, practical, source-aware, and easy to validate.
+6. **Validate created assets**. Validate skills with the skill validator when available. For project docs, verify the file is referenced from the relevant `AGENTS.md` or `CLAUDE.md`. For automations, inspect the saved automation definition.
+7. **Finish with**:
    - what was created or extended
    - what was deliberately skipped
    - what needs more evidence before packaging
