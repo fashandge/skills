@@ -27,36 +27,76 @@ Always use this sequence. Don't use `openclaw update` (the self-updater) — it 
 # 1. Note current version (for rollback)
 openclaw --version
 
-# 2. Stop the gateway cleanly
+# 2. Create a full backup BEFORE any changes
+backup-openclaw
+# Note the backup filename printed (~/backups/openclaw-YYYYMMDD-HHMM.tar.gz) — you'll need it if rollback is required
+
+# 3. Stop the gateway cleanly
 launchctl bootout gui/$(id -u)/ai.openclaw.gateway
 
-# 3. Wipe staged plugin runtime deps (different versions use different layouts)
+# 4. Wipe staged plugin runtime deps (different versions use different layouts)
 rm -rf ~/.openclaw/plugin-runtime-deps
 
-# 4. Install via brew's npm explicitly (avoid PATH ambiguity)
+# 5. Install via brew's npm explicitly (avoid PATH ambiguity)
 /opt/homebrew/bin/npm -g install openclaw@<version>
 
-# 5. Verify the install actually replaced the binary
+# 6. Verify the install actually replaced the binary
 openclaw --version
 
-# 6. Run doctor to rewrite launchd plist + reinstall bundled deps
+# 7. Run doctor to rewrite launchd plist + reinstall bundled deps
 openclaw doctor --fix
 
-# 7. Wait for the install to fully settle — DO NOT kickstart again
+# 8. Wait for the install to fully settle — DO NOT kickstart again
 #    On versions with plugin-runtime-deps staging, first boot pegs CPU
 #    for 1-2 minutes while installing into ~/.openclaw/plugin-runtime-deps/.
 #    Interrupting forces it to start over.
 sleep 30
 ps aux | grep openclaw-gateway | grep -v grep   # cpu should drop toward 0%
 
-# 8. Smoke test
+# 9. Smoke test
 launchctl print gui/$(id -u)/ai.openclaw.gateway | grep -E 'state|last exit'
 tail ~/.openclaw/logs/gateway.log               # look for "[gateway] ready"
 ```
 
-## Rollback procedure
+If any step from 5 onward fails or the smoke test shows problems, proceed to **Restore from backup** below.
 
-Identical to update, just install the older version in step 4. Stable releases of openclaw use date-based versions like `2026.4.23`, `2026.4.22`. List published versions:
+## Restore from backup
+
+If the update fails or introduces regressions, restore from the backup created in step 2. This recovers config, sessions, agent state, and plugin data to the pre-update snapshot.
+
+```bash
+# 1. Stop the gateway
+launchctl bootout gui/$(id -u)/ai.openclaw.gateway
+
+# 2. Roll back the npm package to the previous version
+/opt/homebrew/bin/npm -g install openclaw@<previous-version>
+
+# 3. Restore config/state from the backup tarball
+openclaw backup restore ~/backups/openclaw-YYYYMMDD-HHMM.tar.gz
+
+# 4. Rewrite launchd plist for the restored version
+openclaw doctor --fix
+
+# 5. Wait for settle
+sleep 30
+
+# 6. Verify
+openclaw --version
+launchctl print gui/$(id -u)/ai.openclaw.gateway | grep -E 'state|last exit'
+tail ~/.openclaw/logs/gateway.log
+```
+
+If `openclaw backup restore` is not available on the installed version, manually extract the tarball:
+
+```bash
+tar -xzf ~/backups/openclaw-YYYYMMDD-HHMM.tar.gz -C ~/.openclaw --strip-components=1
+```
+
+After restoring, diff the config to confirm no drift was introduced (see **Post-update: doctor config drift** below).
+
+## Rollback procedure (version-only, no backup)
+
+Identical to update, just install the older version in step 5. Stable releases of openclaw use date-based versions like `2026.4.23`, `2026.4.22`. List published versions:
 
 ```bash
 npm view openclaw versions --json | tail -30
@@ -105,12 +145,14 @@ Recovery target if the user's been on `2026.4.26+` and it's slow: `2026.4.23` (l
 
 ### Config diff procedure
 
-```bash
-# Before updating, backup the config
-cp ~/.openclaw/openclaw.json ~/backups/openclaw-$(date +%Y%m%d-%H%M).json
+The `backup-openclaw` step (step 2) already saved a full snapshot. Extract just the config from it for diffing:
 
-# After doctor, diff against backup
-diff <(jq --sort-keys . ~/backups/openclaw-YYYYMMDD-HHMM.json) \
+```bash
+# Extract the config from the backup tarball for comparison
+tar -xzf ~/backups/openclaw-YYYYMMDD-HHMM.tar.gz --include='*/openclaw.json' -O > /tmp/openclaw-pre-update.json
+
+# After doctor, diff against the pre-update config
+diff <(jq --sort-keys . /tmp/openclaw-pre-update.json) \
      <(jq --sort-keys . ~/.openclaw/openclaw.json)
 
 # Revert a specific key (example: remove groupChat)
