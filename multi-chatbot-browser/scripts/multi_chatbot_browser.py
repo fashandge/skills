@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
-"""Query Gemini / ChatGPT / Grok in the existing local Chrome session.
+"""Query Gemini / ChatGPT / Grok in parallel in a self-spawned logged-in Chrome.
 
-- Opens a new tab for each requested chatbot, or reuses matching tabs with
-  ``--reuse-tabs``
+Instead of attaching to a pre-running Chrome on port 9222, this spawns its own
+**logged-in** Chrome (headless by default, ``--headed`` for a visible window) via
+the ``logged-in-chrome`` project in COW (copy-on-write) mode: an instant APFS
+clone of your real Chrome profile, so every
+site is already signed in — including Gemini/Google, whose rotating tokens can't
+be snapshotted into a cookie file. The browser and its temp profile are created
+and auto-cleaned by ``AsyncLoggedInChrome`` (context-manager teardown), so there
+is nothing to launch or tear down by hand.
+
+- Opens a fresh tab for each requested chatbot
 - Sends the same question to one or more chatbots in parallel
 - Captures the full rendered response text as shown on the page
 
 Requires:
-  - local Chrome running with remote debugging on 127.0.0.1:9222
-  - playwright installed in the active Python environment
-  - requests installed (usually already present)
+  - the ``logged-in-chrome`` project importable as ``browser.src.logged_in_chrome``
+    (it lives at ~/projects/browser/src; ~/projects is on sys.path via the ml env's
+    editable ``projects`` install, so the import resolves with no PYTHONPATH needed)
+  - a system Google Chrome install + playwright / playwright-stealth in the ml env
 
 Example:
   python scripts/multi_chatbot_browser.py --question "la weather tomorrow"
@@ -23,12 +32,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import re
-import sys
-from typing import Iterable
 
-import requests
-from playwright.async_api import async_playwright
-from playwright._impl._errors import TargetClosedError
+# logged-in-chrome lives at ~/projects/browser/src. ~/projects is on sys.path (the
+# editable `projects` install), so import the module by its absolute namespace path —
+# no PYTHONPATH or sys.path hacks needed.
+from browser.src import logged_in_chrome
 
 URLS = {
     "gemini": "https://gemini.google.com/",
@@ -59,42 +67,11 @@ def parse_chatbots(value: str | None) -> list[str]:
     return deduped
 
 
-def ensure_browser_ws() -> str:
-    try:
-        data = requests.get("http://127.0.0.1:9222/json/version", timeout=5).json()
-    except Exception as exc:
-        raise SystemExit(
-            "Could not reach Chrome CDP at http://127.0.0.1:9222/json/version. "
-            "Make sure local Chrome is running with remote debugging enabled."
-        ) from exc
-    ws = data.get("webSocketDebuggerUrl")
-    if not ws:
-        raise SystemExit("Chrome CDP did not return a webSocketDebuggerUrl")
-    return ws
-
-
-async def open_new_page(ctx, bot: str):
+async def open_chatbot(ctx, bot: str):
     page = await ctx.new_page()
     await page.goto(URLS[bot], wait_until="domcontentloaded")
     await page.wait_for_timeout(5000)
     return page
-
-
-async def find_or_open_page(ctx, bot: str):
-    for page in ctx.pages:
-        try:
-            if page.is_closed():
-                continue
-            url = page.url
-        except Exception:
-            continue
-        if bot == "gemini" and "gemini.google.com" in url:
-            return page
-        if bot == "chatgpt" and ("chatgpt.com" in url or "chat.openai.com" in url):
-            return page
-        if bot == "grok" and "grok.com" in url:
-            return page
-    return await open_new_page(ctx, bot)
 
 
 async def last_nonempty_inner_text(locator) -> str:
@@ -164,7 +141,7 @@ async def extract_new_gemini_response(page, baseline_count: int) -> str:
 
 async def gemini_response_complete(text: str) -> bool:
     cleaned = text.strip()
-    if len(cleaned) < 40:
+    if len(cleaned) < 15:  # short factual answers are valid; stability gate guards mid-stream
         return False
 
     low = cleaned.lower()
@@ -230,7 +207,7 @@ async def extract_grok_response(page) -> str:
 
 async def grok_response_complete(text: str, question: str) -> bool:
     cleaned = text.strip()
-    if len(cleaned) < 40:
+    if len(cleaned) < 15:  # short factual answers are valid; stability gate guards mid-stream
         return False
 
     question_norm = " ".join(question.split()).strip().lower()
@@ -347,67 +324,45 @@ def build_gemini_summary_prompt(question: str, chatbots: list[str], results: dic
     return "\n".join(parts).strip()
 
 
+ASKERS = {"gemini": ask_gemini, "chatgpt": ask_chatgpt, "grok": ask_grok}
+
+
 async def run(
     chatbots: list[str],
     question: str,
-    reuse_tabs: bool,
     timeout_seconds: int,
     skip_summary: bool,
+    headed: bool = False,
 ) -> int:
-    ws = ensure_browser_ws()
-    async with async_playwright() as p:
-        browser = await p.chromium.connect_over_cdp(ws)
-        ctx = browser.contexts[0]
+    # Spawn our own logged-in Chrome (COW clone of the real profile → every site
+    # signed in, Gemini included); headless by default. Temp profile auto-cleaned on exit.
+    async with logged_in_chrome.AsyncLoggedInChrome(
+        use_copy_on_write_profile=True, headless=not headed
+    ) as cow:
+        ctx = cow.browser.contexts[0]
 
-        pages = {}
-        for bot in chatbots:
-            page = await (find_or_open_page(ctx, bot) if reuse_tabs else open_new_page(ctx, bot))
-            if page.is_closed():
-                page = await open_new_page(ctx, bot)
-            pages[bot] = page
-            try:
-                await page.bring_to_front()
-                await page.wait_for_timeout(1000)
-            except TargetClosedError:
-                page = await open_new_page(ctx, bot)
-                pages[bot] = page
-                await page.bring_to_front()
-                await page.wait_for_timeout(1000)
+        opened = await asyncio.gather(*(open_chatbot(ctx, bot) for bot in chatbots))
+        pages = dict(zip(chatbots, opened))
 
         async def ask_one(bot: str) -> tuple[str, str]:
-            await pages[bot].bring_to_front()
-            if bot == "gemini":
-                coro = ask_gemini(pages[bot], question)
-            elif bot == "chatgpt":
-                coro = ask_chatgpt(pages[bot], question)
-            elif bot == "grok":
-                coro = ask_grok(pages[bot], question)
-            else:
-                raise RuntimeError(f"Unsupported chatbot: {bot}")
-
             try:
-                return bot, await asyncio.wait_for(coro, timeout=timeout_seconds)
-            except asyncio.TimeoutError:
-                return (
-                    bot,
-                    f"[Timed out after {timeout_seconds}s waiting for {bot} response]",
+                answer = await asyncio.wait_for(
+                    ASKERS[bot](pages[bot], question), timeout=timeout_seconds
                 )
+            except asyncio.TimeoutError:
+                answer = f"[Timed out after {timeout_seconds}s waiting for {bot} response]"
+            return bot, answer
 
-        pairs = await asyncio.gather(*(ask_one(bot) for bot in chatbots))
-        results = dict(pairs)
+        results = dict(await asyncio.gather(*(ask_one(bot) for bot in chatbots)))
 
         for bot in chatbots:
             print(f"\n=== {bot.upper()} FULL RESPONSE ===")
             print(results[bot])
 
-        should_summarize = not skip_summary and len(chatbots) > 1
-        if should_summarize:
+        if not skip_summary and len(chatbots) > 1:
             gemini_page = pages.get("gemini")
-            if gemini_page is None or gemini_page.is_closed():
-                gemini_page = await (
-                    find_or_open_page(ctx, "gemini") if reuse_tabs else open_new_page(ctx, "gemini")
-                )
-                pages["gemini"] = gemini_page
+            if gemini_page is None:
+                gemini_page = await open_chatbot(ctx, "gemini")
 
             summary_prompt = build_gemini_summary_prompt(question, chatbots, results)
             try:
@@ -419,8 +374,6 @@ async def run(
 
             print("\n=== GEMINI SUMMARY ===")
             print(summary)
-
-        await browser.close()
     return 0
 
 
@@ -430,11 +383,6 @@ def main(argv: list[str] | None = None) -> int:
         "--chatbots",
         default=",".join(DEFAULT_CHATBOTS),
         help="Comma-separated list of chatbots: gemini, chatgpt, grok (default: gemini,chatgpt)",
-    )
-    parser.add_argument(
-        "--reuse-tabs",
-        action="store_true",
-        help="Reuse an existing tab for a chatbot if one is already open",
     )
     parser.add_argument(
         "--timeout-seconds",
@@ -447,6 +395,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip the final Gemini summary/comparison step",
     )
+    parser.add_argument(
+        "--headed",
+        action="store_true",
+        help="Show a visible Chrome window (default: headless)",
+    )
     parser.add_argument("--question", required=True, help="Question to send to each chatbot")
     args = parser.parse_args(argv)
 
@@ -457,9 +410,9 @@ def main(argv: list[str] | None = None) -> int:
         run(
             chatbots,
             args.question,
-            args.reuse_tabs,
             args.timeout_seconds,
             args.skip_summary,
+            args.headed,
         )
     )
 

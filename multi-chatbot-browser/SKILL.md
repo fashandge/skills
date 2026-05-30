@@ -1,6 +1,6 @@
 ---
 name: multi-chatbot-browser
-description: Query Gemini, ChatGPT, and Grok in parallel using the existing local Chrome instance over CDP, optionally reuse tabs, capture full responses as rendered, and optionally ask Gemini for a final cross-chatbot summary.
+description: Query Gemini, ChatGPT, and Grok in parallel by spawning a self-managed logged-in headless Chrome (copy-on-write clone of the real profile, so every site is already signed in), capture full responses as rendered, and optionally ask Gemini for a final cross-chatbot summary.
 ---
 
 # Multi-Chatbot Browser Queries
@@ -17,15 +17,20 @@ Default selection:
 - chatgpt
 
 Behavior:
-- Use the existing local Chrome window connected to CDP on port 9222.
-- By default, open a new tab for each requested chatbot.
-- If --reuse-tabs is set, reuse an existing chatbot tab when available.
+- Spawn a self-managed, **logged-in** Chrome via the `logged-in-chrome` project in **COW (copy-on-write) mode** — an instant APFS clone of the real Chrome profile, so every site (Gemini/Google included) is already signed in. Headless by default; pass `--headed` for a visible window. Do **not** depend on a pre-running Chrome or a CDP port.
+- Open a fresh tab for each requested chatbot.
 - Send the same prompt to each chatbot in parallel.
 - Wait for each chatbot response independently, with a per-chatbot timeout.
 - Capture the full response text as it appears in the page body.
 - By default, after collecting multiple chatbot responses, ask Gemini for a final synthesis.
-- If --skip-summary is set, skip the Gemini synthesis step.
+- If `--skip-summary` is set, skip the Gemini synthesis step.
 - Do not summarize, paraphrase, or trim the per-chatbot responses unless the user explicitly asks for that.
+
+## Why COW mode (robustness)
+
+- **Self-contained**: `AsyncLoggedInChrome` launches its own Chrome and a temp profile, then auto-cleans both on exit (context-manager teardown + `atexit` backstop + startup orphan sweep). There is no Chrome window to launch or tear down by hand, and nothing to leave running on port 9222.
+- **Always logged in**: a copy-on-write clone of the real profile carries *every* site's live session. This is the only mode that keeps **Gemini/Google** signed in, because their rotating `__Secure-1PSID*` tokens cannot be snapshotted into a cookie file.
+- **Headless by default**: no visible window; runs unattended. The project applies stealth + a clean User-Agent under headless so Cloudflare-gated sites (ChatGPT, Grok) still pass. Pass `--headed` to watch the run in a real window (useful for debugging or to handle an unexpected login prompt).
 
 ## Trigger phrases
 
@@ -40,61 +45,51 @@ Use this skill when the user asks to:
 A ready-to-run script lives at:
 
 ```bash
-~/.hermes/skills/openclaw-imports/multi-chatbot-browser/scripts/multi_chatbot_browser.py
+~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py
 ```
 
-Examples:
+It imports the module as `browser.src.logged_in_chrome` from the `logged-in-chrome`
+project (at `~/projects/browser/src`). `~/projects` is on `sys.path` via the `ml`
+env's editable `projects` install, so the import resolves with no `PYTHONPATH`
+needed. It spawns the COW browser itself (headless by default).
+
+Run it with the `ml` env Python:
 
 ```bash
-/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python ~/.hermes/skills/openclaw-imports/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
+ML=/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python
+
+# Default: Gemini + ChatGPT, with a final Gemini synthesis
+$ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
   --question "la weather tomorrow"
 
-/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python ~/.hermes/skills/openclaw-imports/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
+# Three chatbots
+$ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
   --chatbots gemini,chatgpt,grok \
   --question "compare VRT vs ETN for a swing trade"
 
-/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python ~/.hermes/skills/openclaw-imports/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
+# Custom timeout, skip the synthesis step
+$ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
   --chatbots gemini,chatgpt,grok \
-  --reuse-tabs \
   --timeout-seconds 90 \
+  --skip-summary \
   --question "best way for browser automation for AI agents"
 
-/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python ~/.hermes/skills/openclaw-imports/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
-  --chatbots gemini,chatgpt,grok \
-  --reuse-tabs \
-  --skip-summary \
-  --question "compare reviews of browser-use/browser-use and vercel-labs/agent-browser"
+# Visible window (e.g. to debug or clear a login prompt)
+$ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
+  --headed \
+  --question "la weather tomorrow"
 ```
 
-## Command-line workflow
+The script is the full working example; it implements the logic described below.
 
-This skill assumes the local Chrome instance is already running with remote debugging enabled on port 9222.
+## Command-line flags
 
-Use the script above for the full working example; it implements the same logic described in this skill.
+- `--chatbots` — comma-separated subset of `gemini,chatgpt,grok` (default `gemini,chatgpt`).
+- `--question` — the prompt sent to each chatbot (required).
+- `--timeout-seconds` — per-chatbot wait cap (default 120).
+- `--skip-summary` — skip the final Gemini synthesis.
+- `--headed` — show a visible Chrome window (default: headless).
 
-## Recommended invocation pattern
-
-Use an explicit chatbot list and a single question.
-
-Examples:
-
-```bash
-# Default: Gemini + ChatGPT
-CHATBOTS="gemini,chatgpt"
-QUESTION="la weather tomorrow"
-
-# Gemini only
-CHATBOTS="gemini"
-QUESTION="what's the outlook for NVDA this quarter?"
-
-# Gemini + ChatGPT + Grok
-CHATBOTS="gemini,chatgpt,grok"
-QUESTION="compare VRT vs ETN for a swing trade"
-
-# Reuse existing tabs when available
-CHATBOTS="gemini,chatgpt,grok"
-QUESTION="SFO weather tomorrow"
-```
 ## Input parsing rules
 
 - If no chatbot list is provided, default to `gemini,chatgpt`.
@@ -115,7 +110,7 @@ QUESTION="SFO weather tomorrow"
 
 Because each chatbot loads differently, use a chatbot-specific completion check:
 
-- Gemini: wait for a new response block after the current turn baseline, then wait for the text to stabilize.
+- Gemini: wait for a new response block after the current turn baseline, then wait for the text to stabilize (stable across 2 polls). Short factual answers are valid.
 - ChatGPT: wait for a substantive assistant turn, not an intermediate `Thinking` / `Thought for ...` stub.
 - Grok: wait for a substantive rendered response, not just an echoed copy of the user prompt.
 
@@ -127,30 +122,23 @@ If the page is still streaming, keep waiting until the answer looks complete or 
   - summarize common points
   - identify disagreements or differences in emphasis
   - print a side-by-side comparison
-- Reuse the same Gemini tab when possible to avoid opening extra tabs.
+- Reuse the Gemini tab from the original query when one exists; otherwise open a Gemini tab for the final synthesis.
 - Capture Gemini's summary as a separate later turn, not as a replacement for Gemini's original answer.
-- If Gemini was not one of the original requested chatbots, open or reuse a Gemini tab for the final synthesis.
 
 ## Notes and pitfalls
 
 - Gemini often uses a contenteditable input rather than a textarea.
 - ChatGPT may expose both a hidden textarea and a visible contenteditable editor.
 - Grok commonly uses a ProseMirror contenteditable editor.
-- By default, open fresh tabs for the requested chatbots.
-- Only reuse existing chatbot tabs when `--reuse-tabs` is set.
-- Always connect to the existing Chrome instance through CDP rather than launching a separate browser.
-- On this environment, the most reliable connection path is: `GET http://127.0.0.1:9222/json/version` -> use `webSocketDebuggerUrl` -> `playwright.chromium.connect_over_cdp(...)`.
-- The agent-browser CLI wrapper may fail with a 500 on this setup; direct Playwright CDP works reliably.
-- If a chatbot has not been authenticated yet, stop and let the user handle login in the visible browser.
+- The browser is spawned fresh each run, so every chatbot gets a clean new tab — there is no tab reuse and no leftover conversation state.
+- Logins come from the COW clone of the real profile. If a chatbot is **not** signed in there, sign into it in your normal Chrome first, then re-run.
+- COW mode exposes the *entire* real profile to automation; that is intentional here (Gemini needs it), but keep questions/prompts non-sensitive accordingly.
 - Use `/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python` for Python execution in this environment.
+- Requires a system Google Chrome install plus `playwright` / `playwright-stealth` in the `ml` env (the `logged-in-chrome` project's dependencies).
 
 ## Verification
 
-A successful run should print one section per requested chatbot, each containing the full text response captured from that page.
-
-If summary is enabled and more than one chatbot was queried, it should also print a final Gemini synthesis block.
-
-Example output structure:
+A successful run prints one section per requested chatbot, each containing the full text response captured from that page:
 
 ```text
 === GEMINI FULL RESPONSE ===
@@ -165,3 +153,5 @@ Example output structure:
 === GEMINI SUMMARY ===
 ...
 ```
+
+If summary is enabled and more than one chatbot was queried, it also prints the final Gemini synthesis block. The temp Chrome profile is removed automatically when the run ends.
