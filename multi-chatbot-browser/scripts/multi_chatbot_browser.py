@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Query Gemini / ChatGPT / Grok in parallel in a self-spawned logged-in Chrome.
+"""Query Gemini / ChatGPT / Grok / Claude in parallel in a self-spawned logged-in Chrome.
 
 Instead of attaching to a pre-running Chrome on port 9222, this spawns its own
 **logged-in** Chrome via the ``logged-in-chrome`` project in COW (copy-on-write)
@@ -24,10 +24,10 @@ Requires:
 
 Example:
   python scripts/multi_chatbot_browser.py --question "la weather tomorrow"
-  python scripts/multi_chatbot_browser.py --chatbots gemini,chatgpt,grok --question "compare VRT vs ETN"
+  python scripts/multi_chatbot_browser.py --chatbots gemini,chatgpt,grok,claude --question "compare VRT vs ETN"
   python scripts/multi_chatbot_browser.py --headless --question "la weather tomorrow"
   python scripts/multi_chatbot_browser.py --no-keep-open --question "la weather tomorrow"
-  python scripts/multi_chatbot_browser.py --chatbots chatgpt,gemini,grok --skip-summary --question "compare VRT vs ETN"
+  python scripts/multi_chatbot_browser.py --chatbots chatgpt,gemini,grok,claude --skip-summary --question "compare VRT vs ETN"
 """
 
 from __future__ import annotations
@@ -45,6 +45,7 @@ URLS = {
     "gemini": "https://gemini.google.com/",
     "chatgpt": "https://chatgpt.com/",
     "grok": "https://grok.com/",
+    "claude": "https://claude.ai/new",
 }
 
 DEFAULT_CHATBOTS = ["gemini", "chatgpt"]
@@ -62,7 +63,7 @@ def parse_chatbots(value: str | None) -> list[str]:
     for bot in bots:
         if bot not in VALID_CHATBOTS:
             raise SystemExit(
-                f"Unknown chatbot '{bot}'. Valid options: gemini, chatgpt, grok"
+                f"Unknown chatbot '{bot}'. Valid options: gemini, chatgpt, grok, claude"
             )
         if bot not in seen:
             deduped.append(bot)
@@ -221,6 +222,88 @@ async def grok_response_complete(text: str, question: str) -> bool:
     return True
 
 
+def claude_response_locator(page):
+    return page.locator(".font-claude-response")
+
+
+async def extract_new_claude_response(page, baseline_count: int) -> str:
+    locator = claude_response_locator(page)
+    count = await locator.count()
+    for i in range(count - 1, baseline_count - 1, -1):
+        try:
+            response = locator.nth(i)
+            markdown = response.locator(".standard-markdown, .progressive-markdown")
+            markdown_count = await markdown.count()
+            parts = []
+            for j in range(markdown_count):
+                part = (await markdown.nth(j).inner_text()).strip()
+                if part:
+                    parts.append(part)
+            text = "\n\n".join(parts).strip()
+            if not text:
+                text = (await response.inner_text()).strip()
+        except Exception:
+            continue
+        if text:
+            return text
+    return ""
+
+
+async def claude_response_complete(text: str, question: str) -> bool:
+    cleaned = text.strip()
+    if not cleaned:
+        return False
+
+    transient_markers = [
+        "identified need",
+        "searching the web",
+        "i'll research",
+        "let me get more detail",
+        "assessing ",
+        "synthesized ",
+    ]
+    if len(cleaned) < 500 and any(marker in cleaned.lower() for marker in transient_markers):
+        return False
+
+    question_norm = " ".join(question.split()).strip().lower()
+    cleaned_norm = " ".join(cleaned.split()).strip().lower()
+    if cleaned_norm == question_norm:
+        return False
+
+    return True
+
+
+async def claude_response_finished(page) -> bool:
+    # Primary signal: each assistant turn is wrapped in <div data-is-streaming="true|false">,
+    # which stays "true" through tool use / web search even while the visible text is frozen
+    # — more reliable than text stability, the Stop button, or a11y status strings.
+    flags = page.locator("[data-is-streaming]")
+    n = await flags.count()
+    if n:
+        if await page.locator('[data-is-streaming="true"]').count():
+            return False
+        last = await flags.nth(n - 1).get_attribute("data-is-streaming")
+        return last == "false"
+
+    # Fallbacks if the attribute ever disappears (DOM change): stop button / a11y status.
+    if await page.locator('button[aria-label*="Stop" i]:visible').count():
+        return False
+
+    try:
+        body = await page.locator("body").inner_text(timeout=2000)
+    except Exception:
+        return False
+
+    if "Claude is responding" in body:
+        return False
+    if "Claude finished the response" in body:
+        return True
+
+    # Claude can briefly omit the accessible status marker on short responses;
+    # in that case the absence of the stop button is enough after text exists.
+    return True
+
+
 async def ask_gemini(page, question: str) -> str:
     prompt = page.locator('[contenteditable="true"]:visible').first
     await prompt.click()
@@ -308,6 +391,51 @@ async def ask_grok(page, question: str) -> str:
     return last_seen or (await extract_grok_response(page)).strip()
 
 
+async def ask_claude(page, question: str) -> str:
+    prompt = page.locator(
+        'div.ProseMirror[contenteditable="true"], [contenteditable="true"]:visible, textarea:visible'
+    ).first
+    await prompt.click()
+    try:
+        await prompt.fill(question)
+    except Exception:
+        await page.keyboard.insert_text(question)
+
+    baseline_count = await claude_response_locator(page).count()
+    send_button = page.locator('button[aria-label*="Send" i]:visible').last
+    if await send_button.count():
+        await send_button.click()
+    else:
+        await prompt.press("Enter")
+
+    last_seen = ""
+    stable_count = 0
+    # Higher budget than the other bots: Claude may run a web search before writing, so the
+    # outer --timeout-seconds (not this inner loop) should govern how long it may take.
+    for _ in range(150):
+        await asyncio.sleep(2)
+        current = (await extract_new_claude_response(page, baseline_count)).strip()
+        if not current:
+            continue
+        if not await claude_response_complete(current, question):
+            continue
+        if not await claude_response_finished(page):
+            last_seen = current
+            stable_count = 0
+            continue
+
+        if current == last_seen:
+            stable_count += 1
+        else:
+            last_seen = current
+            stable_count = 1
+
+        if stable_count >= 2:
+            return current
+
+    return last_seen or (await extract_new_claude_response(page, baseline_count)).strip()
+
+
 def build_gemini_summary_prompt(question: str, chatbots: list[str], results: dict[str, str]) -> str:
     parts = [
         f'Please read the following chatbot responses to the question: "{question}"',
@@ -327,7 +455,12 @@ def build_gemini_summary_prompt(question: str, chatbots: list[str], results: dic
     return "\n".join(parts).strip()
 
 
-ASKERS = {"gemini": ask_gemini, "chatgpt": ask_chatgpt, "grok": ask_grok}
+ASKERS = {
+    "gemini": ask_gemini,
+    "chatgpt": ask_chatgpt,
+    "grok": ask_grok,
+    "claude": ask_claude,
+}
 
 
 async def run(
@@ -394,7 +527,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--chatbots",
         default=",".join(DEFAULT_CHATBOTS),
-        help="Comma-separated list of chatbots: gemini, chatgpt, grok (default: gemini,chatgpt)",
+        help="Comma-separated list of chatbots: gemini, chatgpt, grok, claude (default: gemini,chatgpt)",
     )
     parser.add_argument(
         "--timeout-seconds",

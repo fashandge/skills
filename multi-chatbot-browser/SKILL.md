@@ -1,6 +1,6 @@
 ---
 name: multi-chatbot-browser
-description: Query Gemini, ChatGPT, and Grok in parallel by spawning a self-managed logged-in Chrome (copy-on-write clone of the real profile, so every site is already signed in), capture full responses as rendered, and optionally ask Gemini for a final cross-chatbot summary. The browser is headed and left open by default (--headless / --no-keep-open to change).
+description: Query Gemini, ChatGPT, Grok, and Claude in parallel by spawning a self-managed logged-in Chrome (copy-on-write clone of the real profile, so every site is already signed in), capture full responses as rendered, and optionally ask Gemini for a final cross-chatbot summary. The browser is headed and left open by default (--headless / --no-keep-open to change).
 ---
 
 # Multi-Chatbot Browser Queries
@@ -11,6 +11,7 @@ Supported chatbots:
 - gemini
 - chatgpt
 - grok
+- claude
 
 Default selection:
 - gemini
@@ -37,7 +38,7 @@ Behavior:
 
 Use this skill when the user asks to:
 - compare chatbot answers
-- ask Gemini / ChatGPT / Grok the same question
+- ask Gemini / ChatGPT / Grok / Claude the same question
 - run parallel chatbot queries
 - capture full responses from AI websites
 
@@ -63,14 +64,14 @@ ML=/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python
 $ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
   --question "la weather tomorrow"
 
-# Three chatbots
+# Four chatbots
 $ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
-  --chatbots gemini,chatgpt,grok \
+  --chatbots gemini,chatgpt,grok,claude \
   --question "compare VRT vs ETN for a swing trade"
 
 # Custom timeout, skip the synthesis step
 $ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
-  --chatbots gemini,chatgpt,grok \
+  --chatbots gemini,chatgpt,grok,claude \
   --timeout-seconds 90 \
   --skip-summary \
   --question "best way for browser automation for AI agents"
@@ -90,7 +91,7 @@ The script is the full working example; it implements the logic described below.
 
 ## Command-line flags
 
-- `--chatbots` — comma-separated subset of `gemini,chatgpt,grok` (default `gemini,chatgpt`).
+- `--chatbots` — comma-separated subset of `gemini,chatgpt,grok,claude` (default `gemini,chatgpt`).
 - `--question` — the prompt sent to each chatbot (required).
 - `--timeout-seconds` — per-chatbot wait cap (default 120).
 - `--skip-summary` — skip the final Gemini synthesis.
@@ -100,7 +101,7 @@ The script is the full working example; it implements the logic described below.
 ## Input parsing rules
 
 - If no chatbot list is provided, default to `gemini,chatgpt`.
-- Accept one or more of: `gemini`, `chatgpt`, `grok`.
+- Accept one or more of: `gemini`, `chatgpt`, `grok`, `claude`.
 - Deduplicate the list while preserving order.
 - Fail fast on unknown chatbot names.
 
@@ -112,6 +113,7 @@ The script is the full working example; it implements the logic described below.
 - Keep the assistant response body, not random page chrome or suggestion chips.
 - For ChatGPT, strip transient `Thought for ...` lines when they appear in the captured body.
 - For Gemini, treat each submitted prompt as a separate turn and capture only the new response after that turn.
+- For Claude, submit through the `div.ProseMirror[contenteditable="true"]` editor on `claude.ai/new`, click the visible `button[aria-label*="Send"]`, wait for Claude's finished state, and capture the new `.standard-markdown` / `.progressive-markdown` content inside `.font-claude-response` so the echoed user prompt and duplicated live-status text are excluded.
 
 ## Waiting rules
 
@@ -120,6 +122,7 @@ Because each chatbot loads differently, use a chatbot-specific completion check:
 - Gemini: wait for a new response block after the current turn baseline, then wait for the text to stabilize (stable across 2 polls). Short factual answers are valid.
 - ChatGPT: wait for a substantive assistant turn, not an intermediate `Thinking` / `Thought for ...` stub.
 - Grok: wait for a substantive rendered response, not just an echoed copy of the user prompt.
+- Claude: wait for a new `.font-claude-response` block after the current turn baseline, ignore transient research/search/status-only scaffolding, wait until the page no longer says `Claude is responding`, then wait for the markdown text to stabilize. Short direct answers are valid after Claude reaches the finished state.
 
 If the page is still streaming, keep waiting until the answer looks complete or the timeout expires.
 
@@ -137,6 +140,7 @@ If the page is still streaming, keep waiting until the answer looks complete or 
 - Gemini often uses a contenteditable input rather than a textarea.
 - ChatGPT may expose both a hidden textarea and a visible contenteditable editor.
 - Grok commonly uses a ProseMirror contenteditable editor.
+- Claude uses a ProseMirror contenteditable editor on `https://claude.ai/new`; the send button is only present after the prompt is non-empty.
 - The browser is spawned fresh each run, so every chatbot gets a clean new tab — there is no tab reuse and no leftover conversation state.
 - Logins come from the COW clone of the real profile. If a chatbot is **not** signed in there, sign into it in your normal Chrome first, then re-run.
 - COW mode exposes the *entire* real profile to automation; that is intentional here (Gemini needs it), but keep questions/prompts non-sensitive accordingly.
@@ -155,6 +159,9 @@ A successful run prints one section per requested chatbot, each containing the f
 ...
 
 === GROK FULL RESPONSE ===
+...
+
+=== CLAUDE FULL RESPONSE ===
 ...
 
 === GEMINI SUMMARY ===
