@@ -2,13 +2,15 @@
 """Query Gemini / ChatGPT / Grok in parallel in a self-spawned logged-in Chrome.
 
 Instead of attaching to a pre-running Chrome on port 9222, this spawns its own
-**logged-in** Chrome (headless by default, ``--headed`` for a visible window) via
-the ``logged-in-chrome`` project in COW (copy-on-write) mode: an instant APFS
-clone of your real Chrome profile, so every
+**logged-in** Chrome via the ``logged-in-chrome`` project in COW (copy-on-write)
+mode: an instant APFS clone of your real Chrome profile, so every
 site is already signed in — including Gemini/Google, whose rotating tokens can't
-be snapshotted into a cookie file. The browser and its temp profile are created
-and auto-cleaned by ``AsyncLoggedInChrome`` (context-manager teardown), so there
-is nothing to launch or tear down by hand.
+be snapshotted into a cookie file.
+
+By default the browser is **headed and left open** after answering so you can keep
+using it; a detached watcher removes the temp profile when you close the window.
+Pass ``--headless`` to run with no window (auto-closes when done), or
+``--no-keep-open`` to auto-close the headed window.
 
 - Opens a fresh tab for each requested chatbot
 - Sends the same question to one or more chatbots in parallel
@@ -23,7 +25,8 @@ Requires:
 Example:
   python scripts/multi_chatbot_browser.py --question "la weather tomorrow"
   python scripts/multi_chatbot_browser.py --chatbots gemini,chatgpt,grok --question "compare VRT vs ETN"
-  python scripts/multi_chatbot_browser.py --chatbots gemini,chatgpt,grok --timeout-seconds 45 --question "compare VRT vs ETN"
+  python scripts/multi_chatbot_browser.py --headless --question "la weather tomorrow"
+  python scripts/multi_chatbot_browser.py --no-keep-open --question "la weather tomorrow"
   python scripts/multi_chatbot_browser.py --chatbots chatgpt,gemini,grok --skip-summary --question "compare VRT vs ETN"
 """
 
@@ -332,11 +335,11 @@ async def run(
     question: str,
     timeout_seconds: int,
     skip_summary: bool,
-    headed: bool = False,
-    keep_open: bool = False,
+    headed: bool = True,
+    keep_open: bool = True,
 ) -> int:
     # Spawn our own logged-in Chrome (COW clone of the real profile → every site
-    # signed in, Gemini included); headless by default. Temp profile auto-cleaned on exit.
+    # signed in, Gemini included); headed by default. Temp profile auto-cleaned on exit.
     async with logged_in_chrome.AsyncLoggedInChrome(
         use_copy_on_write_profile=True, headless=not headed
     ) as cow:
@@ -405,15 +408,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip the final Gemini summary/comparison step",
     )
     parser.add_argument(
-        "--headed",
+        "--headless",
         action="store_true",
-        help="Show a visible Chrome window (default: headless)",
+        help="Run with no visible window (default: a headed window left open for you). "
+             "Implies the browser auto-closes when done.",
     )
     parser.add_argument(
-        "--keep-open",
+        "--no-keep-open",
         action="store_true",
-        help="Leave the browser open after answering (implies --headed); its temp "
-             "profile is auto-removed when you close the window. Returns immediately.",
+        help="Close the browser as soon as answers are captured (default: leave the "
+             "headed window open; a watcher removes the temp profile when you close it).",
     )
     parser.add_argument("--question", required=True, help="Question to send to each chatbot")
     args = parser.parse_args(argv)
@@ -422,11 +426,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.timeout_seconds <= 0:
         raise SystemExit("--timeout-seconds must be greater than 0")
 
-    headed = args.headed
-    if args.keep_open and not headed:
-        # A headless window can't be closed by hand, so it would linger forever.
-        print("[--keep-open implies --headed so you can close the window manually]")
-        headed = True
+    # Default: headed + keep the window open. --headless turns off both (a headless
+    # window can't be closed by hand, so keeping it open would linger forever).
+    headed = not args.headless
+    keep_open = headed and not args.no_keep_open
 
     return asyncio.run(
         run(
@@ -435,7 +438,7 @@ def main(argv: list[str] | None = None) -> int:
             args.timeout_seconds,
             args.skip_summary,
             headed,
-            args.keep_open,
+            keep_open,
         )
     )
 

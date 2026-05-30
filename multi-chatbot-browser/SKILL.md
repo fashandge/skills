@@ -1,6 +1,6 @@
 ---
 name: multi-chatbot-browser
-description: Query Gemini, ChatGPT, and Grok in parallel by spawning a self-managed logged-in headless Chrome (copy-on-write clone of the real profile, so every site is already signed in), capture full responses as rendered, and optionally ask Gemini for a final cross-chatbot summary.
+description: Query Gemini, ChatGPT, and Grok in parallel by spawning a self-managed logged-in Chrome (copy-on-write clone of the real profile, so every site is already signed in), capture full responses as rendered, and optionally ask Gemini for a final cross-chatbot summary. The browser is headed and left open by default (--headless / --no-keep-open to change).
 ---
 
 # Multi-Chatbot Browser Queries
@@ -17,21 +17,21 @@ Default selection:
 - chatgpt
 
 Behavior:
-- Spawn a self-managed, **logged-in** Chrome via the `logged-in-chrome` project in **COW (copy-on-write) mode** — an instant APFS clone of the real Chrome profile, so every site (Gemini/Google included) is already signed in. Headless by default; pass `--headed` for a visible window. Do **not** depend on a pre-running Chrome or a CDP port.
+- Spawn a self-managed, **logged-in** Chrome via the `logged-in-chrome` project in **COW (copy-on-write) mode** — an instant APFS clone of the real Chrome profile, so every site (Gemini/Google included) is already signed in. **Headed and left open by default**; pass `--headless` for no window or `--no-keep-open` to auto-close. Do **not** depend on a pre-running Chrome or a CDP port.
 - Open a fresh tab for each requested chatbot.
 - Send the same prompt to each chatbot in parallel.
 - Wait for each chatbot response independently, with a per-chatbot timeout.
 - Capture the full response text as it appears in the page body.
 - By default, after collecting multiple chatbot responses, ask Gemini for a final synthesis.
 - If `--skip-summary` is set, skip the Gemini synthesis step.
-- By default the browser closes (and its temp profile is removed) as soon as answers are captured. With `--keep-open` it stays open for you to keep using; the command returns immediately and a detached watcher removes the temp profile when you close the window.
+- By default the browser stays **open** for you to keep using after answers are captured; the command returns immediately and a detached watcher removes the temp profile when you close the window. With `--headless` (or `--no-keep-open`) it instead closes and removes the profile as soon as answers are captured.
 - Do not summarize, paraphrase, or trim the per-chatbot responses unless the user explicitly asks for that.
 
 ## Why COW mode (robustness)
 
 - **Self-contained**: `AsyncLoggedInChrome` launches its own Chrome and a temp profile, then auto-cleans both on exit (context-manager teardown + `atexit` backstop + startup orphan sweep). There is no Chrome window to launch or tear down by hand, and nothing to leave running on port 9222.
 - **Always logged in**: a copy-on-write clone of the real profile carries *every* site's live session. This is the only mode that keeps **Gemini/Google** signed in, because their rotating `__Secure-1PSID*` tokens cannot be snapshotted into a cookie file.
-- **Headless by default**: no visible window; runs unattended. The project applies stealth + a clean User-Agent under headless so Cloudflare-gated sites (ChatGPT, Grok) still pass. Pass `--headed` to watch the run in a real window (useful for debugging or to handle an unexpected login prompt).
+- **Headed + open by default**: a real window you can keep using; the temp profile is removed when you close it. Pass `--headless` to run unattended with no window (auto-closes when done) — the project applies stealth + a clean User-Agent under headless so Cloudflare-gated sites (ChatGPT, Grok) still pass.
 
 ## Trigger phrases
 
@@ -52,14 +52,14 @@ A ready-to-run script lives at:
 It imports the module as `browser.src.logged_in_chrome` from the `logged-in-chrome`
 project (at `~/projects/browser/src`). `~/projects` is on `sys.path` via the `ml`
 env's editable `projects` install, so the import resolves with no `PYTHONPATH`
-needed. It spawns the COW browser itself (headless by default).
+needed. It spawns the COW browser itself (headed and left open by default).
 
 Run it with the `ml` env Python:
 
 ```bash
 ML=/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python
 
-# Default: Gemini + ChatGPT, with a final Gemini synthesis
+# Default: Gemini + ChatGPT, headed window left open, with a final Gemini synthesis
 $ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
   --question "la weather tomorrow"
 
@@ -75,14 +75,14 @@ $ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
   --skip-summary \
   --question "best way for browser automation for AI agents"
 
-# Visible window (e.g. to debug or clear a login prompt)
+# Headless / unattended (no window, auto-closes when done)
 $ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
-  --headed \
+  --headless \
   --question "la weather tomorrow"
 
-# Keep the window open to keep chatting; returns immediately, auto-cleans on close
+# Headed but auto-close the window once answers are captured
 $ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
-  --keep-open \
+  --no-keep-open \
   --question "la weather tomorrow"
 ```
 
@@ -94,8 +94,8 @@ The script is the full working example; it implements the logic described below.
 - `--question` — the prompt sent to each chatbot (required).
 - `--timeout-seconds` — per-chatbot wait cap (default 120).
 - `--skip-summary` — skip the final Gemini synthesis.
-- `--headed` — show a visible Chrome window (default: headless).
-- `--keep-open` — leave the browser open after answering (implies `--headed`) so you can keep using it. The command returns immediately; a detached watcher removes the temp profile automatically when you close the window.
+- `--headless` — run with no visible window (default is a headed window left open for you). Implies the browser auto-closes when done.
+- `--no-keep-open` — close the headed browser as soon as answers are captured (default: leave it open; a detached watcher removes the temp profile when you close the window).
 
 ## Input parsing rules
 
@@ -161,4 +161,4 @@ A successful run prints one section per requested chatbot, each containing the f
 ...
 ```
 
-If summary is enabled and more than one chatbot was queried, it also prints the final Gemini synthesis block. The temp Chrome profile is removed automatically when the run ends — or, with `--keep-open`, when you close the browser window.
+If summary is enabled and more than one chatbot was queried, it also prints the final Gemini synthesis block. By default the headed window is left open and its temp profile is removed when you close it; with `--headless` or `--no-keep-open` the profile is removed as soon as the run ends.
