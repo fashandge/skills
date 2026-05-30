@@ -23,11 +23,11 @@ Requires:
   - a system Google Chrome install + playwright / playwright-stealth in the ml env
 
 Example:
-  python scripts/multi_chatbot_browser.py --question "la weather tomorrow"
-  python scripts/multi_chatbot_browser.py --chatbots gemini,chatgpt,grok,claude --question "compare VRT vs ETN"
-  python scripts/multi_chatbot_browser.py --headless --question "la weather tomorrow"
-  python scripts/multi_chatbot_browser.py --no-keep-open --question "la weather tomorrow"
-  python scripts/multi_chatbot_browser.py --chatbots chatgpt,gemini,grok,claude --skip-summary --question "compare VRT vs ETN"
+  python scripts/ask_chatbots.py --question "la weather tomorrow"
+  python scripts/ask_chatbots.py --chatbots gemini,chatgpt,grok,claude --question "compare VRT vs ETN"
+  python scripts/ask_chatbots.py --headless --question "la weather tomorrow"
+  python scripts/ask_chatbots.py --no-keep-open --question "la weather tomorrow"
+  python scripts/ask_chatbots.py --chatbots chatgpt,gemini,grok,claude --skip-summary --question "compare VRT vs ETN"
 """
 
 from __future__ import annotations

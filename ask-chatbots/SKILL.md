@@ -1,9 +1,9 @@
 ---
-name: multi-chatbot-browser
+name: ask-chatbots
 description: Query Gemini, ChatGPT, Grok, and Claude in parallel by spawning a self-managed logged-in Chrome (copy-on-write clone of the real profile, so every site is already signed in), capture full responses as rendered, and optionally ask Gemini for a final cross-chatbot summary. The browser is headed and left open by default (--headless / --no-keep-open to change).
 ---
 
-# Multi-Chatbot Browser Queries
+# Ask Chatbots
 
 Use this skill when the user wants to ask the same question to multiple AI chatbots and compare responses side by side.
 
@@ -47,7 +47,7 @@ Use this skill when the user asks to:
 A ready-to-run script lives at:
 
 ```bash
-~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py
+~/skills/ask-chatbots/scripts/ask_chatbots.py
 ```
 
 It imports the module as `browser.src.logged_in_chrome` from the `logged-in-chrome`
@@ -61,28 +61,28 @@ Run it with the `ml` env Python:
 ML=/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python
 
 # Default: Gemini + ChatGPT, headed window left open, with a final Gemini synthesis
-$ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
+$ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
   --question "la weather tomorrow"
 
 # Four chatbots
-$ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
+$ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
   --chatbots gemini,chatgpt,grok,claude \
   --question "compare VRT vs ETN for a swing trade"
 
 # Custom timeout, skip the synthesis step
-$ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
+$ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
   --chatbots gemini,chatgpt,grok,claude \
   --timeout-seconds 90 \
   --skip-summary \
   --question "best way for browser automation for AI agents"
 
 # Headless / unattended (no window, auto-closes when done)
-$ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
+$ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
   --headless \
   --question "la weather tomorrow"
 
 # Headed but auto-close the window once answers are captured
-$ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
+$ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
   --no-keep-open \
   --question "la weather tomorrow"
 ```
