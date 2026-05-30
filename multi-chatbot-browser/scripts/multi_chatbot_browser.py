@@ -333,6 +333,7 @@ async def run(
     timeout_seconds: int,
     skip_summary: bool,
     headed: bool = False,
+    keep_open: bool = False,
 ) -> int:
     # Spawn our own logged-in Chrome (COW clone of the real profile → every site
     # signed in, Gemini included); headless by default. Temp profile auto-cleaned on exit.
@@ -374,6 +375,14 @@ async def run(
 
             print("\n=== GEMINI SUMMARY ===")
             print(summary)
+
+        if keep_open:
+            # Hand Chrome + its temp profile to a detached watcher and leave the
+            # window open. The watcher removes the profile when you close the
+            # browser. __aexit__ below only disconnects Playwright (Chrome stays up).
+            cow.detach()
+            print("\n[Browser left open — close the window when done; "
+                  "its temporary profile is removed automatically.]")
     return 0
 
 
@@ -400,19 +409,33 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Show a visible Chrome window (default: headless)",
     )
+    parser.add_argument(
+        "--keep-open",
+        action="store_true",
+        help="Leave the browser open after answering (implies --headed); its temp "
+             "profile is auto-removed when you close the window. Returns immediately.",
+    )
     parser.add_argument("--question", required=True, help="Question to send to each chatbot")
     args = parser.parse_args(argv)
 
     chatbots = parse_chatbots(args.chatbots)
     if args.timeout_seconds <= 0:
         raise SystemExit("--timeout-seconds must be greater than 0")
+
+    headed = args.headed
+    if args.keep_open and not headed:
+        # A headless window can't be closed by hand, so it would linger forever.
+        print("[--keep-open implies --headed so you can close the window manually]")
+        headed = True
+
     return asyncio.run(
         run(
             chatbots,
             args.question,
             args.timeout_seconds,
             args.skip_summary,
-            args.headed,
+            headed,
+            args.keep_open,
         )
     )
 

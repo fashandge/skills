@@ -24,6 +24,7 @@ Behavior:
 - Capture the full response text as it appears in the page body.
 - By default, after collecting multiple chatbot responses, ask Gemini for a final synthesis.
 - If `--skip-summary` is set, skip the Gemini synthesis step.
+- By default the browser closes (and its temp profile is removed) as soon as answers are captured. With `--keep-open` it stays open for you to keep using; the command returns immediately and a detached watcher removes the temp profile when you close the window.
 - Do not summarize, paraphrase, or trim the per-chatbot responses unless the user explicitly asks for that.
 
 ## Why COW mode (robustness)
@@ -78,6 +79,11 @@ $ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
 $ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
   --headed \
   --question "la weather tomorrow"
+
+# Keep the window open to keep chatting; returns immediately, auto-cleans on close
+$ML ~/skills/multi-chatbot-browser/scripts/multi_chatbot_browser.py \
+  --keep-open \
+  --question "la weather tomorrow"
 ```
 
 The script is the full working example; it implements the logic described below.
@@ -89,6 +95,7 @@ The script is the full working example; it implements the logic described below.
 - `--timeout-seconds` — per-chatbot wait cap (default 120).
 - `--skip-summary` — skip the final Gemini synthesis.
 - `--headed` — show a visible Chrome window (default: headless).
+- `--keep-open` — leave the browser open after answering (implies `--headed`) so you can keep using it. The command returns immediately; a detached watcher removes the temp profile automatically when you close the window.
 
 ## Input parsing rules
 
@@ -154,4 +161,4 @@ A successful run prints one section per requested chatbot, each containing the f
 ...
 ```
 
-If summary is enabled and more than one chatbot was queried, it also prints the final Gemini synthesis block. The temp Chrome profile is removed automatically when the run ends.
+If summary is enabled and more than one chatbot was queried, it also prints the final Gemini synthesis block. The temp Chrome profile is removed automatically when the run ends — or, with `--keep-open`, when you close the browser window.
