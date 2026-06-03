@@ -1,4 +1,0 @@
-interface:
-  display_name: "Organize Obsidian Folder Notes"
-  short_description: "Move loose Obsidian notes into specific subfolders."
-  default_prompt: "Organize loose notes in a specified Obsidian vault folder into appropriate existing or new subfolders."

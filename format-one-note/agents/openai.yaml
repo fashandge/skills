@@ -1,4 +1,0 @@
-interface:
-  display_name: "Format OneNote"
-  short_description: "Rewrite nested OneNote-style Markdown into heading-based notes."
-  default_prompt: "Rewrite this long note from nested bullets into readable Markdown headings while preserving every meaning and data point."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Clean Obsidian Note Titles"
-  short_description: "Remove redundant H1s and improve note filenames."
-  default_prompt: "Clean note titles under a specified Obsidian folder by removing redundant top H1 headings and renaming files to meaningful backlink-friendly titles."
