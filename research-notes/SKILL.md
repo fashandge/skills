@@ -54,18 +54,19 @@ In agent-engine mode, the agent engine has already done its own multi-query retr
 
 Independent of the two search modes above, there is a second axis: **where the findings go**.
 
-1. **Console (default).** The synthesis is written to the response only. Right for quick lookups, exploratory questions, and any prompt that doesn't ask for a persisted artifact.
-2. **Wiki (opt-in).** After the normal console synthesis, the findings are also persisted as a wiki article in the user's Obsidian vault by delegating to the `/wiki` skill. See **Step 7: Persist as Wiki** below for the handoff details.
+1. **Wiki (default).** The synthesis is written to the response AND persisted as a wiki article in the user's Obsidian vault by delegating to the `/wiki` skill. Console output always happens first — the wiki is an *additional* artifact, never a replacement. See **Step 7: Persist as Wiki** below for the handoff details. This is the default for any synthesis-mode research request.
+2. **Console-only (opt-out).** The synthesis is written to the response only, with no wiki persisted. Right for quick lookups, exploratory questions, throwaway checks, and any case where the user signals they don't want a persisted artifact.
 
-Use **wiki output** when the user's prompt contains instructions such as:
-- "save as a wiki" / "save it as a wiki"
-- "write up" / "write it up" the findings
-- "turn it into a wiki" / "turn this into a wiki article"
-- "then `/wiki` it" / "and `/wiki` the result"
-- "document what my notes say about …"
-- "create a wiki article on …" (when paired with research)
+**Wiki is the default**, so a bare "research X" or "find notes about X" produces both a console synthesis and a wiki. Phrases that *reinforce* wiki output (no behavior change, but unambiguous): "save as a wiki", "write it up", "turn it into a wiki", "then `/wiki` it", "document what my notes say about …", "create a wiki article on …".
 
-A bare "research X" or "find notes about X" stays console-only. When the user's intent is ambiguous, default to console — do not auto-promote to a wiki, since the vault should not fill up with throwaway summaries.
+Use **console-only mode** (skip the wiki) when the user's prompt contains instructions such as:
+- "no wiki" / "don't write a wiki" / "skip the wiki"
+- "console only" / "just answer" / "don't save it"
+- "quick lookup" / "just checking" / "don't persist"
+
+Two cases are **always console-only** regardless of the above — never write a wiki for them:
+- **Lookup-only mode** (see below): there is no synthesis to persist.
+- Trivial or throwaway questions where a persisted article would just be vault clutter. When a request is clearly a quick factual check rather than research worth keeping, prefer console-only even without an explicit opt-out; if genuinely ambiguous whether the finding has lasting value, default to writing the wiki (the new default) rather than silently dropping it.
 
 ### Output Shape: Lookup-Only Mode
 
@@ -296,11 +297,11 @@ After gathering information (directly or via batch summaries):
 5. Report coverage breadth (e.g., "Based on 45 notes across 3 batches from your vault...")
 6. Highlight any gaps or areas with limited coverage
 7. If search-only mode was used, mention that index browsing was intentionally skipped. If agent-engine mode was used, mention that retrieval was delegated to the `--engine agent` search and that index browsing plus FTS5/QMD sweeps were intentionally skipped.
-8. If wiki output mode was active (Step 7), also report the wiki's final file path returned by `/wiki`, so the user can open the persisted article
+8. Unless console-only mode is active, proceed to Step 7 to persist the wiki, then report the wiki's final file path returned by `/wiki` so the user can open the persisted article
 
-### Step 7: Persist as Wiki (Conditional)
+### Step 7: Persist as Wiki (Default)
 
-Run this step **only when the user's prompt triggered wiki output mode** (see **Output Destinations** above). Otherwise, the workflow ends at Step 6.
+Run this step for every synthesis-mode research request **unless** the user opted into console-only mode (see **Output Destinations** above) or the request was lookup-only (no synthesis to persist). In those two cases, the workflow ends at Step 6. Otherwise — including bare "research X" / "find notes about X" requests — wiki output is the default, so run this step.
 
 Console output happens first — the user always sees the synthesis in the response. The wiki is an *additional* artifact, not a replacement.
 
@@ -338,7 +339,8 @@ After `/wiki` returns, append its reported file path to the console output so th
 4. Union index candidates + search results, dedupe → ~30 unique candidates
 5. Rerank using BM25 scores (search hits) + summary relevance (index hits)
 6. Check sizes: `wc -c` → total ~60KB, fits in one batch
-7. Read all notes, synthesize
+7. Read all notes, synthesize, print the console answer
+8. **Step 7 (default):** the user didn't opt out of the wiki, so delegate to `/wiki` with a slim handoff and append the returned file path to the console output
 
 ### Top-N research: "Find the top 10 posts about CPU stock investment"
 
@@ -434,15 +436,25 @@ The trigger phrase "use the agent engine" activates agent-engine mode. Skip the 
 4. Synthesize in Step 6 as usual.
 5. In the final answer, include a brief note: "Retrieval delegated to `--engine agent`; index browsing and FTS5/QMD sweeps were intentionally skipped."
 
-### Wiki output: "Research the memory cycle thesis and save it as a wiki"
+### Wiki output (default): "Research the memory cycle thesis"
 
-The trigger phrase "save it as a wiki" activates wiki output mode (in addition to the default index + search mode).
+No special phrase is needed — wiki output is the default for synthesis-mode research. (Phrases like "save it as a wiki" or "write it up" just reinforce the default; behavior is identical without them.)
 
 1. Run Steps 1–6 as usual: index browsing + multi-query search on `内存周期`, `存储周期`, `memory cycle`, `memory supercycle`, `HBM 周期`, `NAND 周期`, `DRAM 周期`, etc.; union, dedupe, rerank; read the top candidates; produce a synthesis.
 2. Print the console synthesis as usual — the user always sees this first.
 3. **Step 7**: Invoke `/wiki` via the Skill tool with a slim prompt containing:
    - Topic pointer: one line — "Write a wiki for the research on the memory cycle thesis just synthesized above in this conversation." Do **not** re-inline the synthesis; `/wiki` picks it up from conversation recency.
    - Source notes list: each note read in Step 5, formatted as `- [[<title>]] — <relevance>`
-   - Coverage caveat: omitted (default mode was used, not search-only)
+   - Coverage caveat: omitted (default index + search mode was used, not search-only)
    - No title or folder hint — `/wiki` derives both itself
 4. When `/wiki` returns the new file path, append it to the console output so the user can open the persisted article.
+
+### Console-only (opt-out): "Research the memory cycle thesis, no wiki"
+
+The phrase "no wiki" (or "console only", "just answer", "don't save it") opts out of the default wiki.
+
+1. Run Steps 1–6 exactly as in the wiki example above: search, merge, read, synthesize.
+2. Print the console synthesis.
+3. **Skip Step 7 entirely** — do not delegate to `/wiki`, do not write any vault file. The workflow ends at the console answer.
+
+Lookup-only requests ("just list the titles", "JSON only") are also console-only by nature — there is no synthesis to persist, so Step 7 never runs for them either.
