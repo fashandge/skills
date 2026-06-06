@@ -260,7 +260,7 @@ along the table below (trigger → first fix → if it still fails).
 | A key person/org returns no first-party material | Try adjacent channels (talk → paper → eng blog → podcast) and the recency-first variant before giving up | List the gap honestly per step 5; never pad with a listicle/summary to fill it |
 | WebFetch can't confirm authorship / first-party | Drop the candidate, or list it explicitly marked "attributed, unverified — not confirmed first-party" | Never present unverified second-hand material as if it were primary |
 | Hunt subagent times out mid-search | Present the compact candidate list it already returned, flagged partial | Re-run only the missing person/org, not the whole hunt |
-| Topic regime unclear (industry vs technical vs ageless) | Default to technical (regime 2); ask one clarifying question only if recency handling would change the answer materially | — |
+| Topic regime unclear (industry vs technical vs ageless) | Default to technical (regime 2); 🔴 ask **one** clarifying question only if recency handling would change the answer materially — otherwise proceed, don't stall | — |
 
 ## Anti-patterns — never do these
 
@@ -291,11 +291,14 @@ specific ways that fight gets lost; treat each as a red line, not a preference:
 
 - **Default — console only.** Print the curated list in the response. Do not
   persist anything.
-- **Opt-in — persist as a wiki.** If the user says "save as wiki", "/wiki it",
-  "write it up", "persist", or similar, delegate to the `wiki` skill to save the
-  curated list as a vault article. Hand `wiki` a slim pointer to the list you
-  just produced plus the source links; let it own folder/title/frontmatter. Only
-  do this on explicit request.
+- **🔴 CHECKPOINT — persist a wiki only on explicit opt-in.** Writing a wiki
+  article is a file write you cannot silently undo, so it is **gated, never
+  automatic**. 🛑 STOP and write **only** when the user explicitly says "save as
+  wiki", "/wiki it", "write it up", "persist", or similar. On that signal,
+  delegate to the `wiki` skill: hand it a slim pointer to the list you just
+  produced plus the source links, and let it own folder/title/frontmatter. If
+  the ask is ambiguous ("can you also save this somewhere?"), confirm the
+  destination once before writing. Never persist on your own initiative.
 
 ## Example
 
