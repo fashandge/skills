@@ -133,6 +133,13 @@ Write the main content with:
 - Use **tables** for any comparison or structured information
 - Add **practical/actionable takeaways** where appropriate
 - Avoid vague generalities — every paragraph should convey a distinct insight
+- **Inline every hyperlink onto the phrase it describes** — write `[Source Title](url)`
+  or `[[Note Name]]` directly on the title/term in the prose, table cell, or list
+  item. Never leave bare `https://…` URLs or dump a standalone list of raw links
+  under a table/section as an afterthought. A reader should click the words, not a
+  URL string. (Raw URLs are acceptable inside code blocks where the literal
+  string matters, and in the `## 参考资料` references section, which is a link
+  index by design.)
 
 ### 3e. References Section
 
