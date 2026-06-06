@@ -43,6 +43,23 @@ people and orgs who define the frontier of [topic], then surface what they
 personally said,
 wrote, or published about it** — and rank that above everything else.
 
+**Match the kind of insider to the kind of topic.** "Frontier insider" is not
+always a researcher:
+
+- **Technical / how-it-works topics** (architectures, algorithms, system
+  design) → founders, lead researchers, and named engineers; their papers,
+  talks, and engineering blog posts.
+- **Industry / market-trend topics** (where a sector is heading, demand
+  drivers, competitive dynamics, capex cycles) → the **CEOs and senior
+  executives of the leading companies in that sector**. A CEO running the
+  business has the sharpest, most accountable read on the trend — they're
+  steering capital against it. For "optical communication industry trend," that
+  means talks/interviews from the **Marvell (MRVL) CEO, Lumentum (LITE) CEO,
+  Coherent, Broadcom, etc.** — earnings-call commentary, investor-day keynotes,
+  and sell-side/podcast interviews — not a generic analyst explainer. Prefer the
+  operator's own words over second-hand market commentary, the same way you
+  prefer a researcher's paper over a summary of it.
+
 Carry this heuristic beyond this skill: whenever you're learning something,
 first ask "who actually builds this, and where did they explain it?"
 
@@ -58,31 +75,44 @@ it is how you seed the whole search. Start there.
 
 ### 1. Mine the user's vault first (mandatory when a vault exists)
 
-Before touching the web, query the user's notes vault via the `research-notes`
-skill. This is a required first step, not an optional one — skip it only if the
-user explicitly wants external-only material or has no vault.
+Before touching the web, mine the vault — and **do this in a subagent**, not in
+the main conversation. It is a required first step (skip only if the user wants
+external-only material or has no vault). Delegating is the single biggest token
+saver: the subagent reads the index and note bodies in *its own* context and
+returns only a compact set of seeds, so the 1,000+-line index and full note
+bodies never enter the main thread.
 
-Invoke `research-notes` correctly for this sub-step — two settings matter:
+Spawn a `general-purpose` subagent and instruct it to:
 
-- **Default mode (index + search), NOT its "search-only" mode.** In
-  `research-notes`, "search-only" is a reserved term meaning *skip index
-  browsing* — which is the opposite of what you want. The index browse is what
-  surfaces a vault *folder* dedicated to the topic (itself a curated reading
-  list), catching notes whose vocabulary no query matches. Keep the index on.
-- **Console-only — explicitly say "no wiki".** `research-notes` persists a wiki
-  article *by default*. Here it is running as an internal sub-step of this
-  skill, so it must not write its own article into the vault. Pass an explicit
-  console-only / "no wiki" instruction. (Persistence is handled later, only if
-  the user asks — see Output destinations.)
+- **Run the `research-notes` workflow in default mode (index + search),
+  console-only.** Honor research-notes' contract at this seam: keep its index
+  browse ON — do NOT use its reserved **"search-only"** mode (that skips the
+  index and would miss a vault folder dedicated to the topic), and the FTS sweep
+  must also stay (the index does not cover the whole vault, so search catches
+  on-topic notes filed under unrelated folders — e.g. an optical note living in
+  an `AI Chips` folder). Pass an explicit **"no wiki / console-only"**
+  instruction so the sub-step never persists its own article. Let research-notes
+  own the query count and sweep mechanics; this skill only adds *what angles* to
+  cover: also query the names of any labs/people you already suspect own the
+  frontier, so the vault can confirm or expand that list.
+- **Triage before full-read.** Judge relevance from `notes-search` snippets,
+  titles, and index summaries first; never read a full note body just to
+  discover it is off-topic.
+- **Extract, don't ingest.** Triage *before* opening anything: judge each
+  candidate from its `notes-search` snippet and the index one-line summary —
+  these are purpose-built snippets, better than reading the file's first N lines.
+  For notes that survive triage, this task needs each one's frontmatter
+  (`source:`, `author:`), its intro, and any reference / `参考资料` list — not the
+  body. Harvest links in bulk with `grep -rhoE "source: ?https?://[^ )\"']+"
+  <topic-folder>` and `grep -n "source:\|http\|arxiv" <note>`. Only when a
+  survivor genuinely needs its framing, do a bounded `Read` (limit ~40 lines) for
+  the frontmatter + intro — the `参考资料` list sits at the *bottom* of the note,
+  so a head read alone misses it (the grep above is what catches those links).
+  Use `rtk read` for the rare genuine gist-read; reserve full plain `Read` for
+  the few notes that truly warrant it.
 
-You do want the notes **read**, not just listed, so this is *not* a titles-only
-lookup. Let `research-notes` own *how many* queries and the sweep mechanics —
-follow its multi-query guidance rather than a count fixed here (it mandates a
-broad synonym/sub-term sweep, never a single query). This skill only adds *what
-angles* to cover beyond the usual: besides the topic and its synonyms, query the
-names of any labs/people you already suspect own the frontier, so the vault can
-confirm or expand that list. Then **read** the strongest hits and extract three
-things to drive everything downstream:
+The subagent should **return only seeds, not bodies** — three things that drive
+everything downstream:
 
 - **People** — named authors, founders, researchers the notes attribute ideas
   to. These become your per-person search seeds in step 3.
@@ -110,9 +140,12 @@ and extending it:
   non-AI topic, the equivalent leading orgs) — fold in any the vault named.
 - Identify the **specific named people** most associated with it — founders,
   lead authors of the seminal papers, the engineer who gave the well-known
-  talk. This is the most important step: named people are how you find primary
-  material that generic searches bury. The vault is your best source of these
-  names; supplement with search only for gaps.
+  talk. For an **industry-trend** topic, these named people are instead the
+  **CEOs/executives of the leading companies in the sector** (e.g. MRVL CEO,
+  LITE CEO for optical comms) — list the dominant firms, then their named
+  leaders. This is the most important step: named people are how you find
+  primary material that generic searches bury. The vault is your best source of
+  these names; supplement with search only for gaps.
 
 If the vault and your own knowledge leave gaps, run a search to fill them (e.g.
 `who pioneered <topic>`, `<topic> lead researcher`, `<topic> seminal paper
@@ -120,8 +153,18 @@ authors`) — but treat that only as scaffolding to get to their primary work.
 
 ### 3. Hunt primary outputs in the right channels
 
-For each key person/org, search their **primary** channels. Prefer authored,
-first-party material over anyone's summary of it:
+**Run the hunt in a subagent too.** Web search returns verbose, low-density
+output (snippets plus auto-generated summaries) and WebFetch returns whole
+pages; keep all of it out of the main thread. Spawn a `general-purpose`
+subagent, hand it the people/orgs/terms from step 2, and have it return only a
+compact, annotated candidate list (title, URL, author + role, format/length,
+one-line why) — never raw search dumps or fetched page text. It applies the same
+*extract-don't-ingest* discipline: WebFetch only to confirm
+authorship/first-party/on-topic and return a one-line verdict, not the page
+body. You then rank (step 4) and present (step 5) from that returned list.
+
+For each key person/org, the subagent searches their **primary** channels,
+preferring authored, first-party material over anyone's summary of it:
 
 | Channel | What to look for |
 |---|---|
@@ -130,11 +173,28 @@ first-party material over anyone's summary of it:
 | Conference talks & keynotes | NeurIPS/ICML invited talks, dev-day keynotes, internal-turned-public talks |
 | YouTube lectures | Long-form deep dives (e.g. Karpathy), recorded talks, university lectures |
 | High-signal podcasts | Dwarkesh, Latent Space, No Priors, Lex (be selective), where insiders go long-form |
+| Earnings calls & investor days (industry topics) | CEO/CFO commentary in earnings-call transcripts, investor-day keynotes, and sell-side conference fireside chats — the operator's own read on the trend |
+| Executive interviews (industry topics) | CNBC/Bloomberg interviews and business podcasts where a sector CEO goes long on where the industry is heading |
 | Personal sites / long threads | A researcher's own blog or substantive X/Twitter thread |
 
 Search tactics:
 - Query by **person + topic** (`<name> <topic> talk`, `<name> <topic> paper`),
   not just topic — this is what surfaces the primary material.
+- **Run a latest-cycle pass, and don't anchor queries to a past year.** Fast
+  topics move every cycle, so recency must drive *retrieval*, not just ranking
+  (step 4). For each key person/org also run a recency-first variant —
+  `<name> <topic> latest`, `<topic> <current-year>`, the newest product
+  generation / conference edition — so the most recent keynote, paper, or
+  earnings call surfaces alongside the foundational ones. **Never hardcode a
+  year you merely remember** (e.g. searching `Snapdragon Summit 2024` because
+  that's the edition you know) — a bare past-year anchor pins retrieval to a
+  stale event before ranking can weigh recency. Pin a specific past year *only*
+  when you are deliberately hunting the category's origin/seminal moment; for
+  "what's current," let the engine return the newest and let step 4 decide what
+  is current vs. foundational-but-still-essential. **For industry-trend topics
+  this is non-negotiable:** pull the *most recent* earnings call, investor day,
+  and keynote edition (this cycle's summit, not a prior year's) — the operator's
+  current-cycle read is the entire point of the exercise.
 - When a strong candidate appears, use WebFetch to confirm it's genuinely
   first-party and on-topic (right author, right depth) before listing it.
 - Follow citation/host trails: a good podcast episode names papers; a paper's
@@ -146,9 +206,21 @@ Score candidates on three axes and lead with the best:
 
 - **Authority** — how central is this person/org to the topic? First-party
   builders > adjacent practitioners > commentators.
-- **Recency** — for fast-moving topics, prefer recent material, but never drop a
-  seminal foundational piece just because it's older. Note when something is
-  "foundational (older but still essential)."
+- **Recency — weight it by how fast the topic moves (three regimes):**
+  - *Industry / market-trend topics* — recency dominates. Lead with the latest
+    cycle (most recent earnings call, keynote, investor day, current product
+    generation); the frontier read is the operator's *current* read. Keep older
+    material only when it is genuinely thesis-defining background (e.g. the piece
+    that first framed the bull/bear case or coined the category) — and label it
+    as background so it reads as context, not current state.
+  - *Fast-moving technical topics* — prefer recent work, but never drop a seminal
+    foundational piece just because it's older. Keep the paper/talk that
+    introduced the method or architecture and mark it "foundational (older but
+    still essential)."
+  - *Ageless / slow-moving topics* (health, eye care, math/CS fundamentals,
+    evergreen how-it-works) — recency barely matters. Judge on authority and
+    depth; do not penalize a great source for being old, and do not pad with a
+    worse-but-newer one to look current.
 - **Depth** — a 40-minute talk or a full technical report beats a tweet or a
   300-word post, when the goal is real understanding.
 
@@ -224,3 +296,32 @@ Note how the vault pass set the vocabulary and the lead source *before* any web
 query; how every entry names the author + their org and links primary material;
 how vault hits are marked; and how it excludes anonymous "top N agent frameworks"
 roundups.
+
+That example is a **fast-moving technical** topic (regime 2): recent work leads,
+but Karpathy's older lecture survives as labeled foundational. An **industry /
+market-trend** topic (regime 1) ranks differently — recency dominates:
+
+**Prompt:** "find authoritative sources on the optical-communication industry trend"
+
+**Good response shape (abridged):**
+
+> **Who defines this frontier:** the CEOs steering capital against the trend —
+> Marvell (MRVL), Lumentum (LITE), Coherent, Broadcom.
+>
+> **Marvell — Matt Murphy (CEO)**
+> - *Q3 FY2026 earnings call* — the latest call (most recent quarter) — his
+>   *current* read on custom-silicon + optical DSP demand. **Lead here.**
+> - *AI Investor Day keynote (this year's)* — the current TAM/roadmap framing.
+>
+> **Lumentum — Michael Hurlston (CEO)**
+> - Most recent earnings call + a 2026 sell-side fireside chat — current
+>   datacenter-interconnect demand read.
+>
+> **Background (labeled, not current state):**
+> - The investor-day deck that first framed the AI-optical bull case — useful
+>   origin context only; do not present as the present.
+
+Note the contrast: the operator's *latest* call/keynote leads, and the older
+thesis-defining deck is demoted to clearly-marked background — whereas an
+**ageless** topic (regime 3, e.g. eye-care for high myopia) would ignore date
+entirely and rank purely on authority and depth.

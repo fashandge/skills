@@ -97,6 +97,17 @@ Read ~/notes/index/raw/root_index.md
 
 The root index is ~1100 lines; the Read tool's default 2000-line limit covers it. Do not pipe it through `cat`, `head`, or any shell tool — the rtk PreToolUse hook rewrites `cat` to `rtk read`, and any caller that wraps the output (subagent summaries, etc.) may clip it.
 
+**Token-efficient variant — grep-first when the topic has distinctive keywords.** Loading the full ~1100-line index every time is wasteful when the topic has specific, high-signal terms (e.g. `光通信`/`optical`/`CPO`, not generic words like "investment"). In that case, instead of reading the whole file, first `grep` it to find candidate sections:
+
+```
+grep -inE "光通信|光互连|光模块|硅光|optical|photonic|transceiver|CPO|DWDM|coherent" ~/notes/index/raw/root_index.md
+grep -nE "^## \[" ~/notes/index/raw/root_index.md   # section-header → section_indices/<file>.md map
+```
+
+- Build the alternation from the **same query expansion you construct for Track B Step B1** (synonyms, both languages, sub-concepts), OR'd into one case-insensitive `grep -iE` pattern. The more complete the alternation, the lower the miss risk — under-expanding the pattern is the main failure mode, so err toward more terms.
+- A hit may land on a folder prefix, a theme, or a representative note title; the enclosing section is the nearest preceding `## [folder](section_indices/<file>.md)` line (use the second grep as the map). Read only those matched section indices in Step A2.
+- **Recall caveat and fallback.** root_index lists only each section's folder name, themes, and ~3 representative titles, so grep can miss a section whose name/titles don't contain your terms (e.g. an optical note filed under an `AI Chips` section). Two backstops: (1) Track B's full-vault FTS sweep catches on-topic notes regardless of which folder they sit in — it always runs, so a grep miss here is recoverable; (2) when keywords are generic, the topic is broad, or grep returns suspiciously few sections, **fall back to the full `Read` of root_index** for maximum recall. This grep-first path applies *only* to the root index — once a section is selected, Step A2 still **reads its section index in full** (that's where the per-note summaries that catch vocabulary mismatches live).
+
 The root index lists sections with:
 - Folder prefix (e.g., `raw/AI/Agent/harness`)
 - Note count
