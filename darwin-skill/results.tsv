@@ -1,0 +1,5 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-06-05T00:00	baseline	authoritative-sources	-	76.6	baseline	-	mature skill; runtime_warn=0; weak dims: dim3(6) dim9(6) dim4(5) dim7(7)	dry_run
+2026-06-05T00:10	e6f76ca	authoritative-sources	76.6	80.2	keep	dim3	if-then fallback table (HL-2); 6 failure modes	dry_run
+2026-06-05T00:15	16d5f29	authoritative-sources	80.2	82.0	keep	dim9	consolidated 9-item anti-pattern blacklist	dry_run
+2026-06-05T00:25	9cc0a0e	authoritative-sources	82.0	83.8	keep	dim4	visual checkpoint markers (HL-1): wiki write-gate + regime question; blind judge 4->8	dry_run
