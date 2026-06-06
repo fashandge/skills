@@ -247,6 +247,21 @@ summary of each source. Mark any entry that came from the user's vault with
 If a key sub-angle has no strong primary source, say so honestly rather than
 padding with weak material.
 
+## When a step fails
+
+This skill leans on subagents, a vault, and web search — any of which can come
+back empty or time out. Never let one dead step kill the whole task; degrade
+along the table below (trigger → first fix → if it still fails).
+
+| Trigger | First fix | If it still fails |
+|---|---|---|
+| Vault subagent times out / errors / returns nothing usable | Proceed without it — build the frontier map (step 2) from your own knowledge + the web sweep | Note "couldn't mine the vault" in one line and continue; never block the task on the vault step |
+| Vault has no notes on the topic | Say so briefly, build the frontier map from scratch (step 2) | — |
+| A key person/org returns no first-party material | Try adjacent channels (talk → paper → eng blog → podcast) and the recency-first variant before giving up | List the gap honestly per step 5; never pad with a listicle/summary to fill it |
+| WebFetch can't confirm authorship / first-party | Drop the candidate, or list it explicitly marked "attributed, unverified — not confirmed first-party" | Never present unverified second-hand material as if it were primary |
+| Hunt subagent times out mid-search | Present the compact candidate list it already returned, flagged partial | Re-run only the missing person/org, not the whole hunt |
+| Topic regime unclear (industry vs technical vs ageless) | Default to technical (regime 2); ask one clarifying question only if recency handling would change the answer materially | — |
+
 ## Output destinations
 
 - **Default — console only.** Print the curated list in the response. Do not

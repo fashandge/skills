@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "prompt": "find authoritative sources on KV cache optimization in LLM inference",
+    "expected": "Regime-2 (fast-moving technical): vault-first pass, names frontier people/orgs (e.g. vLLM/PagedAttention authors, DeepSeek MLA, lab inference teams), per-person primary material (papers/talks/eng blogs), recent leads + foundational labeled, grouped & annotated, console-only.",
+    "regime": "2-technical"
+  },
+  {
+    "id": 2,
+    "prompt": "find authoritative sources on the optical-communication industry trend",
+    "expected": "Regime-1 (industry/market-trend): frontier = sector CEOs (MRVL, LITE, Coherent, Broadcom), latest earnings calls/investor days lead, older thesis-defining deck demoted to labeled background, recency dominates.",
+    "regime": "1-industry"
+  },
+  {
+    "id": 3,
+    "prompt": "I want to really understand retinal detachment risk in high myopia — point me at the best stuff",
+    "expected": "Regime-3 (ageless): vault-first, frontier = retina specialists / ophthalmology authorities, rank on authority+depth only, date ignored, no padding with worse-but-newer. Tests that the skill does NOT force recency where it doesn't matter.",
+    "regime": "3-ageless"
+  }
+]
