@@ -69,15 +69,65 @@ about — saved the seminal post, clipped the founder's talk, named the people i
 their own words. That curation is a high-signal **prior**: it tells you who and
 what to search for, and it surfaces the exact-term coinages and recent posts a
 cold web query will bury. Mining the vault is not a courtesy fold-in at the end;
-it is how you seed the whole search. Start there.
+it is how you seed the whole search. Whether you do that serially or in parallel,
+the vault must always shape the web queries — never skip the seeding (see
+Orchestration below).
 
 ## Workflow
 
+### Orchestration: three discovery channels, sequenced by your prior strength
+
+This skill runs **three discovery channels** whose results are merged and sorted
+at the end (step 4): **(1)** the user's **vault**, **(2)** a **web hunt**, and
+**(3)** a direct **ChatGPT consultation**. The vault and web channels share a
+*seeding dependency* — the vault's names and exact terms shape the web queries —
+so they are sequenced below by your prior strength. The **ChatGPT channel is
+independent of both**: it asks ChatGPT the bare topic and needs no seeds, so it
+**always launches in parallel at the very start**, regardless of serial/parallel
+mode, its latency overlapping everything else. Fire it in the same opening
+message as the vault subagent (and, in parallel mode, the web subagent).
+
+Steps 1 (vault) and 3 (web hunt) are the two heavy steps, and the vault's whole
+job is to **shape the web queries** — its names, exact terms, and lead source.
+*Seeding* the hunt from the vault is non-negotiable; whether you do it serially
+or in parallel depends only on how confidently you can already name the frontier:
+
+- **Weak priors → run serially.** If you can't confidently name the frontier
+  orgs/people yourself, mine the vault first, derive queries from what it
+  surfaced, *then* hunt. A web round blind to the vault wastes most of its effort
+  and buries the field's coinages. This is the safe default — use it whenever in
+  doubt, and always for niche or heavily bilingual topics where the vault holds
+  names/terms you'd never seed cold.
+- **Strong priors → run in parallel, then reconcile.** If you can already name
+  the frontier from your own knowledge, launch the vault and web subagents
+  together (one message, two `Agent` calls) to reclaim the latency — but this
+  incurs a debt: round-1 web is blind to the vault. So when the vault returns you
+  MUST **reconcile** — a scoped **round-2** hunt for the seeds round-1 never
+  searched, bilingual orgs and field coinages especially (mechanic in step 3).
+  Skip it and you silently drop the vault's unique contribution — the one thing
+  it was for.
+
+**Seeds widen the hunt, they never narrow it.** In *either* mode the vault's
+names/terms are *added* to an independent enumeration of the frontier (your own
+knowledge + a cold `who leads / pioneered <topic>` search) — never a whitelist
+that bounds what you search. Always search the obvious frontier orgs, even ones
+the vault never mentioned. Parallel mode gets this for free: its vault-blind
+round-1 *is* that independent breadth pass. Serial mode has no such guarantee, so
+it must run the independent enumeration explicitly alongside the vault-derived
+queries — otherwise vault coverage silently caps the search.
+
+The invariant either way: **no final list until the vault's seeds have been
+searched on the web.** Parallel is a latency optimization, never a license to
+skip the vault→web seeding. And independently: **no final list until the ChatGPT
+channel has returned (or been declared dead per the failure table)** and its
+candidates merged in — it is additive discovery, not optional polish.
+
 ### 1. Mine the user's vault first (mandatory when a vault exists)
 
-Before touching the web, mine the vault — and **do this in a subagent**, not in
-the main conversation. It is a required first step (skip only if the user wants
-external-only material or has no vault). Delegating is the single biggest token
+Mine the vault in a subagent (never in the main conversation) — strictly before
+the web hunt, or in parallel with it per the Orchestration decision above. It is
+a required step (skip only if the user wants external-only material or has no
+vault). Delegating is the single biggest token
 saver: the subagent reads the index and note bodies in *its own* context and
 returns only a compact set of seeds, so the 1,000+-line index and full note
 bodies never enter the main thread.
@@ -91,10 +141,36 @@ Spawn a `general-purpose` subagent and instruct it to:
   must also stay (the index does not cover the whole vault, so search catches
   on-topic notes filed under unrelated folders — e.g. an optical note living in
   an `AI Chips` folder). Pass an explicit **"no wiki / console-only"**
-  instruction so the sub-step never persists its own article. Let research-notes
-  own the query count and sweep mechanics; this skill only adds *what angles* to
-  cover: also query the names of any labs/people you already suspect own the
-  frontier, so the vault can confirm or expand that list.
+  instruction so the sub-step never persists its own article.
+- **Pass ONE topic string, then add seeds as *extras* — never a flat term
+  list.** research-notes is built to take a *single* topic and expand it itself
+  into the query sweep: synonyms, **both languages**, and CJK word-split variants
+  (`光通信` + `光 通信`). That bilingual expansion is the step that produces Chinese
+  queries — so if you instead hand it a pre-enumerated block of ~10–20 English
+  angle phrasings as "the queries to run," you *short-circuit* that step: it
+  treats your list as the final queries, skips per-topic bilingual + word-split
+  expansion, blows past its calibrated query budget, and its breadth-rerank
+  (which assumes a few sub-concepts from one topic) loses its teeth — the net
+  effect is silent under-coverage of Chinese-language notes. So: give it the
+  natural-language topic (e.g. *"running AI agents on the cloud rather than
+  locally"*) and let it own the sweep. Then append, as an explicit **"in addition
+  to your own bilingual expansion, also ensure each of these gets a query"**
+  list, the **proper nouns it can't derive from the topic** — the specific
+  labs/people you suspect own the frontier (e.g. Anthropic, OpenAI, Cognition),
+  and on a bilingual vault the **Chinese-named orgs an English seeder would
+  miss** (智谱/Zhipu, 月之暗面/Moonshot, DeepSeek/深度求索). Do *not* re-list topic
+  synonyms — those are research-notes' own job. Only if you want a belt-and-braces
+  hedge against it under-expanding may you add a *few* Chinese topic terms (云端
+  agent、沙箱), clearly marked as a hedge, not as the main query set.
+- **Let research-notes own *how* it reads the index — including its grep-first
+  path.** It already decides internally whether to grep the root index for
+  distinctive keywords vs. full-read it (and falls back to a full read when terms
+  are generic or grep returns too few sections), with the always-on FTS sweep as
+  the recall backstop. Do **not** instruct it to grep: forcing the grep path from
+  here breaks the seam and tilts toward grep's one weakness — missing a section
+  whose name/titles don't contain your term (exactly the cross-folder catch this
+  skill cares about). Passing one clean topic (above) is what lets it make that
+  grep-vs-read call correctly; a flat multi-term blob breaks the judgment.
 - **Triage before full-read.** Judge relevance from `notes-search` snippets,
   titles, and index summaries first; never read a full note body just to
   discover it is off-topic.
@@ -144,8 +220,9 @@ and extending it:
   **CEOs/executives of the leading companies in the sector** (e.g. MRVL CEO,
   LITE CEO for optical comms) — list the dominant firms, then their named
   leaders. This is the most important step: named people are how you find
-  primary material that generic searches bury. The vault is your best source of
-  these names; supplement with search only for gaps.
+  primary material that generic searches bury. The vault is a strong source of
+  these names, but additive, not a whitelist (Orchestration): enumerate the
+  frontier from your own knowledge first, then union in the vault's names.
 
 If the vault and your own knowledge leave gaps, run a search to fill them (e.g.
 `who pioneered <topic>`, `<topic> lead researcher`, `<topic> seminal paper
@@ -162,6 +239,13 @@ one-line why) — never raw search dumps or fetched page text. It applies the sa
 *extract-don't-ingest* discipline: WebFetch only to confirm
 authorship/first-party/on-topic and return a one-line verdict, not the page
 body. You then rank (step 4) and present (step 5) from that returned list.
+
+**Reconcile here if you ran in parallel (see Orchestration).** Once the vault
+subagent returns, diff its seeds against what this hunt already queried and spawn
+a short round-2 subagent for the residual only — vault-named people/orgs and
+exact terms round-1 never searched (bilingual orgs and field coinages
+especially). Top up the gap; don't re-run the whole hunt. Ran serially? The hunt
+was already vault-seeded — no round-2.
 
 For each key person/org, the subagent searches their **primary** channels,
 preferring authored, first-party material over anyone's summary of it:
@@ -180,6 +264,11 @@ preferring authored, first-party material over anyone's summary of it:
 Search tactics:
 - Query by **person + topic** (`<name> <topic> talk`, `<name> <topic> paper`),
   not just topic — this is what surfaces the primary material.
+- **Also run a few seedless discovery queries** (`who leads <topic>`, `<topic>
+  best engineering blog / talk`) so frontier players *absent from your seed list*
+  still surface — then chase each by person/org. Seeds guide the hunt; they never
+  cap it (Orchestration: seeds widen, never narrow). In serial mode this seedless
+  pass is what keeps vault coverage from bounding the search.
 - **Run a latest-cycle pass, and don't anchor queries to a past year.** Fast
   topics move every cycle, so recency must drive *retrieval*, not just ranking
   (step 4). For each key person/org also run a recency-first variant —
@@ -200,7 +289,76 @@ Search tactics:
 - Follow citation/host trails: a good podcast episode names papers; a paper's
   authors have other talks.
 
-### 4. Rank by authority × recency × depth
+### 3b. Consult ChatGPT as the third discovery channel (runs in parallel from the start)
+
+Run this **in its own subagent**, launched in parallel at the very start
+(Orchestration) — its output, like the web hunt's, is verbose rendered page text
+that must stay out of the main thread. The subagent delegates to the
+**`ask-chatbots`** skill in **headless, ChatGPT-only** mode and asks the bare
+discovery question, then extracts the sources from the captured answer. The
+canonical invocation is the `ask-chatbots` companion script:
+
+```bash
+ML=/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python
+"$ML" ~/skills/ask-chatbots/scripts/ask_chatbots.py \
+  --headless --chatbots chatgpt --skip-summary \
+  --question "find important sources (articles, talks, podcasts, etc.) about <topic>"
+```
+
+- **Headless, ChatGPT-only, skip-summary.** `--headless` runs unattended with no
+  window (it auto-closes when done); `--chatbots chatgpt` queries *only* ChatGPT
+  — no Gemini/Grok/Claude; `--skip-summary` is harmless here (the Gemini
+  synthesis only fires for multi-bot runs) but pass it anyway so the contract is
+  explicit. Do **not** open a headed window — this is a background channel.
+- **Ask the bare topic, not the seeds.** Send the discovery question verbatim
+  with the topic substituted in: *"find important sources (articles, talks,
+  podcasts, etc.) about <topic>"*. The point of this channel is an
+  *independent* read — ChatGPT's own sense of who and what matters — so do NOT
+  prime it with the vault's names or your frontier map; that would just echo your
+  priors back. Its value is surfacing sources the other two channels miss.
+- **Extract, don't ingest.** The script prints the full rendered ChatGPT answer
+  under `=== CHATGPT FULL RESPONSE ===`. The subagent parses that into the same
+  compact candidate shape as the web hunt — title, URL, author + role,
+  format/length, one-line why — and returns only that list, never the raw page
+  text.
+- **Treat its suggestions as candidates, not gospel — but don't WebFetch them.**
+  ChatGPT is a *discovery* channel, not an authority — it can hallucinate URLs,
+  misattribute authorship, or name a source that doesn't exist. Even so, **skip
+  per-link WebFetch verification for ChatGPT picks** — it returns many links and
+  fetching each one burns resources for little gain. Instead, judge each
+  candidate's relevance and importance **from the title and the description
+  ChatGPT gives** (when it gives one): is it a named first-party source by a
+  plausible author, on-topic, the right depth? Carry the ones that pass that
+  read-through into the merge. A ChatGPT pick that *also* shows up from the vault
+  or web is a strong positive signal — corroborated. One that *only* ChatGPT
+  names and looks thin or unverifiable from its title/description should be
+  demoted or dropped at step 4, or listed marked "attributed (ChatGPT),
+  unverified" — never WebFetch-chased just to confirm it.
+
+### 4. Merge the three channels, then rank by authority × recency × depth
+
+**First merge, then rank.** You now hold three candidate lists — vault, web,
+ChatGPT. Union them and **dedupe by source** (same paper/talk/post = one entry),
+matching on URL *and* on title+author, since the three channels routinely cite
+the same primary source through different links. When a source appears in more
+than one channel, keep a single entry but **record every channel that surfaced
+it**: cross-channel agreement (e.g. both your vault and ChatGPT independently
+name the same talk) is itself an authority signal — let it lift the entry. Then
+rank the merged, deduped set on the three axes below.
+
+**Channel count is a ranking input, never an inclusion gate — default to high
+recall.** Agreement *lifts* a source up the list; being named by only one channel
+*never* drops it. A source the web hunt found and nothing else, a paper only the
+vault saved, a talk only ChatGPT named — each is first-class and belongs in the
+output **if it clears the quality bar below** (authoritative, first-party,
+on-topic, enough depth). The merge is a *union*, not an intersection: a single
+channel is enough. The only things that remove a candidate are the *quality*
+filters (the demote list below) and *verification* failure (thin/unverifiable
+picks, per step 3b) — never "only one channel named it." When in doubt, include
+it and mark its channel; most of a field's best sources are surfaced by exactly
+one channel, so thinning single-channel finds quietly guts recall. Reserve
+omission for material that genuinely fails on quality, and when you do omit, say
+what you dropped and why (step 5) rather than silently dropping it.
 
 Score candidates on three axes and lead with the best:
 
@@ -224,10 +382,13 @@ Score candidates on three axes and lead with the best:
 - **Depth** — a 40-minute talk or a full technical report beats a tweet or a
   300-word post, when the goal is real understanding.
 
-**Demote aggressively:** listicles, SEO content, "top 10 tools" roundups,
-anonymous tutorials, AI-generated summaries, and second-hand explainers of a
-primary source you could link directly instead. If you catch yourself about to
-list a summary *of* a paper/talk, link the paper/talk itself.
+**Demote aggressively — on quality, not on channel count:** listicles, SEO
+content, "top 10 tools" roundups, anonymous tutorials, AI-generated summaries,
+and second-hand explainers of a primary source you could link directly instead.
+If you catch yourself about to list a summary *of* a paper/talk, link the
+paper/talk itself. This bar is about *what the source is*, never *how many
+channels named it* — a first-party paper surfaced by one channel clears it; a
+listicle named by all three does not.
 
 ### 5. Output: a curated, annotated list
 
@@ -242,10 +403,20 @@ for each entry give:
 
 Lead with a one-line "who defines this frontier" framing so the user sees the
 landscape, then the list. Keep annotations tight; this is a pointer list, not a
-summary of each source. Mark any entry that came from the user's vault with
-"already in your vault" so they can tell new material from what they've saved.
-If a key sub-angle has no strong primary source, say so honestly rather than
-padding with weak material.
+summary of each source. Mark each entry with the channel(s) that surfaced it —
+**"already in your vault"** for vault hits (so the user can tell new material
+from what they've saved), and flag when a source was **independently surfaced by
+more than one channel** (e.g. "vault + ChatGPT", "web + ChatGPT") since that
+agreement is a confidence signal. Don't clutter every line with single-channel
+web tags; the signals worth surfacing are vault membership and multi-channel
+agreement. **List every candidate that cleared the step-4 quality bar, including
+the single-channel ones** — a source named by only the web hunt, only the vault,
+or only ChatGPT still goes in the list; multi-channel agreement changes its
+*rank*, not whether it appears. Do not quietly compress the output down to the
+corroborated few — that is the most common way this skill loses recall. If a key
+sub-angle has no strong primary source, say so honestly rather than padding with
+weak material — but "only one channel found it" is not weakness, so never use it
+as a reason to cut.
 
 ## When a step fails
 
@@ -260,6 +431,8 @@ along the table below (trigger → first fix → if it still fails).
 | A key person/org returns no first-party material | Try adjacent channels (talk → paper → eng blog → podcast) and the recency-first variant before giving up | List the gap honestly per step 5; never pad with a listicle/summary to fill it |
 | WebFetch can't confirm authorship / first-party | Drop the candidate, or list it explicitly marked "attributed, unverified — not confirmed first-party" | Never present unverified second-hand material as if it were primary |
 | Hunt subagent times out mid-search | Present the compact candidate list it already returned, flagged partial | Re-run only the missing person/org, not the whole hunt |
+| ChatGPT-channel subagent times out / errors / returns nothing usable | Proceed with the vault + web channels — the ChatGPT channel is purely additive discovery | Note "couldn't reach ChatGPT" in one line and continue; never block the task on it |
+| `ask-chatbots` reports ChatGPT not signed in / Cloudflare-gated | Note it in one line and continue with the other two channels | Tell the user to sign into ChatGPT in their real Chrome and re-run if they want that channel |
 | Topic regime unclear (industry vs technical vs ageless) | Default to technical (regime 2); ask one clarifying question only if recency handling would change the answer materially | — |
 
 ## Anti-patterns — never do these
@@ -271,6 +444,11 @@ specific ways that fight gets lost; treat each as a red line, not a preference:
   explainer *of* a paper/talk? Link the paper/talk itself.
 - **Never present unverified or second-hand material as primary.** Confirm
   first-party authorship first, or mark it "attributed, unverified."
+- **Never drop a source just because only one channel surfaced it.** The merge is
+  a union — channel count sets *rank*, never inclusion (step 4). A quality
+  first-party source named by only the web hunt, only the vault, or only ChatGPT
+  belongs in the final list; corroboration lifts, it does not gate. Compressing
+  the output to the multi-channel few is the skill's most common recall failure.
 - **Never lead with listicles, "top N tools" roundups, SEO content, or
   AI-generated summaries.** Demote them hard (step 4).
 - **Never hardcode a year you merely remember** (e.g. `Snapdragon Summit 2024`) —
@@ -279,12 +457,31 @@ specific ways that fight gets lost; treat each as a red line, not a preference:
 - **Never skip the vault when one exists**, and **never use research-notes'
   "search-only" mode** — mine the vault first with index browse + FTS sweep on
   (step 1), or say in one line why you couldn't.
+- **Never parallelize the vault and web hunts without reconciling** — a round-1
+  web hunt blind to the vault must be followed by a vault-seed diff and a scoped
+  round-2 (Orchestration + step 3). Skipping it silently drops the vault's unique
+  names/terms (e.g. a bilingual serving-infra angle) — the one thing it was for.
+- **Never let the vault whitelist the web hunt** — vault seeds are *additive* to
+  an independent frontier enumeration, never a filter. Search the obvious
+  frontier even when the vault never named it; otherwise vault coverage caps the
+  search (the serial-mode mirror of the reconcile-skip above).
+- **Never hand research-notes a flat multi-term query list** — pass ONE topic and
+  let it own the bilingual expansion, adding suspected names only as labelled
+  *extras* (step 1). A pre-enumerated English term block silently drops Chinese
+  coverage by short-circuiting the per-topic synonym/word-split sweep.
 - **Never read a full note body just to discover it's off-topic** — triage from
   `notes-search` snippets and index summaries first.
 - **Never pad a weak sub-angle to look complete** — say "no strong primary source
   here" honestly (step 5).
 - **Never force recency where it doesn't belong** — an ageless topic (regime 3)
   ranks on authority + depth; don't swap a great old source for a worse new one.
+- **Never WebFetch ChatGPT's links to verify them** — it returns many and
+  fetching each wastes resources. Judge ChatGPT picks from the title/description
+  it gives; corroborate via vault/web overlap, and mark a thin uncorroborated
+  pick "attributed (ChatGPT), unverified" rather than chasing it (step 3b + 4).
+- **Never prime the ChatGPT channel with your vault names or frontier map** — ask
+  it the bare topic so its read stays independent; priming just echoes your
+  priors back and wastes the channel (step 3b).
 - **Never persist to a wiki unless explicitly asked** — default is console-only.
 
 ## Output destinations
@@ -334,8 +531,13 @@ a cold start would have used, which bury the coinage entirely.
 
 Note how the vault pass set the vocabulary and the lead source *before* any web
 query; how every entry names the author + their org and links primary material;
-how vault hits are marked; and how it excludes anonymous "top N agent frameworks"
-roundups.
+how vault hits are marked; how the **ChatGPT channel ran in parallel from the
+start** (headless, chatgpt-only) and any source it *independently* named carries
+a "+ ChatGPT" agreement tag; and how it excludes anonymous "top N agent
+frameworks" roundups. (That walkthrough shows the **serial** vault↔web mode; with
+strong priors you could instead run vault + web in parallel and reach the same
+endpoint via the round-2 reconcile — Orchestration. The ChatGPT channel fires in
+parallel either way.)
 
 That example is a **fast-moving technical** topic (regime 2): recent work leads,
 but Karpathy's older lecture survives as labeled foundational. An **industry /
