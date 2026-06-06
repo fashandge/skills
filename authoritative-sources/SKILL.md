@@ -262,6 +262,31 @@ along the table below (trigger → first fix → if it still fails).
 | Hunt subagent times out mid-search | Present the compact candidate list it already returned, flagged partial | Re-run only the missing person/org, not the whole hunt |
 | Topic regime unclear (industry vs technical vs ageless) | Default to technical (regime 2); ask one clarifying question only if recency handling would change the answer materially | — |
 
+## Anti-patterns — never do these
+
+The whole skill is a fight against secondary, low-signal material. These are the
+specific ways that fight gets lost; treat each as a red line, not a preference:
+
+- **Never list a summary when you can link the primary.** About to cite an
+  explainer *of* a paper/talk? Link the paper/talk itself.
+- **Never present unverified or second-hand material as primary.** Confirm
+  first-party authorship first, or mark it "attributed, unverified."
+- **Never lead with listicles, "top N tools" roundups, SEO content, or
+  AI-generated summaries.** Demote them hard (step 4).
+- **Never hardcode a year you merely remember** (e.g. `Snapdragon Summit 2024`) —
+  it pins retrieval to a stale event. Let the engine return the newest; weigh
+  recency in step 4.
+- **Never skip the vault when one exists**, and **never use research-notes'
+  "search-only" mode** — mine the vault first with index browse + FTS sweep on
+  (step 1), or say in one line why you couldn't.
+- **Never read a full note body just to discover it's off-topic** — triage from
+  `notes-search` snippets and index summaries first.
+- **Never pad a weak sub-angle to look complete** — say "no strong primary source
+  here" honestly (step 5).
+- **Never force recency where it doesn't belong** — an ageless topic (regime 3)
+  ranks on authority + depth; don't swap a great old source for a worse new one.
+- **Never persist to a wiki unless explicitly asked** — default is console-only.
+
 ## Output destinations
 
 - **Default — console only.** Print the curated list in the response. Do not
