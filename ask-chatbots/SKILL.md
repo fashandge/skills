@@ -112,6 +112,7 @@ The script is the full working example; it implements the logic described below.
 - Do not extract only the final paragraph unless the user explicitly requests a concise answer.
 - Keep the assistant response body, not random page chrome or suggestion chips.
 - For ChatGPT, strip transient `Thought for ...` lines when they appear in the captured body.
+- For ChatGPT, preserve body links: each `<a href>` in the answer is captured as inline Markdown `[text](url)` instead of being flattened to bare text. Extraction clones the response node offscreen, rewrites its anchors, then reads `innerText`, so the live page the user keeps open is untouched.
 - For Gemini, treat each submitted prompt as a separate turn and capture only the new response after that turn.
 - For Claude, submit through the `div.ProseMirror[contenteditable="true"]` editor on `claude.ai/new`, click the visible `button[aria-label*="Send"]`, wait for Claude's finished state, and capture the new `.standard-markdown` / `.progressive-markdown` content inside `.font-claude-response` so the echoed user prompt and duplicated live-status text are excluded.
 

@@ -90,6 +90,57 @@ async def last_nonempty_inner_text(locator) -> str:
     return ""
 
 
+# Reads an element's text like innerText (layout-aware line breaks) but rewrites every
+# <a href> into inline Markdown `[text](url)` so body links survive capture instead of
+# being flattened away. Works on an offscreen clone, so the live page is untouched.
+LINKED_INNER_TEXT_JS = """
+(el) => {
+  const cleanUrl = (raw) => {
+    try {
+      const u = new URL(raw);
+      // ChatGPT appends utm_source=chatgpt.com (and friends) to every source link.
+      if (u.searchParams.get('utm_source') === 'chatgpt.com') {
+        ['utm_source', 'utm_medium', 'utm_campaign'].forEach(p => u.searchParams.delete(p));
+      }
+      return u.toString().replace(/\\?$/, '');
+    } catch {
+      return raw;
+    }
+  };
+  const clone = el.cloneNode(true);
+  clone.querySelectorAll('a[href]').forEach(a => {
+    const href = a.href ? cleanUrl(a.href) : '';
+    if (!href) return;
+    const t = (a.textContent || '').replace(/\\s+/g, ' ').trim();
+    a.textContent = t ? `[${t}](${href})` : `(${href})`;
+  });
+  clone.style.position = 'absolute';
+  clone.style.left = '-99999px';
+  clone.style.top = '0';
+  document.body.appendChild(clone);
+  const text = clone.innerText;
+  clone.remove();
+  return text;
+}
+"""
+
+
+async def last_nonempty_linked_text(locator) -> str:
+    """Like last_nonempty_inner_text, but preserves <a href> links as inline Markdown."""
+    count = await locator.count()
+    for i in range(count - 1, -1, -1):
+        try:
+            handle = await locator.nth(i).element_handle()
+            if handle is None:
+                continue
+            text = (await handle.evaluate(LINKED_INNER_TEXT_JS)).strip()
+        except Exception:
+            continue
+        if text:
+            return text
+    return ""
+
+
 async def wait_for_stable_text(
     extractor,
     baseline: str,
@@ -167,10 +218,10 @@ async def extract_chatgpt_response(page) -> str:
     assistant_turns = page.locator(
         'section[data-testid^="conversation-turn-"]'
     ).filter(has=page.locator('[data-message-author-role="assistant"]'))
-    text = await last_nonempty_inner_text(assistant_turns)
+    text = await last_nonempty_linked_text(assistant_turns)
     if text:
         return re.sub(r"\nThought for \d+s\s*\n?", "\n", text).strip()
-    text = await last_nonempty_inner_text(
+    text = await last_nonempty_linked_text(
         page.locator('[data-message-author-role="assistant"]')
     )
     return re.sub(r"\nThought for \d+s\s*\n?", "\n", text).strip()
