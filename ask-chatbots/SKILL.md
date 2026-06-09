@@ -1,6 +1,6 @@
 ---
 name: ask-chatbots
-description: Query Gemini, ChatGPT, Grok, and Claude in parallel by spawning a self-managed logged-in Chrome (copy-on-write clone of the real profile, so every site is already signed in), capture full responses as rendered, and optionally ask Gemini for a final cross-chatbot summary. The browser is headed and left open by default (--headless / --no-keep-open to change).
+description: Query Gemini, ChatGPT, Grok, Claude, and DeepSeek in parallel by spawning a self-managed logged-in Chrome (copy-on-write clone of the real profile, so every site is already signed in), capture full responses as rendered, and optionally ask Gemini for a final cross-chatbot summary. The browser is headed and left open by default (--headless / --no-keep-open to change).
 ---
 
 # Ask Chatbots
@@ -12,6 +12,7 @@ Supported chatbots:
 - chatgpt
 - grok
 - claude
+- deepseek
 
 Default selection:
 - gemini
@@ -38,7 +39,7 @@ Behavior:
 
 Use this skill when the user asks to:
 - compare chatbot answers
-- ask Gemini / ChatGPT / Grok / Claude the same question
+- ask Gemini / ChatGPT / Grok / Claude / DeepSeek the same question
 - run parallel chatbot queries
 - capture full responses from AI websites
 
@@ -64,9 +65,9 @@ ML=/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python
 $ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
   --question "la weather tomorrow"
 
-# Four chatbots
+# Five chatbots
 $ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
-  --chatbots gemini,chatgpt,grok,claude \
+  --chatbots gemini,chatgpt,grok,claude,deepseek \
   --question "compare VRT vs ETN for a swing trade"
 
 # Custom timeout, skip the synthesis step
@@ -91,7 +92,7 @@ The script is the full working example; it implements the logic described below.
 
 ## Command-line flags
 
-- `--chatbots` — comma-separated subset of `gemini,chatgpt,grok,claude` (default `gemini,chatgpt`).
+- `--chatbots` — comma-separated subset of `gemini,chatgpt,grok,claude,deepseek` (default `gemini,chatgpt`).
 - `--question` — the prompt sent to each chatbot (required).
 - `--timeout-seconds` — per-chatbot wait cap (default 120).
 - `--skip-summary` — skip the final Gemini synthesis.
@@ -101,7 +102,7 @@ The script is the full working example; it implements the logic described below.
 ## Input parsing rules
 
 - If no chatbot list is provided, default to `gemini,chatgpt`.
-- Accept one or more of: `gemini`, `chatgpt`, `grok`, `claude`.
+- Accept one or more of: `gemini`, `chatgpt`, `grok`, `claude`, `deepseek`.
 - Deduplicate the list while preserving order.
 - Fail fast on unknown chatbot names.
 
@@ -115,6 +116,7 @@ The script is the full working example; it implements the logic described below.
 - For ChatGPT, preserve body links: each `<a href>` in the answer is captured as inline Markdown `[text](url)` instead of being flattened to bare text. Extraction clones the response node offscreen, rewrites its anchors, then reads `innerText`, so the live page the user keeps open is untouched.
 - For Gemini, treat each submitted prompt as a separate turn and capture only the new response after that turn.
 - For Claude, submit through the `div.ProseMirror[contenteditable="true"]` editor on `claude.ai/new`, click the visible `button[aria-label*="Send"]`, wait for Claude's finished state, and capture the new `.standard-markdown` / `.progressive-markdown` content inside `.font-claude-response` so the echoed user prompt and duplicated live-status text are excluded.
+- For DeepSeek, submit through the `textarea` (placeholder "Message DeepSeek") on `chat.deepseek.com`, press Enter, and capture the new `.ds-markdown.ds-assistant-message-main-content` block after the current turn baseline. The COW profile clone carries prior conversation history, so baseline-count the assistant-message nodes before sending and read only the newest one.
 
 ## Waiting rules
 
@@ -124,6 +126,7 @@ Because each chatbot loads differently, use a chatbot-specific completion check:
 - ChatGPT: wait for a substantive assistant turn, not an intermediate `Thinking` / `Thought for ...` stub.
 - Grok: wait for a substantive rendered response, not just an echoed copy of the user prompt.
 - Claude: wait for a new `.font-claude-response` block after the current turn baseline, ignore transient research/search/status-only scaffolding, wait until the page no longer says `Claude is responding`, then wait for the markdown text to stabilize. Short direct answers are valid after Claude reaches the finished state.
+- DeepSeek: wait for a new `.ds-assistant-message-main-content` block after the current turn baseline, then wait for the text to stabilize (stable across 2 polls). Short factual answers are valid; reject a capture that is just an echo of the prompt.
 
 If the page is still streaming, keep waiting until the answer looks complete or the timeout expires.
 
@@ -142,6 +145,7 @@ If the page is still streaming, keep waiting until the answer looks complete or 
 - ChatGPT may expose both a hidden textarea and a visible contenteditable editor.
 - Grok commonly uses a ProseMirror contenteditable editor.
 - Claude uses a ProseMirror contenteditable editor on `https://claude.ai/new`; the send button is only present after the prompt is non-empty.
+- DeepSeek uses a plain `textarea` (placeholder "Message DeepSeek") on `https://chat.deepseek.com`; pressing Enter submits. Its send/stop controls are unlabeled icon `div`s, so completion is detected by text stability rather than a stop button.
 - The browser is spawned fresh each run, so every chatbot gets a clean new tab — there is no tab reuse and no leftover conversation state.
 - Logins come from the COW clone of the real profile. If a chatbot is **not** signed in there, sign into it in your normal Chrome first, then re-run.
 - COW mode exposes the *entire* real profile to automation; that is intentional here (Gemini needs it), but keep questions/prompts non-sensitive accordingly.
@@ -163,6 +167,9 @@ A successful run prints one section per requested chatbot, each containing the f
 ...
 
 === CLAUDE FULL RESPONSE ===
+...
+
+=== DEEPSEEK FULL RESPONSE ===
 ...
 
 === GEMINI SUMMARY ===

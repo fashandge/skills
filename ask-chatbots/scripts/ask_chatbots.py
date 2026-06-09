@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Query Gemini / ChatGPT / Grok / Claude in parallel in a self-spawned logged-in Chrome.
+"""Query Gemini / ChatGPT / Grok / Claude / DeepSeek in parallel in a self-spawned logged-in Chrome.
 
 Instead of attaching to a pre-running Chrome on port 9222, this spawns its own
 **logged-in** Chrome via the ``logged-in-chrome`` project in COW (copy-on-write)
@@ -24,7 +24,7 @@ Requires:
 
 Example:
   python scripts/ask_chatbots.py --question "la weather tomorrow"
-  python scripts/ask_chatbots.py --chatbots gemini,chatgpt,grok,claude --question "compare VRT vs ETN"
+  python scripts/ask_chatbots.py --chatbots gemini,chatgpt,grok,claude,deepseek --question "compare VRT vs ETN"
   python scripts/ask_chatbots.py --headless --question "la weather tomorrow"
   python scripts/ask_chatbots.py --no-keep-open --question "la weather tomorrow"
   python scripts/ask_chatbots.py --chatbots chatgpt,gemini,grok,claude --skip-summary --question "compare VRT vs ETN"
@@ -46,6 +46,7 @@ URLS = {
     "chatgpt": "https://chatgpt.com/",
     "grok": "https://grok.com/",
     "claude": "https://claude.ai/new",
+    "deepseek": "https://chat.deepseek.com/",
 }
 
 DEFAULT_CHATBOTS = ["gemini", "chatgpt"]
@@ -63,7 +64,7 @@ def parse_chatbots(value: str | None) -> list[str]:
     for bot in bots:
         if bot not in VALID_CHATBOTS:
             raise SystemExit(
-                f"Unknown chatbot '{bot}'. Valid options: gemini, chatgpt, grok, claude"
+                f"Unknown chatbot '{bot}'. Valid options: gemini, chatgpt, grok, claude, deepseek"
             )
         if bot not in seen:
             deduped.append(bot)
@@ -487,6 +488,68 @@ async def ask_claude(page, question: str) -> str:
     return last_seen or (await extract_new_claude_response(page, baseline_count)).strip()
 
 
+def deepseek_response_locator(page):
+    # Each finished assistant turn renders its body in this markdown node. The COW
+    # profile clone carries prior conversation history, so baseline-count the nodes
+    # before sending and read only the new one after.
+    return page.locator(".ds-markdown.ds-assistant-message-main-content")
+
+
+async def extract_new_deepseek_response(page, baseline_count: int) -> str:
+    locator = deepseek_response_locator(page)
+    count = await locator.count()
+    for i in range(count - 1, baseline_count - 1, -1):
+        try:
+            text = (await locator.nth(i).inner_text()).strip()
+        except Exception:
+            continue
+        if text:
+            return text
+    return ""
+
+
+async def deepseek_response_complete(text: str, question: str) -> bool:
+    cleaned = text.strip()
+    if len(cleaned) < 15:  # short factual answers are valid; stability gate guards mid-stream
+        return False
+
+    question_norm = " ".join(question.split()).strip().lower()
+    cleaned_norm = " ".join(cleaned.split()).strip().lower()
+    if cleaned_norm == question_norm:
+        return False
+
+    return True
+
+
+async def ask_deepseek(page, question: str) -> str:
+    prompt = page.locator("textarea:visible").first
+    await prompt.click()
+    await prompt.fill(question)
+    baseline_count = await deepseek_response_locator(page).count()
+    await prompt.press("Enter")
+
+    last_seen = ""
+    stable_count = 0
+    for _ in range(60):
+        await asyncio.sleep(2)
+        current = (await extract_new_deepseek_response(page, baseline_count)).strip()
+        if not current:
+            continue
+        if not await deepseek_response_complete(current, question):
+            continue
+
+        if current == last_seen:
+            stable_count += 1
+        else:
+            last_seen = current
+            stable_count = 1
+
+        if stable_count >= 2:
+            return current
+
+    return last_seen or (await extract_new_deepseek_response(page, baseline_count)).strip()
+
+
 def build_gemini_summary_prompt(question: str, chatbots: list[str], results: dict[str, str]) -> str:
     parts = [
         f'Please read the following chatbot responses to the question: "{question}"',
@@ -511,6 +574,7 @@ ASKERS = {
     "chatgpt": ask_chatgpt,
     "grok": ask_grok,
     "claude": ask_claude,
+    "deepseek": ask_deepseek,
 }
 
 
@@ -578,7 +642,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--chatbots",
         default=",".join(DEFAULT_CHATBOTS),
-        help="Comma-separated list of chatbots: gemini, chatgpt, grok, claude (default: gemini,chatgpt)",
+        help="Comma-separated list of chatbots: gemini, chatgpt, grok, claude, deepseek (default: gemini,chatgpt)",
     )
     parser.add_argument(
         "--timeout-seconds",
