@@ -1,17 +1,18 @@
 ---
 name: learn
-description: Front-door router for learning/teaching requests — classifies what the user wants to learn and dispatches to the right specialized teaching skill (socratic-tutor, socratic-study, socratic-elenchus, deep-mastery, system-internalization, or explain-session). Use when the user says "help me learn/understand/study X", "teach me X", "I want to get good at X", "/learn X", or otherwise wants to learn something but hasn't named a specific method. Do NOT use when the user already names a method or leaf skill (e.g. "Socratic me on X", "drill me to mastery", "stress-test this belief") — let that skill trigger directly.
+description: Front-door router for learning/teaching requests — classifies what the user wants to learn and dispatches to the right specialized teaching skill (socratic-tutor, socratic-study, socratic-elenchus, deep-mastery, system-internalization, motivating-examples, or explain-session). Use when the user says "help me learn/understand/study X", "teach me X", "I want to get good at X", "/learn X", or otherwise wants to learn something but hasn't named a specific method. Do NOT use when the user already names a method or leaf skill (e.g. "Socratic me on X", "drill me to mastery", "explain X with examples", "stress-test this belief") — let that skill trigger directly.
 ---
 
 # Learn (router)
 
 You are a routing layer, not a teacher. Your only job: figure out **what kind of learning** the user wants and hand off to the right specialized skill by invoking it with the **Skill** tool. Do not start teaching yourself — pick the skill, state the choice in one line, and invoke it.
 
-## The six destinations
+## The seven destinations
 
 | Skill | Use it when… | End state |
 |---|---|---|
 | **explain-session** | The subject is the work just done in **this** conversation (a change/build/fix you and the user did together). | User understands what was just done. |
+| **motivating-examples** | The user wants a **concept/mechanism made to click via vivid worked examples** — *shown* the intuition (you build the examples), not questioned, not drilled. Best for math/ML/CS/physics/econ/philosophy where the formula tends to arrive before the intuition. | Idea *clicks*; user feels why it works. |
 | **socratic-elenchus** | The user wants to **challenge / stress-test a belief or conviction** — truth-agnostic, expose assumptions, fine to end in aporia. | Belief examined; assumptions surfaced. |
 | **system-internalization** | A **documented rule-based system the user wants to apply by reflex** to live situations. (Currently tuned for **trading/investment systems** in their Obsidian wiki.) | User can *execute* the rules under pressure. |
 | **deep-mastery** | A **bounded, reasoning-rich artifact** (code change, algorithm, proof, design decision, focused paper) and the user wants **certified mastery** — understand every *why*, quizzed until solid. | User can *defend* the artifact. |
@@ -25,11 +26,13 @@ You are a routing layer, not a teacher. Your only job: figure out **what kind of
 3. Input = **documented procedure/system** + goal = **apply it automatically** (trading system in their wiki) → `system-internalization`.
 4. Input = **one bounded artifact** + goal = **master & defend it, drilled to certainty** → `deep-mastery`.
 5. Input = **document(s) handed over** + goal = **explore/understand** → `socratic-study`.
-6. Otherwise (a **topic name**, exploratory) → `socratic-tutor`.
+6. Topic name + goal = **be shown the intuition via worked examples** ("explain with examples", "give me the intuition", "make it click", "I don't get *why* it works") → `motivating-examples`.
+7. Otherwise (a **topic name**, exploratory, wants to reason it out) → `socratic-tutor`.
 
 The discriminators that separate the close calls:
 - **Document vs. topic:** is there an actual file/URL/note, or just a subject in their head? → study vs. tutor.
-- **Explore vs. master vs. apply:** open understanding (`socratic-study`/`tutor`) vs. certified comprehension you can defend (`deep-mastery`) vs. reflexive execution (`system-internalization`).
+- **Shown vs. questioned:** want *you* to construct illuminating examples and walk them through (`motivating-examples`) vs. want to be *asked* questions and reason it out themselves (`socratic-tutor`). "Explain/show me…" leans shown; "help me think through…" leans questioned.
+- **Explore vs. master vs. apply:** open understanding (`socratic-study`/`tutor`/`motivating-examples`) vs. certified comprehension you can defend (`deep-mastery`) vs. reflexive execution (`system-internalization`).
 - **Learn vs. challenge:** want to absorb it (everything else) vs. want to test whether it holds (`socratic-elenchus`).
 
 ## Protocol
