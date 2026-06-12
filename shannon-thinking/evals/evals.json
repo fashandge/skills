@@ -1,0 +1,53 @@
+{
+  "skill_name": "shannon-thinking",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "quant-flat-pnl-despite-ic",
+      "prompt": "I'm stuck on my intraday futures strategy and want help thinking about it. I have an ML model (gradient boosting on order-flow and momentum features) that predicts 1-hour-ahead returns on ES futures with decent out-of-sample rank IC, around 0.04. But when I backtest a simple long/short strategy on the signal, the P&L is basically flat after transaction costs. I've tried tweaking entry thresholds and holding periods and nothing moves the needle. How should I attack this problem?",
+      "expected_output": "An analysis that pins down the problem and solution shape, attacks it from multiple Shannon angles (e.g. decomposing signal->portfolio->execution with per-link metrics, inverting from required IC/turnover given costs, restating as a cost problem vs an alpha problem), converges on the most promising angle, and ends with concrete next experiments.",
+      "files": [],
+      "assertions": [
+        "States the problem setup (givens/constraints) and what a solution would look like before proposing any approaches",
+        "Offers at least 3 genuinely different reframings of the problem that change what would count as an answer (not synonym swaps)",
+        "Includes at least one working-backward/inversion analysis (e.g. assume the strategy is profitable and derive what the signal/turnover/costs must look like)",
+        "Decomposes the pipeline into stages (signal -> portfolio -> execution -> P&L) with a way to measure where the value is lost",
+        "Includes at least one analogy to a known solved problem whose solution is explicitly mapped back onto this strategy problem",
+        "Converges on a recommended angle with concrete, ordered next experiments rather than ending on an undifferentiated list of options",
+        "Stays about this specific ES strategy throughout; never lectures about thinking methods in the abstract"
+      ]
+    },
+    {
+      "id": 1,
+      "eval_name": "agentic-fact-loss-in-synthesis",
+      "prompt": "help me think through an architecture problem with my multi-agent research system. an orchestrator spawns reader subagents over a set of documents, each subagent summarizes its docs, and the orchestrator writes a final report. the reports keep missing key facts that the subagents actually found -- i can literally see the facts in the subagent transcripts but they don't make it into the final report. not sure if i need better prompts, a different topology, shared memory, or what. how should i attack this?",
+      "expected_output": "An analysis that reframes the topology question as an information-flow problem, decomposes the pipeline (subagent finding -> summary -> orchestrator context -> synthesis) to locate where facts drop, works backward from the ideal report, proposes a toy version (one subagent, one fact) to isolate the failure, and converges on concrete next steps like structured findings instead of prose summaries.",
+      "files": [],
+      "assertions": [
+        "States the problem setup and what a solution would look like (e.g. measurable fact-retention through the pipeline) before proposing fixes",
+        "Reframes the topology question ('prompts vs topology vs shared memory') into at least 3 genuinely different problem statements, at least one being an information-flow or per-step 'what did the orchestrator actually see' framing",
+        "Decomposes the pipeline (subagent finding -> summary -> orchestrator context -> final report) and proposes checking each link to locate where facts drop, rather than redesigning blindly",
+        "Includes at least one working-backward/inversion analysis (e.g. start from the ideal report or ideal trace and derive what each stage must emit)",
+        "Proposes a simplified/toy reproduction (e.g. one subagent, one known fact) to isolate the failure",
+        "Converges on a recommended angle with concrete, ordered next steps rather than ending on an undifferentiated list of options",
+        "Stays about this specific multi-agent system throughout; never lectures about thinking methods in the abstract"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "generic-news-dedup",
+      "prompt": "I need to design a deduplication scheme for a stream of news articles arriving at about 50k/day. Near-duplicates (rewrites, syndicated copies, lightly edited versions) should collapse into one cluster, but genuine follow-up stories on the same event should NOT be merged. My current approach is embedding cosine similarity with a threshold, and it has too many false merges -- follow-ups keep collapsing into the original story. I'm stuck on how to even think about this problem. Help me think it through.",
+      "expected_output": "An analysis that articulates the real difficulty (one similarity scalar can't separate 'same text' from 'same event'), restates the problem in several genuinely different ways (e.g. classification of article pairs vs clustering, provenance/copy-detection vs semantic similarity), simplifies to a toy (a handful of hand-picked article pairs), draws analogies to solved problems (plagiarism detection, MinHash/shingling, record linkage), and converges on a concrete direction with next experiments.",
+      "files": [],
+      "assertions": [
+        "States the problem setup and what a solution would look like, and names the core difficulty (a single semantic-similarity scalar cannot separate 'same text/provenance' from 'same event')",
+        "Offers at least 3 genuinely different reframings of the problem that change what would count as an answer (e.g. pairwise classification vs clustering, copy/provenance detection vs semantic similarity, two-stage same-event-then-same-text)",
+        "Proposes a simplified/toy version (e.g. a small hand-labeled set of duplicate pairs vs follow-up pairs) before full-scale redesign",
+        "Includes at least one analogy to a known solved problem (e.g. plagiarism/copy detection, MinHash/shingling, record linkage, TDT/event tracking) whose solution is explicitly mapped back onto this dedup problem",
+        "Includes at least one working-backward/inversion analysis (e.g. start from the desired clustering and derive what evidence distinguishes a rewrite from a follow-up)",
+        "Converges on a recommended angle with concrete, ordered next experiments rather than ending on an undifferentiated list of options",
+        "Stays about this specific dedup problem throughout; never lectures about thinking methods in the abstract"
+      ]
+    }
+  ]
+}
