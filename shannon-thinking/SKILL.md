@@ -1,7 +1,7 @@
 ---
 name: shannon-thinking
 description: >
-  Attack a hard open problem with Claude Shannon's six creative-thinking moves — simplification, seeking similar known problems (analogy), restatement, generalization, structural analysis (decomposition), and inversion — applied concretely to the user's actual problem, never lectured about in the abstract. Use whenever the user is stuck on, or wants help thinking about, an open problem of their own: "help me think about/through this problem", "I'm stuck on X", "how should I approach/attack X", "brainstorm approaches to X", "give me angles on X", "I can't figure out how to X", or "/shannon-thinking X". Especially apt for research-flavored problems — quant trading ML models and strategies, agentic/LLM system design, algorithms, system architecture, math — where the path from problem to solution is unknown. Do NOT use for learning established material ("help me learn/understand X" → the `learn` family): this skill is for problems where nobody has the answer yet and the goal is a solution, a design, or a research direction.
+  Attack a hard open problem with Claude Shannon's six creative-thinking moves: simplification, analogy, restatement, generalization, structural analysis, and inversion. Use when the user is stuck on their own problem or asks how to approach, attack, or brainstorm angles on it, especially research-flavored work like quant trading ML, agentic systems, algorithms, architecture, or math. Do not use for learning established material; route "help me learn/understand X" to the learn family instead.
 ---
 
 # Shannon Thinking
