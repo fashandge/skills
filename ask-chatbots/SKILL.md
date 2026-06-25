@@ -94,7 +94,7 @@ The script is the full working example; it implements the logic described below.
 
 - `--chatbots` — comma-separated subset of `gemini,chatgpt,grok,claude,deepseek` (default `gemini,chatgpt`).
 - `--question` — the prompt sent to each chatbot (required).
-- `--timeout-seconds` — per-chatbot wait cap (default 120).
+- `--timeout-seconds` — per-chatbot wait cap (default 300). Higher than a single answer needs, to cover ChatGPT/Grok web-search turns that browse for several minutes before rendering.
 - `--skip-summary` — skip the final Gemini synthesis.
 - `--headless` — run with no visible window (default is a headed window left open for you). Implies the browser auto-closes when done.
 - `--no-keep-open` — close the headed browser as soon as answers are captured (default: leave it open; a detached watcher removes the temp profile when you close the window).

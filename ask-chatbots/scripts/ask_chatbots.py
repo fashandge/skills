@@ -647,8 +647,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--timeout-seconds",
         type=int,
-        default=120,
-        help="Maximum seconds to wait for each chatbot response (default: 120)",
+        default=300,
+        help="Maximum seconds to wait for each chatbot response (default: 300)",
     )
     parser.add_argument(
         "--skip-summary",
