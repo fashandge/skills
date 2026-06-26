@@ -1,6 +1,6 @@
 ---
 name: ask-chatbots
-description: Query Gemini, ChatGPT, Grok, Claude, and DeepSeek in parallel via a self-spawned logged-in Chrome. Output goes to a temp file; only the file path is printed to stdout (zero LLM tokens spent on response body).
+description: Query Gemini, ChatGPT, Grok, Claude, and DeepSeek in parallel via a self-spawned logged-in Chrome. Output goes to a temp file; optional wiki integration via the /wiki skill.
 ---
 
 # Ask Chatbots
@@ -19,7 +19,7 @@ Use this when you want to ask the same question to multiple AI chatbots and comp
 
 ## How it works
 
-Spawns its own Chrome via the `logged-in-chrome` project in COW (copy-on-write) mode — an instant APFS clone of your real Chrome profile, so every site is already signed in. Opens a tab per chatbot, sends the prompt, captures the full rendered response, optionally asks Gemini for a synthesis. Output is written to a temp file; only the file path is printed to stdout.
+Spawns its own Chrome via the `logged-in-chrome` project in COW (copy-on-write) mode — an instant APFS clone of your real Chrome profile, so every site is already signed in. Opens a tab per chatbot, sends the prompt, captures the full rendered response, optionally asks Gemini for a synthesis.
 
 ## Usage
 
@@ -35,10 +35,10 @@ $ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
   --include-responses \
   --question "compare VRT vs ETN for a swing trade"
 
-# Headless, no browser window
+# Save to wiki (no content on stdout, agent calls /wiki skill)
 $ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
-  --headless \
-  --question "la weather tomorrow"
+  --wiki \
+  --question "best places to hike in bay area"
 ```
 
 ## CLI flags
@@ -53,18 +53,30 @@ $ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
 | `--headless` | off | No visible browser window |
 | `--no-keep-open` | off | Close browser after capture (default: leave it open) |
 | `--stdout` | off | Print output to stdout instead of a temp file |
+| `--wiki` | off | Write output to a temp file, print only the path. The **agent** then reads the file and delegates to the `/wiki` skill to save as an Obsidian note. |
 
-## Output
+## Output modes
 
-- **Default**: writes responses to a temp file at `/var/folders/.../ask-chatbots-XXXX.txt`. Prints the file path followed by the full file content to stdout.
-- **`--stdout`**: prints everything to stdout (same output, no temp file).
-- **`--headless` or `--no-keep-open`**: browser auto-closes; output still printed.
-- **`--include-responses`**: includes each bot's `=== {BOT} FULL RESPONSE ===` section.
-- **Single chatbot**: always writes the full response (no summary for one bot).
+### Default
+Writes responses to a temp file at `/var/folders/.../ask-chatbots-XXXX.txt`. Prints the file path followed by the full file content to stdout.
 
-## Agent delivery rule
+### `--stdout`
+Prints everything to stdout (same output, no temp file).
 
-**Print the script's stdout verbatim as the final response.** Do not add framing commentary, reformatting, or bullet-point rewrites on top of what the script printed. The script prints the file path then the content — both are the answer.
+### `--wiki`
+Writes all output to a temp file (same as default). Prints **only the file path** — no content on stdout. The agent is responsible for:
+1. Reading the temp file
+2. Extracting the relevant content:
+   - **Multi-bot**: extract the `=== GEMINI SUMMARY ===` section
+   - **Single-bot**: extract the `=== {BOT} FULL RESPONSE ===` section (or the whole file if it's the only content)
+3. Delegating to the `/wiki` skill with that content as the body
+4. Reporting the wiki note path to the user
+
+## Agent delivery rules
+
+**Default / `--stdout`**: print the script's stdout verbatim. No framing or reformatting.
+
+**`--wiki`**: the script prints only the temp file path. Read the file, extract the relevant section, delegate to `/wiki`, then clean up the temp file. Print only the wiki note path returned by `/wiki` as the final response.
 
 ## Implementation
 

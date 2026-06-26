@@ -899,7 +899,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print output to stdout instead of writing to a temp file (default: write to a temp file, print only the file path)",
     )
-    parser.add_argument("--question", required=True, help="Question to send to each chatbot")
+    parser.add_argument(
+        "--question", required=True, help="Question to send to each chatbot"
+    )
+    parser.add_argument(
+        "--wiki",
+        action="store_true",
+        help="Write the final synthesis (or single response) as a wiki note in ~/notes/wiki/Chatbot Queries/ and print only the note path",
+    )
     return parser
 
 
@@ -918,6 +925,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # By default, write all output to a temp file and print the path
     # followed by the content. With --stdout, use real stdout directly.
+    # With --wiki, write to a temp file and print ONLY the path (the agent
+    # reads the file and delegates to the /wiki skill).
     follow_link = False
     if args.stdout:
         out = sys.stdout
@@ -927,7 +936,7 @@ def main(argv: list[str] | None = None) -> int:
         follow_link = path
 
     try:
-        result = asyncio.run(
+        asyncio.run(
             run(
                 chatbots,
                 args.question,
@@ -943,12 +952,17 @@ def main(argv: list[str] | None = None) -> int:
         if follow_link:
             out.close()
 
-    if follow_link:
+    if args.wiki:
+        # Print only the file path — no content echoing.
+        # The agent reads the temp file and delegates to the /wiki skill.
+        print(follow_link)
+
+    elif follow_link:
         print(follow_link)
         with open(follow_link) as f:
             print(f.read(), end="")
 
-    return result
+    return 0
 
 
 if __name__ == "__main__":
