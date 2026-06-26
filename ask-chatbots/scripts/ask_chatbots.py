@@ -232,6 +232,46 @@ async def gemini_response_complete(text: str) -> bool:
     return True
 
 
+async def gemini_response_finished(page) -> bool:
+    """True when Gemini is no longer generating the current response.
+
+    Mirrors `claude_response_finished`: reads a DOM-level streaming signal so a
+    mid-generation pause (text frozen for several seconds) can't be mistaken for
+    completion — the text-stability gate alone would return a truncated answer.
+    Either of these being present means "still generating":
+
+      1. ``aria-busy="true"`` on the markdown panel inside the response container
+         (Angular sets it while streaming the answer, clears it at done).
+      2. A visible "Stop response" button (present only while generating).
+
+    If neither signal is found (DOM changed under us), return True so the caller
+    falls back to its text-stability gate rather than blocking forever.
+    """
+    # Primary: aria-busy on the response's markdown panel. Scope to the response
+    # containers so an unrelated busy element elsewhere on the page can't keep us
+    # waiting; the bare selector covers the custom <message-content> element too.
+    try:
+        if await page.locator(
+            'message-content [aria-busy="true"], '
+            '.response-container-content [aria-busy="true"], '
+            '.markdown-main-panel[aria-busy="true"]'
+        ).count():
+            return False
+    except Exception:
+        pass
+
+    # Fallback: the "Stop response" button is visible only while generating.
+    try:
+        if await page.locator(
+            'button[aria-label*="Stop" i]:visible'
+        ).count():
+            return False
+    except Exception:
+        pass
+
+    return True
+
+
 async def extract_chatgpt_response(page) -> str:
     assistant_turns = page.locator(
         'section[data-testid^="conversation-turn-"]'
@@ -448,6 +488,14 @@ async def ask_gemini(page, question: str) -> str:
         if not current:
             continue
         if not await gemini_response_complete(current):
+            continue
+        # Gate on the DOM streaming signal, not text stability alone: Gemini can
+        # pause mid-generation for several seconds and look "stable" to a 2-poll
+        # gate while still streaming. If still generating, keep waiting and
+        # don't let the stale text accrue stability credit (mirrors ask_claude).
+        if not await gemini_response_finished(page):
+            last_seen = current
+            stable_count = 0
             continue
 
         if current == last_seen:

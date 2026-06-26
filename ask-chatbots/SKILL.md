@@ -123,7 +123,7 @@ The script is the full working example; it implements the logic described below.
 
 Because each chatbot loads differently, use a chatbot-specific completion check:
 
-- Gemini: wait for a new response block after the current turn baseline, then wait for the text to stabilize (stable across 2 polls). Short factual answers are valid.
+- Gemini: wait for a new response block after the current turn baseline, then wait for the text to stabilize (stable across 2 polls) **but only after the page reports it is no longer generating**. Gate on the DOM streaming signal (`aria-busy="true"` on the response's markdown panel, or a visible "Stop response" button) — Gemini can pause mid-generation for several seconds and look "stable" to a 2-poll gate while still streaming, which would return a truncated answer. While either signal is present, keep resetting the stability counter and keep waiting. Short factual answers are valid once the page reports finished.
 - ChatGPT: wait for a substantive assistant turn, not an intermediate `Thinking` / `Thought for ...` stub.
 - Grok: wait for a substantive rendered response, not just an echoed copy of the user prompt.
 - Claude: wait for a new `.font-claude-response` block after the current turn baseline, ignore transient research/search/status-only scaffolding, wait until the page no longer says `Claude is responding`, then wait for the markdown text to stabilize. Short direct answers are valid after Claude reaches the finished state.
