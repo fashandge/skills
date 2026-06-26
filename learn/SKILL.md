@@ -48,4 +48,5 @@ The discriminators that separate the close calls:
 
 - When unsure between `socratic-study` and `deep-mastery`: if the user wants to be *quizzed to certainty / be able to defend every decision*, that's `deep-mastery`; if they want to *explore and understand* the material more openly, that's `socratic-study`.
 - `system-internalization` is currently trading-specialized. If the user wants reflexive mastery of a *non-trading* documented procedure (runbook, clinical protocol, compliance framework), it has no perfect home yet — route to `deep-mastery` for the comprehension layer and note the gap.
+- If the subject is an **open problem of the user's own to solve** (a model to build, a system to design, a research question — no established material to absorb), it's not a learning request at all — route to `shannon-thinking` instead of any destination here.
 - If the user explicitly names a method, you shouldn't have been invoked — defer to that leaf skill.

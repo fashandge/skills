@@ -143,6 +143,10 @@ Recovery target if the user's been on `2026.4.26+` and it's slow: `2026.4.23` (l
 
 2. **`plugins.allow` pruning** — Doctor removes entries for plugins that aren't installed (e.g., `acpx`). This is usually fine but verify the `anthropic` plugin is still in the list if using `claude-cli` runtime.
 
+3. **Provider ID normalization (`openai-codex` → `openai`)** — 2026.6.x renamed the `openai-codex` provider to `openai` as part of its "reliable model routing" overhaul. In a diff this looks like account keys changing from `openai-codex:<email>` to `openai:<email>` and `provider: "openai-codex"` → `provider: "openai"`. **This is legitimate, not a regression.** The OAuth token migrates intact under the new key. Confirm with `openclaw models` — look for `openai via codex ... status=usable` and the OAuth account still listed. If a token shows expired after the rename, the fix is `openclaw models auth login --provider openai` (note: `--provider openai-codex` from pitfall #3 above is the *old* name and will fail on 2026.6.x — use `openai`).
+
+4. **Whole model entries pruned for discontinued models** — Doctor drops model entries for models the new version no longer ships (e.g., `anthropic/claude-opus-4-5` vanished on update to 2026.6.10, where available opus models became 4-6/4-7/4-8). This is scarier than the agentRuntime.id key-strip in pitfall #4 of "Watch out for" because the entire model block disappears. Verify against `openclaw models` output — if the model isn't in `Configured models` or `Aliases` anymore, the removal is correct; don't restore the stale entry from backup. *Do* restore the entry if the model is still listed as available — that's a doctor bug, not a migration.
+
 ### Config diff procedure
 
 The `backup-openclaw` step (step 2) already saved a full snapshot. Extract just the config from it for diffing:
@@ -173,6 +177,7 @@ If Discord shows "typing..." but no reply appears, or a specific channel stops r
 | All channels stuck after model ID change | All sessions bound to old provider | Clear all Discord sessions (see below) |
 | All channels dead after update | Discord app caching stale bot state | Restart the Discord app |
 | Agent processes but no Discord send | Config or delivery issue | Check `visibleReplies` and session state |
+| `conflicting plugin install metadata for: codex, discord` in `openclaw models` output | Shared SQLite plugin-install index has stale/double entries left by the version change | Soft warning, not yet a breakage. If Discord goes silent, run `openclaw doctor --fix` again (it tries to reconcile the index); if it persists and a specific channel is dead, apply the stale-session fix below. Don't manually edit the SQLite. |
 
 ### Stale session fix
 
@@ -228,9 +233,25 @@ grep 'cli exec.*trigger=user' ~/.openclaw/logs/gateway.log | tail -5
 
 ```bash
 openclaw --version
-ps aux | grep openclaw-gateway | grep -v grep | awk '{print "cpu="$3"%"}'    # 0.0% when idle
-tail -1 ~/.openclaw/logs/gateway.log
+# Process name is NOT "openclaw-gateway" — it's node running dist/index.js.
+# pgrep the node command instead of grepping ps for a binary that doesn't exist:
+pgrep -fl 'openclaw/dist/index.js gateway' | head
+ps -p "$(pgrep -f 'openclaw/dist/index.js gateway')" -o pid,%cpu,etime 2>/dev/null   # %cpu near 0 when idle
+# Confirm it's actually listening (authoritative proof the gateway is up):
+lsof -nP -iTCP:18789 -sTCP:LISTEN 2>/dev/null | head
+# Portal state:
+launchctl print gui/$(id -u)/ai.openclaw.gateway | grep -E '\tstate|last exit'
+
+# Fastest provider/token health check after a version bump — confirms OAuth
+# tokens survived migration and lists which provider IDs are now valid:
+openclaw models
 ```
+
+**Caveat on `ps aux | grep openclaw-gateway`** — earlier revisions of this skill used that form. On 2026.6.x the gateway process shows as `node .../openclaw/dist/index.js gateway --port 18789`, so grepping for `openclaw-gateway` returns nothing even when the gateway is fine. This is not a broken gateway — it's a stale pattern. Use the `pgrep -f 'openclaw/dist/index.js gateway'` form above.
+
+**Caveat on `tail ~/.openclaw/logs/gateway.log`** — on 2026.6.x the gateway no longer appends to `gateway.log`/`gateway.err.log` (those files can sit stale for weeks while the gateway runs fine). Active health output goes to `config-health.json` and `config-audit.jsonl` in the same logs dir (fresh mtime = recent gateway doctor pass). Treat a stale `gateway.log` as a possible logging-path change, not a crashed gateway — confirm with `lsof` + `launchctl print` + `openclaw models` instead of relying on the log file.
+
+**Provider/token survival after the 2026.6.x `openai-codex` → `openai` rename** — run `openclaw models` and find the line `openai via codex uses openai ... status=usable`; the OAuth account (e.g. `openai:<email>`) should still appear under `Providers w/ OAuth/tokens` with usage remaining. This single command replaced grepping the stale err-log for token status this session.
 
 For end-to-end confirmation, send "who are you?" through the user's TUI and watch:
 - `chat.history` latency in the log (should be <2s on 2026.4.23, <1s ideal)
