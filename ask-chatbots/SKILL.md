@@ -133,10 +133,9 @@ If the page is still streaming, keep waiting until the answer looks complete or 
 
 ## Summary rules
 
-- If more than one chatbot was queried and `--skip-summary` is not set, submit a final prompt to Gemini asking it to:
-  - summarize common points
-  - identify disagreements or differences in emphasis
-  - print a side-by-side comparison
+- If more than one chatbot was queried and `--skip-summary` is not set, submit a final prompt to Gemini asking it to **synthesize the responses into one coherent answer to the original question** — this is the primary output the user wants, not a comparison digest. Treat the responses as input research: reconcile agreements, resolve contradictions using its own judgment, and fill gaps. Where the chatbots disagree or differ in emphasis in a way the user would care about, fold that nuance into the answer itself (a short "Key differences"/"Nuance" note within the relevant section) rather than a section-by-bot breakdown.
+- Include a compact comparison (short bullet list or small table) only where it genuinely clarifies a trade-off within the synthesis; skip it entirely for factual questions where the bots agree.
+- Do not attribute points to specific chatbots unless the question is specifically about how different bots frame something.
 - Reuse the Gemini tab from the original query when one exists; otherwise open a Gemini tab for the final synthesis.
 - Capture Gemini's summary as a separate later turn, not as a replacement for Gemini's original answer.
 
