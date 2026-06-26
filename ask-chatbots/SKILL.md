@@ -22,7 +22,7 @@ Behavior:
 - Spawn a self-managed, **logged-in** Chrome via the `logged-in-chrome` project in **COW (copy-on-write) mode** — an instant APFS clone of the real Chrome profile, so every site (Gemini/Google included) is already signed in. **Headed and left open by default**; pass `--headless` for no window or `--no-keep-open` to auto-close. Do **not** depend on a pre-running Chrome or a CDP port.
 - Open a fresh tab for each requested chatbot.
 - Send the same prompt to each chatbot in parallel.
-- Wait for each chatbot response independently, with a per-chatbot timeout.
+- Wait for each chatbot response independently, with a per-chatbot timeout. Failures are isolated: if one chatbot times out or errors (e.g. its editor never appears), the others still complete and the run prints an error string for that bot instead of aborting.
 - Capture the full response text as it appears in the page body.
 - By default, after collecting multiple chatbot responses, ask Gemini for a final synthesis.
 - If `--skip-summary` is set, skip the Gemini synthesis step.
@@ -117,6 +117,7 @@ The script is the full working example; it implements the logic described below.
 - For Gemini, treat each submitted prompt as a separate turn and capture only the new response after that turn.
 - For Claude, submit through the `div.ProseMirror[contenteditable="true"]` editor on `claude.ai/new`, click the visible `button[aria-label*="Send"]`, wait for Claude's finished state, and capture the new `.standard-markdown` / `.progressive-markdown` content inside `.font-claude-response` so the echoed user prompt and duplicated live-status text are excluded.
 - For DeepSeek, submit through the `textarea` (placeholder "Message DeepSeek") on `chat.deepseek.com`, press Enter, and capture the new `.ds-markdown.ds-assistant-message-main-content` block after the current turn baseline. The COW profile clone carries prior conversation history, so baseline-count the assistant-message nodes before sending and read only the newest one.
+- For Grok, dismiss the `/tos-gate` interstitial first (click the visible "Got it" button when Grok updates its Terms of Service — the COW clone inherits the real profile's un-accepted state, so the gate can reappear whenever Grok ships new ToS), then submit through the visible `<textarea>` composer (focus + `fill`, not a center-click — the textarea starts at `y=0` behind the top-nav bar and a center-click lands on the nav and times out). Press Enter, falling back to a send button if the textarea doesn't clear. Capture the assistant reply from its markdown message container.
 
 ## Waiting rules
 
@@ -143,7 +144,7 @@ If the page is still streaming, keep waiting until the answer looks complete or 
 
 - Gemini often uses a contenteditable input rather than a textarea.
 - ChatGPT may expose both a hidden textarea and a visible contenteditable editor.
-- Grok commonly uses a ProseMirror contenteditable editor.
+- Grok uses a plain `<textarea>` composer (as of 2026-06; previously a ProseMirror contenteditable editor). It also gates access behind a `/tos-gate` interstitial whenever it ships updated Terms of Service — `ask_grok` auto-dismisses it by clicking "Got it", but you can also accept once in your real Chrome at grok.com to persist the acceptance in the COW profile.
 - Claude uses a ProseMirror contenteditable editor on `https://claude.ai/new`; the send button is only present after the prompt is non-empty.
 - DeepSeek uses a plain `textarea` (placeholder "Message DeepSeek") on `https://chat.deepseek.com`; pressing Enter submits. Its send/stop controls are unlabeled icon `div`s, so completion is detected by text stability rather than a stop button.
 - The browser is spawned fresh each run, so every chatbot gets a clean new tab — there is no tab reuse and no leftover conversation state.

@@ -79,6 +79,23 @@ async def open_chatbot(ctx, bot: str):
     return page
 
 
+async def open_chatbots(ctx, bots: list[str]) -> dict[str, object]:
+    """Open one tab per bot, isolating failures.
+
+    A single bot's navigation failure must not cancel the batch — return an error
+    string for that bot and a real page for the rest. (Without return_exceptions,
+    asyncio.gather propagates the first error and kills the other opens.)
+    """
+    async def _one(bot: str):
+        try:
+            return bot, await open_chatbot(ctx, bot)
+        except BaseException as e:  # noqa: BLE001 — isolate per-bot failure
+            return bot, f"[failed to open {bot}: {type(e).__name__}: {e}]"
+
+    opened = await asyncio.gather(*(_one(b) for b in bots))
+    return dict(opened)
+
+
 async def last_nonempty_inner_text(locator) -> str:
     count = await locator.count()
     for i in range(count - 1, -1, -1):
@@ -254,11 +271,71 @@ async def chatgpt_response_complete(page, text: str) -> bool:
     return True
 
 
+async def grok_dismiss_tos_gate(page, timeout_s: int = 30) -> bool:
+    """If Grok parks on /tos-gate, click the visible "Got it" button.
+
+    The COW clone inherits your real profile's state; if you haven't accepted
+    Grok's latest ToS there, every run lands on the gate and the composer never
+    renders (causing a 30s Playwright click-timeout). Returns True if dismissed.
+    """
+    deadline = timeout_s
+    for _ in range(deadline):
+        if "/tos-gate" not in page.url:
+            return True
+        got_it = page.locator('button:has-text("Got it"):visible')
+        if await got_it.count():
+            try:
+                await got_it.first.click()
+                # wait for the gate to clear and composer to load
+                for _ in range(20):
+                    await page.wait_for_timeout(1000)
+                    if "/tos-gate" not in page.url:
+                        return True
+                return "/tos-gate" not in page.url
+            except Exception:
+                return False
+        await page.wait_for_timeout(1000)
+    return "/tos-gate" not in page.url
+
+
+async def find_grok_composer(page, timeout_s: int = 60):
+    """Poll for Grok's prompt composer. As of 2026-06, Grok ships a plain
+    <textarea> (not contenteditable). Returns the locator or None.
+
+    The textarea initially renders at y=0 behind the top nav bar with
+    visibility:hidden while the SPA is still laying out, so requiring a settled
+    box (y past the nav) avoids clicking into the nav and timing out."""
+    deadline = timeout_s
+    for _ in range(deadline):
+        for sel in ["textarea:visible", '[contenteditable="true"]:visible']:
+            loc = page.locator(sel).first
+            if await loc.count():
+                try:
+                    box = await loc.bounding_box()
+                except Exception:
+                    box = None
+                # y>5 skips the y=0 pre-layout state; height>5 skips collapsed shells
+                if box and box["y"] > 5 and box["height"] > 5:
+                    return loc
+        await page.wait_for_timeout(1000)
+    return None
+
+
 async def extract_grok_response(page) -> str:
-    text = await last_nonempty_inner_text(
-        page.locator("#last-reply-container .response-content-markdown")
-    )
-    return text.strip()
+    # Grok's reply container class has drifted historically; try several. As of
+    # 2026-06 the assistant reply renders in a div whose class contains
+    # "message-content" / "markdown" inside the conversation thread.
+    for sel in [
+        '[data-testid="message-text-content"]',
+        'div[class*="message-text-content" i]',
+        'div[class*="response-content-markdown" i]',
+        "#last-reply-container .response-content-markdown",
+        'div[class*="markdown" i]:has(span)',
+    ]:
+        text = await last_nonempty_inner_text(page.locator(sel))
+        if text.strip():
+            return text.strip()
+    return ""
 
 
 async def grok_response_complete(text: str, question: str) -> bool:
@@ -415,11 +492,56 @@ async def ask_chatgpt(page, question: str) -> str:
 
 
 async def ask_grok(page, question: str) -> str:
-    prompt = page.locator('[contenteditable="true"]:visible').first
-    await prompt.click()
-    await prompt.fill(question)
+    # Grok gates access behind /tos-gate ("Got it") when the profile hasn't
+    # accepted the latest ToS. Dismiss it first, or no composer ever renders.
+    await grok_dismiss_tos_gate(page)
+
+    prompt = await find_grok_composer(page)
+    if prompt is None:
+        raise RuntimeError(
+            "Grok composer not found (no visible textarea/contenteditable after ToS gate)"
+        )
+    # Focus then type — a center-click on the textarea routinely lands on the
+    # absolutely-positioned top-nav bar (the textarea starts at y=0), which is
+    # what produced the 30s Locator.click timeouts. focus()+fill() sidesteps it.
+    typed = False
+    try:
+        await prompt.focus(timeout=60000)
+        await prompt.fill(question)
+        typed = True
+    except Exception:
+        pass
+    if not typed:
+        try:
+            await prompt.click(timeout=60000)
+        except Exception:
+            pass
+        await page.keyboard.type(question, delay=20)
     baseline = await extract_grok_response(page)
+
+    # Enter may not submit on Grok's textarea editor; fall back to a send button.
     await prompt.press("Enter")
+    await page.wait_for_timeout(800)
+    try:
+        remaining = await prompt.input_value()
+    except Exception:
+        remaining = ""
+    if remaining:
+        for sel in [
+            'button[aria-label*="send" i]:visible',
+            'button[aria-label*="submit" i]:visible',
+            'button[data-testid*="send" i]:visible',
+        ]:
+            btn = page.locator(sel).first
+            if await btn.count():
+                try:
+                    await btn.click()
+                    submitted = True
+                    break
+                except Exception:
+                    pass
+    else:
+        submitted = True
 
     last_seen = ""
     stable_count = 0
@@ -593,16 +715,28 @@ async def run(
     ) as cow:
         ctx = cow.browser.contexts[0]
 
-        opened = await asyncio.gather(*(open_chatbot(ctx, bot) for bot in chatbots))
-        pages = dict(zip(chatbots, opened))
+        opened = await open_chatbots(ctx, chatbots)
+        pages: dict[str, object] = {}
 
         async def ask_one(bot: str) -> tuple[str, str]:
+            page = opened.get(bot)
+            if isinstance(page, str):
+                # open_chatbot itself failed for this bot — surface the error.
+                return bot, page
+            pages[bot] = page
             try:
                 answer = await asyncio.wait_for(
-                    ASKERS[bot](pages[bot], question), timeout=timeout_seconds
+                    ASKERS[bot](page, question), timeout=timeout_seconds
                 )
             except asyncio.TimeoutError:
-                answer = f"[Timed out after {timeout_seconds}s waiting for {bot} response]"
+                answer = (
+                    f"[Timed out after {timeout_seconds}s waiting for {bot} response]"
+                )
+            except BaseException as e:  # noqa: BLE001 — isolate per-bot failure
+                # Playwright TimeoutError (e.g. composer never appears) is NOT an
+                # asyncio.TimeoutError, so the clause above doesn't catch it.
+                # Swallow it here so one flaky bot can't cancel the whole batch.
+                answer = f"[{bot} failed: {type(e).__name__}: {e}]"
             return bot, answer
 
         results = dict(await asyncio.gather(*(ask_one(bot) for bot in chatbots)))
@@ -614,15 +748,23 @@ async def run(
         if not skip_summary and len(chatbots) > 1:
             gemini_page = pages.get("gemini")
             if gemini_page is None:
+                # Gemini wasn't in the requested set; open a fresh tab for the summary.
                 gemini_page = await open_chatbot(ctx, "gemini")
 
             summary_prompt = build_gemini_summary_prompt(question, chatbots, results)
-            try:
-                summary = await asyncio.wait_for(
-                    ask_gemini(gemini_page, summary_prompt), timeout=timeout_seconds
-                )
-            except asyncio.TimeoutError:
-                summary = f"[Timed out after {timeout_seconds}s waiting for gemini summary]"
+            if isinstance(gemini_page, str):
+                summary = gemini_page  # open failed; surface the error string
+            else:
+                try:
+                    summary = await asyncio.wait_for(
+                        ask_gemini(gemini_page, summary_prompt), timeout=timeout_seconds
+                    )
+                except asyncio.TimeoutError:
+                    summary = (
+                        f"[Timed out after {timeout_seconds}s waiting for gemini summary]"
+                    )
+                except BaseException as e:  # noqa: BLE001 — summary is best-effort
+                    summary = f"[gemini summary failed: {type(e).__name__}: {e}]"
 
             print("\n=== GEMINI SUMMARY ===")
             print(summary)
