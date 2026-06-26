@@ -34,7 +34,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import re
+import sys
+import tempfile
 
 # logged-in-chrome lives at ~/projects/browser/src. ~/projects is on sys.path (the
 # editable `projects` install), so import the module by its absolute namespace path —
@@ -765,9 +768,13 @@ async def run(
     question: str,
     timeout_seconds: int,
     skip_summary: bool,
+    include_responses: bool = False,
     headed: bool = True,
     keep_open: bool = True,
+    out=None,
 ) -> int:
+    if out is None:
+        out = sys.stdout
     # Spawn our own logged-in Chrome (COW clone of the real profile → every site
     # signed in, Gemini included); headed by default. Temp profile auto-cleaned on exit.
     async with logged_in_chrome.AsyncLoggedInChrome(
@@ -801,9 +808,21 @@ async def run(
 
         results = dict(await asyncio.gather(*(ask_one(bot) for bot in chatbots)))
 
-        for bot in chatbots:
-            print(f"\n=== {bot.upper()} FULL RESPONSE ===")
-            print(results[bot])
+        # By default, only print the Gemini summary for multi-bot queries.
+        # --include-responses also prints individual chatbot answers.
+        # If --skip-summary is set without --include-responses, force responses
+        # on (otherwise nothing would be printed).
+        # Single-chatbot queries always print the response (no summary generated).
+        print_individual = (
+            include_responses
+            or (skip_summary and len(chatbots) > 1)
+            or len(chatbots) == 1
+        )
+
+        if print_individual:
+            for bot in chatbots:
+                print(f"\n=== {bot.upper()} FULL RESPONSE ===", file=out)
+                print(results[bot], file=out)
 
         if not skip_summary and len(chatbots) > 1:
             gemini_page = pages.get("gemini")
@@ -826,8 +845,8 @@ async def run(
                 except BaseException as e:  # noqa: BLE001 — summary is best-effort
                     summary = f"[gemini summary failed: {type(e).__name__}: {e}]"
 
-            print("\n=== GEMINI SUMMARY ===")
-            print(summary)
+            print("\n=== GEMINI SUMMARY ===", file=out)
+            print(summary, file=out)
 
         if keep_open:
             # Hand Chrome + its temp profile to a detached watcher and leave the
@@ -835,11 +854,12 @@ async def run(
             # browser. __aexit__ below only disconnects Playwright (Chrome stays up).
             cow.detach()
             print("\n[Browser left open — close the window when done; "
-                  "its temporary profile is removed automatically.]")
+                  "its temporary profile is removed automatically.]", file=out)
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """Return the argument parser (exposed for testing)."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--chatbots",
@@ -869,7 +889,22 @@ def main(argv: list[str] | None = None) -> int:
         help="Close the browser as soon as answers are captured (default: leave the "
              "headed window open; a watcher removes the temp profile when you close it).",
     )
+    parser.add_argument(
+        "--include-responses",
+        action="store_true",
+        help="Also print individual chatbot responses (default: only print the Gemini summary)",
+    )
+    parser.add_argument(
+        "--stdout",
+        action="store_true",
+        help="Print output to stdout instead of writing to a temp file (default: write to a temp file, print only the file path)",
+    )
     parser.add_argument("--question", required=True, help="Question to send to each chatbot")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
 
     chatbots = parse_chatbots(args.chatbots)
@@ -881,16 +916,39 @@ def main(argv: list[str] | None = None) -> int:
     headed = not args.headless
     keep_open = headed and not args.no_keep_open
 
-    return asyncio.run(
-        run(
-            chatbots,
-            args.question,
-            args.timeout_seconds,
-            args.skip_summary,
-            headed,
-            keep_open,
+    # By default, write all output to a temp file and print the path
+    # followed by the content. With --stdout, use real stdout directly.
+    follow_link = False
+    if args.stdout:
+        out = sys.stdout
+    else:
+        fd, path = tempfile.mkstemp(suffix=".txt", prefix="ask-chatbots-")
+        out = os.fdopen(fd, "w")
+        follow_link = path
+
+    try:
+        result = asyncio.run(
+            run(
+                chatbots,
+                args.question,
+                args.timeout_seconds,
+                args.skip_summary,
+                args.include_responses,
+                headed,
+                keep_open,
+                out=out,
+            )
         )
-    )
+    finally:
+        if follow_link:
+            out.close()
+
+    if follow_link:
+        print(follow_link)
+        with open(follow_link) as f:
+            print(f.read(), end="")
+
+    return result
 
 
 if __name__ == "__main__":
