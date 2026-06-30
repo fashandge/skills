@@ -1,11 +1,34 @@
 # Testing ask-chatbots
 
+## Output mode matrix
+
+Each mode has different stdout expectations. Test all of them:
+
+| Mode | Flags | Temp file? | Stdout has path? | Stdout has content? |
+|---|---|---|---|---|
+| Default | *(none)* | Yes (.txt) | Yes | Yes |
+| `--stdout` | `--stdout` | No | No | Yes |
+| `--wiki` | `--wiki` | Yes (.txt) | Yes | No (one-line path only) |
+| `--include-responses` | `--include-responses` | Yes | Yes | Yes + per-bot sections |
+
+Edge cases:
+- **Single-bot default**: always prints the response (no summary for one bot)
+- **`--skip-summary` without `--include-responses`**: auto-prints individual responses (otherwise empty output)
+- **`--skip-summary --include-responses`**: prints individual responses, no summary
+- **`--wiki` single-bot**: temp file contains `=== {BOT} FULL RESPONSE ===` section; agent extracts it for wiki
+
 ## Mocking the chatbot functions
 
 The `ASKERS` dict is defined at module level and captures references to the real
 `ask_gemini`, `ask_chatgpt`, etc. at import time. Standard `@mock.patch.object`
 on `ask_chatbots.ask_gemini` patching the module attribute does NOT reach into
 the dict — the dict still holds the original reference.
+
+The `ask_gemini` function is also called directly (not via `ASKERS`) for the
+summary step inside `run()` (line ~838). That call resolves the module-level
+name at call time, so `@mock.patch.object` on `ask_chatbots.ask_gemini` does
+work for the summary step — but NOT for the initial bot queries through
+`ASKERS`.
 
 To mock correctly, patch BOTH:
 
@@ -15,14 +38,22 @@ ask_chatbots.ask_gemini = fg
 
 # ASKERS dict must also be patched for the initial queries:
 ask_chatbots.ASKERS["gemini"] = fg
+ask_chatbots.ASKERS["chatgpt"] = fc
 ```
 
 Restore in `tearDown`:
 
 ```python
+def setUp(self):
+    self._saved_askers = {k: ask_chatbots.ASKERS[k] for k in ask_chatbots.ASKERS}
+    self._saved_fns = (ask_chatbots.ask_gemini, ask_chatbots.ask_chatgpt)
+    ask_chatbots.ASKERS["gemini"] = ask_chatbots.ask_gemini = fg
+    ask_chatbots.ASKERS["chatgpt"] = ask_chatbots.ask_chatgpt = fc
+
 def tearDown(self):
-    ask_chatbots.ASKERS["gemini"] = self._saved_askers["gemini"]
-    ask_chatbots.ask_gemini = self._saved_ask_fns["ask_gemini"]
+    ask_chatbots.ASKERS.clear()
+    ask_chatbots.ASKERS.update(self._saved_askers)
+    ask_chatbots.ask_gemini, ask_chatbots.ask_chatgpt = self._saved_fns
 ```
 
 ## Mocking the page object
@@ -36,6 +67,9 @@ p.goto = mock.AsyncMock()
 p.wait_for_timeout = mock.AsyncMock()
 # .locator() returns a MagicMock via default auto-creation — correct for sync
 ```
+
+Using `AsyncMock` for the page causes `'coroutine' object has no attribute 'first'`
+when the real `ask_gemini` calls `page.locator(...).first`.
 
 ## Fake Chrome context
 
@@ -56,3 +90,14 @@ class FakeChrome:
     async def __aexit__(self, *a): pass
     def detach(self): pass
 ```
+
+Decorate test class with:
+```python
+@mock.patch.object(ask_chatbots.logged_in_chrome, "AsyncLoggedInChrome", FakeChrome)
+```
+
+## Temp file cleanup
+
+All tests that use the default or `--wiki` modes create temp files. Always
+`os.unlink(path)` in the test body (or in `tearDown` if tracking paths).
+Never leave temp files behind — they litter `/var/folders/.../T/`.

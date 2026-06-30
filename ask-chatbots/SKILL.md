@@ -1,6 +1,6 @@
 ---
 name: ask-chatbots
-description: Query Gemini, ChatGPT, Grok, Claude, and DeepSeek in parallel via a self-spawned logged-in Chrome. Output goes to a temp file; optional wiki integration via the /wiki skill.
+description: Query Gemini, ChatGPT or more chatbots (Grok, Claude, and DeepSeek, when specified) in parallel via a self-spawned logged-in Chrome. Output goes to a temp file; optional wiki integration via the /wiki skill.
 ---
 
 # Ask Chatbots
@@ -76,8 +76,10 @@ Writes all output to a temp file (same as default). Prints **only the file path*
 
 **Default / `--stdout`**: print the script's stdout verbatim. No framing or reformatting.
 
-**`--wiki`**: the script prints only the temp file path. Read the file, extract the relevant section, delegate to `/wiki`, then clean up the temp file. Print only the wiki note path returned by `/wiki` as the final response.
+**`--wiki`**: the script prints only the temp file path. Read the file, extract the relevant section, delegate to `/wiki`, clean up the temp file, then print only the wiki note path returned by `/wiki` as the final response.
 
 ## Implementation
 
 All DOM interaction, response capture, waiting logic, and output formatting is self-contained in the script at `~/skills/ask-chatbots/scripts/ask_chatbots.py`. The script's docstring has the full implementation notes.
+
+For testing patterns (mocking `ASKERS`, the page object, Chrome context, and output mode verification), see `references/testing.md`.
