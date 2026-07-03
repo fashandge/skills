@@ -25,6 +25,7 @@ The user provides a description of what to generate. This is typically based on 
 - Review the current conversation for relevant answers, analysis, and references
 - If the user mentions specific notes (via `@filename` or `<current_note>`), read those files
 - If backlinks or source documents are referenced, read them for additional context
+- Calling skills (e.g. `ask-chatbots`, `research-notes`) may hand over a temp-file path as the body source, and/or a coverage caveat to include — read the file yourself rather than expecting inlined content, and carry any caveat into the overview or body
 
 ## Step 2: Choose Folder Location
 
@@ -32,15 +33,10 @@ The wiki goes under `~/notes/wiki/`. Follow these rules **in order**:
 
 1. **List existing folders first:**
    ```bash
-   find ~/notes/wiki -type d -maxdepth 4 | sort
+   find ~/notes/wiki -maxdepth 4 -type d | sort
    ```
 
-2. **Use an existing folder** if one clearly fits the topic. Existing folders include:
-   - `wiki/Software Engineering/` (System Design, skills)
-   - `wiki/ai/` (agent, reinforcement learning)
-   - `wiki/ai_and_engineering/` (paradigm_shifts)
-   - `wiki/investment/` (trading)
-   - (Always re-check at generation time — the user may have added more)
+2. **Use an existing folder** if one clearly fits the topic. Judge only from the `find` output above — the vault changes often, so never rely on a remembered snapshot of its folders.
 
 3. **Create a new folder** if no existing folder fits. New folders must be:
    - At least **2 levels deep** under `wiki/` (e.g., `wiki/topic/subtopic/`)
@@ -58,7 +54,7 @@ The title, filename, and `# H1` heading must all be **identical**.
 - Must be **globally unique** across the vault — specific enough to never collide
 - Lead with the core subject, add a short qualifier only if needed to disambiguate
 - Include concrete nouns (names, technologies, concepts) rather than generic words
-- Must be valid for Obsidian backlinking: **no `/`, `\`, `^`, `[`, `]`, `|`, `:` characters**
+- Must be valid for Obsidian backlinking: **no `/`, `\`, `#`, `^`, `[`, `]`, `|`, `:` characters** (`#` in a title breaks `[[Title#Heading]]` links)
 - Can be English or Chinese depending on content language
 
 **Good titles:** `DHH on Agent-First Programming and Engineer Value Shifts`, `Kent Beck Smalltalk Best Practice Patterns`, `CLI as the Ideal Agent Interface`
@@ -66,23 +62,39 @@ The title, filename, and `# H1` heading must all be **identical**.
 
 **Filename** = title + `.md`. Example: `DHH on Agent-First Programming and Engineer Value Shifts.md`
 
+**Verify uniqueness** before writing — the title must not collide with any existing note in the vault:
+
+```bash
+find ~/notes -name "<Title>.md"
+```
+
+If this returns a hit, add a qualifier to the title and re-check.
+
 This enables clean backlinking: `[[DHH on Agent-First Programming and Engineer Value Shifts]]` — no path needed when the title is unambiguous.
 
 ## Step 3: Generate the Wiki Article
 
 Use the following structure. All sections are required unless noted.
 
+The section headings `## 📚 目录` and `## 参考资料` are fixed conventions — use them verbatim even when the article body is in English (do not switch to `## Table of Contents` / `## References`).
+
 ### 3a. Frontmatter
 
 ```yaml
 ---
 title: <same as filename, without .md>
-date: <today's date, YYYY-MM-DD>
+date: <today's date, YYYY-MM-DD — take it from the session context or `date +%F`, don't guess>
 tags:
   - <relevant tag 1>
   - <relevant tag 2>
   - <...3-6 tags total>
 ---
+```
+
+For tag consistency, check what sibling articles in the chosen folder already use before inventing new tags:
+
+```bash
+awk '/^tags:/{f=1;next} /^---/{f=0} f&&/^  - /' "<chosen folder>"/*.md | sort | uniq -c | sort -rn
 ```
 
 ### 3b. Title and Overview
@@ -105,14 +117,16 @@ Use Obsidian wikilink heading references for clickable navigation:
 ## 📚 目录
 
 - [[#Section Title 1]]
+    - [[#Subsection Title 1a]]
 - [[#Section Title 2]]
 - [[#Section Title 3]]
 ```
 
 **Rules for the table of contents:**
-- Include **all h2 (`##`) and h3 (`###`) headings** — up to two levels deep
+- Include **all h2 (`##`) and h3 (`###`) headings** — up to two levels deep, with h3 entries indented under their h2
 - Use the `[[#Exact Heading Text]]` format (Obsidian native heading links)
 - The heading text inside `[[#...]]` must **exactly match** the actual heading in the document
+- Heading text must be **unique document-wide** — `[[#...]]` resolves to the *first* matching heading, so repeated h3 text under different h2s (e.g. two `### 示例` sections) silently mislinks; qualify the heading text instead
 - Do NOT use markdown anchor links (`[text](#anchor)`) — they don't work in Obsidian
 - Do NOT use block IDs (`^id`) — unnecessary complexity
 - Do NOT put quotes (「」、""、 etc.) in heading text — they break anchor links
@@ -152,7 +166,7 @@ End with a references section containing backlinks to relevant notes in the vaul
 
 - [[related note 1]] — brief description of relevance
 - [[related note 2]] — brief description of relevance
-- [[External Link Title]](https://url) — for external sources
+- [External Link Title](https://url) — for external sources (markdown link, NOT `[[...]](url)`)
 ```
 
 **Rules for references:**
@@ -179,9 +193,9 @@ After writing the file:
 Before finishing, verify:
 
 - [ ] **Title = filename = H1** — all three are identical
-- [ ] Title is globally unique, concrete, and contains no `^`, `[`, `]`, `|`, `:` characters
+- [ ] Title is globally unique (verified with `find ~/notes -name "<Title>.md"`), concrete, and contains no `/`, `\`, `#`, `^`, `[`, `]`, `|`, `:` characters
 - [ ] Overview section answers "what is this, why does it exist?"
-- [ ] Table of contents uses `[[#Heading Text]]` with exact heading matches
+- [ ] Table of contents uses `[[#Heading Text]]` with exact heading matches, and heading text is unique document-wide
 - [ ] No quotes or special characters in heading text that could break links
 - [ ] References section has all backlinks (source docs, related wikis, external URLs)
 - [ ] Tags in frontmatter are relevant and consistent with existing vault tags

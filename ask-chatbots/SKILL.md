@@ -53,7 +53,7 @@ $ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
 | `--headless` | off | No visible browser window |
 | `--no-keep-open` | off | Close browser after capture (default: leave it open) |
 | `--stdout` | off | Print output to stdout instead of a temp file |
-| `--wiki` | off | Write output to a temp file, print only the path. The **agent** then reads the file and delegates to the `/wiki` skill to save as an Obsidian note. |
+| `--wiki` | off | Write output to a temp file, print only the path. The **agent** then delegates to the `/wiki` skill (passing the file path, not the content) to save as an Obsidian note. |
 
 ## Output modes
 
@@ -65,18 +65,18 @@ Prints everything to stdout (same output, no temp file).
 
 ### `--wiki`
 Writes all output to a temp file (same as default). Prints **only the file path** — no content on stdout. The agent is responsible for:
-1. Reading the temp file
-2. Extracting the relevant content:
-   - **Multi-bot**: extract the `=== GEMINI SUMMARY ===` section
-   - **Single-bot**: extract the `=== {BOT} FULL RESPONSE ===` section (or the whole file if it's the only content)
-3. Delegating to the `/wiki` skill with that content as the body
-4. Reporting the wiki note path to the user
+1. Delegating to the `/wiki` skill with a **slim pointer, not inlined content**: the question asked, the temp file path, and which section of the file to use as the body:
+   - **Multi-bot**: the `=== GEMINI SUMMARY ===` section
+   - **Single-bot**: the `=== {BOT} FULL RESPONSE ===` section (or the whole file if it's the only content)
+
+   `/wiki` reads the file itself. Do NOT paste the file content into the `/wiki` prompt — re-inlining it dilutes `/wiki`'s own instructions in its attention budget and produces worse articles (same rationale as `research-notes`' slim handoff).
+2. After `/wiki` returns: cleaning up the temp file and reporting the wiki note path to the user
 
 ## Agent delivery rules
 
 **Default / `--stdout`**: print the script's stdout verbatim. No framing or reformatting.
 
-**`--wiki`**: the script prints only the temp file path. Read the file, extract the relevant section, delegate to `/wiki`, clean up the temp file, then print only the wiki note path returned by `/wiki` as the final response.
+**`--wiki`**: the script prints only the temp file path. Delegate to `/wiki` with the question + temp file path + section pointer (no inlined content), wait for `/wiki` to return, clean up the temp file, then print only the wiki note path returned by `/wiki` as the final response.
 
 ## Implementation
 
