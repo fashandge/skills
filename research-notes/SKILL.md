@@ -21,7 +21,7 @@ Use when the user asks to:
 
 ## Research Workflow
 
-This workflow has **three modes**:
+This workflow has **three retrieval modes**:
 
 1. **Default mode: index + search.** Use two parallel data sources: index browsing and keyword search. Run them concurrently (read section indices in parallel with search queries), then merge results in the union step.
 2. **Search-only mode: skip index.** If the user explicitly asks to skip the index, avoid index browsing, use only `notes-search`, and say in the final answer that index coverage was intentionally skipped.
@@ -48,16 +48,14 @@ Use **agent-engine mode** when the user's prompt contains instructions such as:
 - "use agent search"
 - "delegate the search to the agent engine"
 
-In agent-engine mode, the agent engine has already done its own multi-query retrieval and ranking internally, so do **not** read the index and do **not** run any additional `notes-search` queries (FTS5 or QMD). Make exactly one `notes-search search "<topic>" --engine agent --json` call, parse the returned note list, then jump directly to Step 5 (Read Relevant Notes) on those notes. See **Track C** for details.
+In agent-engine mode, the agent engine has already done its own multi-query retrieval and ranking internally, so do **not** read the index and do **not** run any additional `notes-search` queries (FTS5 or QMD). Make exactly one `notes-search search "<topic>" --engine agent --json` call, parse the returned note list, then jump directly to Step 2 (Read Relevant Notes) on those notes. See **Track C** for details.
 
 ### Output Destinations
 
-Independent of the two search modes above, there is a second axis: **where the findings go**.
+Independent of the retrieval modes above, there is a second axis: **where the findings go**.
 
-1. **Wiki (default).** The synthesis is written to the response AND persisted as a wiki article in the user's Obsidian vault by delegating to the `/wiki` skill. Console output always happens first — the wiki is an *additional* artifact, never a replacement. See **Step 7: Persist as Wiki** below for the handoff details. This is the default for any synthesis-mode research request.
+1. **Wiki (default).** The synthesis is written to the response AND persisted as a wiki article in the user's Obsidian vault by delegating to the `/wiki` skill. Console output always happens first — the wiki is an *additional* artifact, never a replacement. See **Step 4: Persist as Wiki** below for the handoff details. This is the default for any synthesis-mode research request, so a bare "research X" or "find notes about X" produces both a console synthesis and a wiki. Phrases like "save as a wiki", "write it up", or "create a wiki article on …" just reinforce the default; behavior is identical without them.
 2. **Console-only (opt-out).** The synthesis is written to the response only, with no wiki persisted. Right for quick lookups, exploratory questions, throwaway checks, and any case where the user signals they don't want a persisted artifact.
-
-**Wiki is the default**, so a bare "research X" or "find notes about X" produces both a console synthesis and a wiki. Phrases that *reinforce* wiki output (no behavior change, but unambiguous): "save as a wiki", "write it up", "turn it into a wiki", "then `/wiki` it", "document what my notes say about …", "create a wiki article on …".
 
 Use **console-only mode** (skip the wiki) when the user's prompt contains instructions such as:
 - "no wiki" / "don't write a wiki" / "skip the wiki"
@@ -66,7 +64,7 @@ Use **console-only mode** (skip the wiki) when the user's prompt contains instru
 
 Two cases are **always console-only** regardless of the above — never write a wiki for them:
 - **Lookup-only mode** (see below): there is no synthesis to persist.
-- Trivial or throwaway questions where a persisted article would just be vault clutter. When a request is clearly a quick factual check rather than research worth keeping, prefer console-only even without an explicit opt-out; if genuinely ambiguous whether the finding has lasting value, default to writing the wiki (the new default) rather than silently dropping it.
+- Trivial or throwaway questions where a persisted article would just be vault clutter. When a request is clearly a quick factual check rather than research worth keeping, prefer console-only even without an explicit opt-out; if genuinely ambiguous whether the finding has lasting value, default to writing the wiki rather than silently dropping it.
 
 ### Output Shape: Lookup-Only Mode
 
@@ -79,7 +77,7 @@ Use **lookup-only mode** when the user asks to find/list top, latest, or relevan
 - "exact shape"
 
 In lookup-only mode, still perform the normal retrieval, union, dedupe, rerank, and top-N selection rules for the chosen search mode. Then stop at the selected note list:
-- Do **not** read the full note bodies in Step 5.
+- Do **not** read the full note bodies in Step 2.
 - Do **not** synthesize themes, takeaways, or evidence.
 - Output only the fields the user requested. If no schema is specified, use title and vault-relative path.
 - If the user requests JSON-only, the final answer must be valid JSON with no Markdown, commentary, rankings, scores, snippets, or prose outside the JSON.
@@ -95,9 +93,9 @@ Read the root index to find sections related to the research topic. **Use the Re
 Read ~/notes/index/raw/root_index.md
 ```
 
-The root index is ~1100 lines; the Read tool's default 2000-line limit covers it. Do not pipe it through `cat`, `head`, or any shell tool — the rtk PreToolUse hook rewrites `cat` to `rtk read`, and any caller that wraps the output (subagent summaries, etc.) may clip it.
+The root index is currently well under the Read tool's default 2000-line limit, so a single Read loads it fully. Do not pipe it through `cat`, `head`, or any shell tool — the rtk PreToolUse hook rewrites `cat` to `rtk read`, and any caller that wraps the output (subagent summaries, etc.) may clip it. If a future Read ever truncates (the file has grown past the limit), read it in two chunks with `offset`.
 
-**Token-efficient variant — grep-first when the topic has distinctive keywords.** Loading the full ~1100-line index every time is wasteful when the topic has specific, high-signal terms (e.g. `光通信`/`optical`/`CPO`, not generic words like "investment"). In that case, instead of reading the whole file, first `grep` it to find candidate sections:
+**Token-efficient variant — grep-first when the topic has distinctive keywords.** Loading the full index every time is wasteful when the topic has specific, high-signal terms (e.g. `光通信`/`optical`/`CPO`, not generic words like "investment"). In that case, instead of reading the whole file, first `grep` it to find candidate sections:
 
 ```
 grep -inE "光通信|光互连|光模块|硅光|optical|photonic|transceiver|CPO|DWDM|coherent" ~/notes/index/raw/root_index.md
@@ -124,7 +122,7 @@ For each relevant section, read the section index with the **Read tool** (not `c
 Read ~/notes/index/raw/section_indices/raw-investment-candidates-ai-chips-foundry.md
 ```
 
-Largest section indices are ~1100 lines, within the Read tool's default 2000-line limit. Same reason as the root index: avoid `cat`/`head` so nothing in the rewrite/wrap chain can truncate the file.
+Section indices also fit within the Read tool's default 2000-line limit today. Same reason as the root index: avoid `cat`/`head` so nothing in the rewrite/wrap chain can truncate the file.
 
 Section indices contain per-note metadata:
 - Path: exact file path
@@ -194,17 +192,11 @@ notes-search search "agent harness"
 # JSON output for structured processing
 notes-search search "agent harness" --json
 
-# Limit results
-notes-search search "reinforcement learning" --limit 10
-
 # Restrict to a folder
 notes-search search "fine-tuning" --folder "raw/AI"
 
 # Sort by time (most recent first, uses frontmatter published/created/date then mtime)
 notes-search search "agent harness" --sort time --limit 50
-
-# Large research: fetch up to top N results by relevance
-notes-search search "investment" --limit 100 --json
 
 # QMD semantic search (slower, ~1.5s, finds conceptually related notes)
 notes-search search "how to build autonomous agents" --engine qmd --mode vsearch
@@ -212,6 +204,8 @@ notes-search search "how to build autonomous agents" --engine qmd --mode vsearch
 # QMD hybrid with LLM reranking (slowest, ~17s, best quality)
 notes-search search "agent memory systems" --engine qmd --mode query
 ```
+
+Run `notes-search search --help` for the full flag list.
 
 **Sort and limit guidance:**
 - Use `--sort time` only when the user asks about "recent", "latest", or time-sensitive topics
@@ -232,16 +226,22 @@ Guidance:
 - Pass the user's research topic as the query string. Phrase it naturally (e.g., "memory cycle thesis", "CPU stock investment"); the agent engine handles its own keyword expansion.
 - For time-sensitive asks ("latest", "recent"), add `--sort time`.
 - For folder-scoped asks, add `--folder <prefix>`.
-- **For top-N asks ("top 20", "most recent 50", "find me 30 notes about..."), pass `--limit <N>`** to the agent engine call so it returns at most N notes. Example: `notes-search search "华为韬定律" --engine agent --json --limit 20`. Unlike default/search-only modes (where `--limit` is per-query and the cap is applied after unioning), in agent-engine mode `--limit` IS the final cap — the agent engine returns the ranked list directly. If the user does not specify a count, omit `--limit` and let the engine choose.
+- **For top-N asks ("top 20", "most recent 50", "find me 30 notes about..."), pass `--limit <N>`** to the agent engine call so it returns at most N notes. Example: `notes-search search "华为韬定律" --engine agent --json --limit 20`. Unlike default/search-only modes (where `--limit` is per-query and the cap is applied after unioning), in agent-engine mode `--limit` IS the final cap — the agent engine returns the ranked list directly.
+- **If the user does not specify a count, the CLI default `--limit 20` applies** — the limit is baked into the prompt sent to the engine ("find the top 20 most relevant notes"), so omitting the flag asks for exactly 20; it does not let the engine choose. Pass a larger explicit `--limit` when the ask implies broader coverage.
+- `--engine agent` runs a Codex→Claude→Gemini fallback chain. Pinned variants `agent-claude` and `agent-gemini` exist (see `notes-search search --help`); use one only when the user names a specific backend.
 - The agent engine returns its own ranked list with titles and paths. Treat that list as the final candidate set — no union, no extra reranking, no extra FTS5/QMD queries.
 - If the user asked for a top-N, prefer passing `--limit N` to the agent engine call (see above) rather than slicing the returned list after the fact.
-- **The returned list is the Step 5 reading list** — every entry must be read there. Don't shrink it here on filename/folder priors; see Step 5 for the full rule.
-- Then proceed directly to **Step 5** (Read Relevant Notes) on those notes, followed by **Step 6** (Synthesize) and, if applicable, **Step 7** (Persist as Wiki).
+- **The returned list is the Step 2 reading list** — every entry must be read there. Don't shrink it here on filename/folder priors; see Step 2 for the full rule.
+- Then proceed directly to **Step 2** (Read Relevant Notes) on those notes, followed by **Step 3** (Synthesize) and, if applicable, **Step 4** (Persist as Wiki).
 - In the final synthesis, mention that retrieval was delegated to the agent search engine and that index browsing plus FTS5/QMD sweeps were intentionally skipped.
 
-### Step 4: Union, Deduplicate, and Rerank
+## Shared Pipeline
 
-This step applies only to **default mode** and **search-only mode**. In **agent-engine mode**, skip this step — the agent engine has already produced a ranked list.
+After retrieval, all modes converge on these steps. Agent-engine mode skips Step 1 (its list is already ranked and final).
+
+### Step 1: Union, Deduplicate, and Rerank
+
+This step applies only to **default mode** and **search-only mode**.
 
 You now have candidates from one or two sources:
 - **Default mode:** index browsing (Track A) and keyword search (Track B)
@@ -256,7 +256,7 @@ Candidates are **unioned**, not intersected — a note appearing in *any* enable
    - Its summary from the index, if available and if index browsing was enabled
 3. **Filter out generic and cross-sector notes.** Before ranking, remove or demote two categories:
    - **Generic meta-notes** whose primary subject is not any specific topic: watchlists, portfolio summaries, PEG/valuation screens, glossaries, and other broad reference notes that mention many topics. A note titled "Watchlist Competitive Landscape" will match queries for memory, optical, AI, etc. — but it's not *about* any of those topics.
-   - **Cross-sector notes** whose primary subject is a DIFFERENT or BROADER sector but that mention the research topic as one of several areas. For example, a note about the entire semiconductor supply chain that mentions optical communications should rank below notes specifically about optical communications. A note about "AI infrastructure" that mentions memory should rank below notes specifically about memory cycles. The research topic should be the note's PRIMARY subject, not a secondary mention.
+   - **Cross-sector notes** whose primary subject is a DIFFERENT or BROADER sector but that mention the research topic as one of several areas. For example, a note about the entire semiconductor supply chain that mentions optical communications should rank below notes specifically about optical communications. The research topic should be the note's PRIMARY subject, not a secondary mention.
 4. **Rerank the merged pool.** Use all available signals:
    - **Appeared in both sources** — strong relevance signal. A note selected from the index AND matched by search queries is almost certainly on-topic.
    - **Title relevance:** Does the note's title directly reference the research topic or its core concepts? Notes with topic keywords in the title are almost always more relevant than notes that only mention the topic in passing within the body.
@@ -270,11 +270,11 @@ Candidates are **unioned**, not intersected — a note appearing in *any* enable
 7. **Stop for lookup-only mode** — if the user asked only for titles/paths/JSON and no synthesis, output the selected list now using the requested shape.
 8. **Select notes to read** — for synthesis mode, pick the top candidates (may be dozens or hundreds for large research)
 
-### Step 5: Read Relevant Notes (Batched)
+### Step 2: Read Relevant Notes (Batched)
 
 For small sets, read all notes directly. For large sets, batch by file size to stay within context limits.
 
-**Read what was selected — don't drop candidates by filename prior.** When the candidate set was chosen by Step 4 (default/search-only) or by the agent engine (Track C), every note on the list earned its slot. Do not skip notes mid-Step-5 based on filename, folder, or guessed redundancy ("looks like a clipping", "the analytical notes probably already cover this"). If the total is large, batch by `wc -c` and read across multiple batches — that is what batching is for. The only acceptable skip reason is a concrete observation made *after* reading: byte-identical duplicate, empty file, etc. This rule is especially load-bearing in **agent-engine mode**, where dropping notes by prior amounts to reranking the agent's output — which Track C forbids.
+**Read what was selected — don't drop candidates by filename prior.** When the candidate set was chosen by Step 1 (default/search-only) or by the agent engine (Track C), every note on the list earned its slot. Do not skip notes mid-Step-2 based on filename, folder, or guessed redundancy ("looks like a clipping", "the analytical notes probably already cover this"). If the total is large, batch by `wc -c` and read across multiple batches — that is what batching is for. The only acceptable skip reason is a concrete observation made *after* reading: byte-identical duplicate, empty file, etc. This rule is especially load-bearing in **agent-engine mode**, where dropping notes by prior amounts to reranking the agent's output — which Track C forbids.
 
 **1. Estimate sizes** of candidate notes:
 
@@ -298,7 +298,7 @@ Group notes so each batch stays under ~80KB (~20K tokens). Order batches so high
 
 **4. Merge batch summaries** into a unified view before final synthesis.
 
-### Step 6: Synthesize and Answer
+### Step 3: Synthesize and Answer
 
 After gathering information (directly or via batch summaries):
 1. If batched: merge batch summaries first, noting which batches covered which sub-topics
@@ -308,13 +308,11 @@ After gathering information (directly or via batch summaries):
 5. Report coverage breadth (e.g., "Based on 45 notes across 3 batches from your vault...")
 6. Highlight any gaps or areas with limited coverage
 7. If search-only mode was used, mention that index browsing was intentionally skipped. If agent-engine mode was used, mention that retrieval was delegated to the `--engine agent` search and that index browsing plus FTS5/QMD sweeps were intentionally skipped.
-8. Unless console-only mode is active, proceed to Step 7 to persist the wiki, then report the wiki's final file path returned by `/wiki` so the user can open the persisted article
+8. Unless console-only mode is active (see **Output Destinations**), proceed to Step 4 to persist the wiki
 
-### Step 7: Persist as Wiki (Default)
+### Step 4: Persist as Wiki (Default)
 
-Run this step for every synthesis-mode research request **unless** the user opted into console-only mode (see **Output Destinations** above) or the request was lookup-only (no synthesis to persist). In those two cases, the workflow ends at Step 6. Otherwise — including bare "research X" / "find notes about X" requests — wiki output is the default, so run this step.
-
-Console output happens first — the user always sees the synthesis in the response. The wiki is an *additional* artifact, not a replacement.
+Run this step for every synthesis-mode research request unless console-only mode is active or the request was lookup-only (see **Output Destinations** — in those cases the workflow ends at Step 3). Console output happens first — the user always sees the synthesis in the response; the wiki is an *additional* artifact.
 
 Delegate to the `/wiki` skill via the Skill tool rather than writing the wiki file directly. `/wiki` owns folder selection, title uniqueness, frontmatter, the `[[#Heading]]` TOC format, and the References section convention — reimplementing any of that here would drift.
 
@@ -324,7 +322,7 @@ Invoke `/wiki` with a prompt containing only:
 
 1. **Topic pointer.** One line stating the research topic and instructing `/wiki` to base the article on the synthesis just printed above in this conversation. Do **not** re-inline the synthesis.
 
-2. **Source notes list.** Every note read in Step 5, with its vault path and (where available) one-line description of why it's relevant. This is the one item `/wiki` cannot reliably reconstruct from recency — Step 5 note paths are scattered across earlier tool results. Format each entry so `/wiki` can drop it into the `## 参考资料` section with minimal transformation:
+2. **Source notes list.** Every note read in Step 2, with its vault path and (where available) one-line description of why it's relevant. This is the one item `/wiki` cannot reliably reconstruct from recency — Step 2 note paths are scattered across earlier tool results. Format each entry so `/wiki` can drop it into the `## 参考资料` section with minimal transformation:
    ```
    - [[<note title>]] — <why it's relevant to this research>
    ```
@@ -336,22 +334,6 @@ Do **not** pass a title hint or folder suggestion — `/wiki` derives the title 
 After `/wiki` returns, append its reported file path to the console output so the user knows where the artifact landed.
 
 ## Example Usage
-
-### Small research: "Research what my notes say about agent harnesses"
-
-**Track A (index):** N is open-ended, treat as ~20. Budget: 2×20 = 40 index candidates.
-1. Read `~/notes/index/raw/root_index.md` → find `raw/AI/Agent/harness` section (21 notes)
-2. Read `~/notes/index/raw/section_indices/raw-ai-agent-harness.md` → scan summaries, select all 21 (all relevant to topic)
-
-**Track B (search):** Run in parallel with Track A.
-3. Run `notes-search search "agent harness" --limit 30 --json`, `"coding agent"`, `"agent loop"`, etc.
-
-**Merge:**
-4. Union index candidates + search results, dedupe → ~30 unique candidates
-5. Rerank using BM25 scores (search hits) + summary relevance (index hits)
-6. Check sizes: `wc -c` → total ~60KB, fits in one batch
-7. Read all notes, synthesize, print the console answer
-8. **Step 7 (default):** the user didn't opt out of the wiki, so delegate to `/wiki` with a slim handoff and append the returned file path to the console output
 
 ### Top-N research: "Find the top 10 posts about CPU stock investment"
 
@@ -368,104 +350,29 @@ After `/wiki` returns, append its reported file path to the console output so th
 6. Verify sub-concept coverage (AMD, Intel, ARM, QCOM each represented)
 7. Take top 10
 
-### Large research: "Research my top 100 notes on investment"
-
-**Track A (index):** N=100, budget: N = 100 index candidates.
-1. Read root index → find all investment-related sections (candidates, macro analysis, trading strategy, etc.)
-2. Read section indices for those sections → select ~100 most relevant by summary
-
-**Track B (search):** Run in parallel.
-3. Run `notes-search search "investment" --limit 100 --json` plus topic-specific queries
-
-**Merge:**
-4. Union index + search, dedupe → ~150 candidates
-5. Rerank, take top 100
-6. Check sizes: `wc -c` → total ~400KB → split into 5 batches of ~80KB
-7. Process each batch, merge summaries, synthesize
-
 ### Recent-focused: "What are my latest 10 notes on AI agents?"
 
 Even though the user asked for just 10 notes, **do not** run a single query and cap at 10 — that misses notes using synonym terms.
 
-**Track A (index):** N=10, budget: 2×10 = 20 index candidates.
-1. Read root index → find `raw/AI/Agent` and sub-sections
-2. Read section indices → select ~20 notes, noting their timestamps for recency sorting
-
-**Track B (search):** Run in parallel with Track A.
-3. Run multiple time-sorted queries, each with `--sort time --limit 30 --json`:
-   ```bash
-   notes-search search "AI agents" --sort time --limit 30 --json
-   notes-search search "agent" --sort time --limit 30 --json
-   notes-search search "autonomous agents" --sort time --limit 30 --json
-   notes-search search "agent harness" --sort time --limit 30 --json
-   notes-search search "LLM agent" --sort time --limit 30 --json
-   ```
-
-**Merge:**
-4. Union index + search, dedupe by filepath
-5. Sort the unioned set by `frontmatter_sort_time` (fallback `file_mtime`) descending
-6. Take the top 10 from the unioned sorted list
+1. **Track A:** read root index → `raw/AI/Agent` sections → select ~20 candidates (2×N budget), noting timestamps.
+2. **Track B (parallel):** run multiple time-sorted queries — `"AI agents"`, `"agent"`, `"autonomous agents"`, `"agent harness"`, `"LLM agent"` — each with `--sort time --limit 30 --json`.
+3. Union + dedupe, sort the unioned set by `frontmatter_sort_time` (fallback `file_mtime`) descending, take the top 10.
 
 The same pattern applies for bilingual topics — add Chinese synonym queries alongside English ones before unioning.
 
+### Large research: "Research my top 100 notes on investment"
+
+Same as top-N, scaled: index budget = N = 100; run `notes-search search "investment" --limit 100 --json` plus topic-specific queries; union → ~150 candidates → rerank → top 100. `wc -c` shows ~400KB total → split into ~5 batches of ~80KB, process each, merge summaries, synthesize, then Step 4 (wiki, the default).
+
 ### Search-only: "Find the top 10 notes about CPU stock investment, skip index"
 
-When the user explicitly asks to skip the index, do not read `root_index.md` or section indices.
-
-1. Run a broader-than-usual set of search queries with generous per-query limits:
-   ```bash
-   notes-search search "CPU 投资" --limit 30 --json
-   notes-search search "CPU stock" --limit 30 --json
-   notes-search search "服务器 CPU" --limit 30 --json
-   notes-search search "server CPU" --limit 30 --json
-   notes-search search "CPU demand" --limit 30 --json
-   notes-search search "CPU 需求" --limit 30 --json
-   notes-search search "Intel investment" --limit 30 --json
-   notes-search search "AMD investment" --limit 30 --json
-   notes-search search "ARM CPU" --limit 30 --json
-   notes-search search "QCOM CPU" --limit 30 --json
-   notes-search search "CPU 芯片" --limit 30 --json
-   notes-search search "AI CPU" --limit 30 --json
-   ```
-2. Union all search results, dedupe by filepath, and rerank by title relevance, best BM25 score, number of matched queries, sub-concept coverage, note depth, and recency if relevant.
-3. Filter generic meta-notes and cross-sector notes whose primary subject is not CPU stock investment.
-4. Verify coverage across the major CPU angles surfaced by the query plan (for example AMD, Intel, ARM, QCOM, server CPU demand, AI inference/agentic AI).
-5. Read the selected notes and synthesize as usual.
-6. In the final answer, include a brief coverage note such as: "Search-only mode used; index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered."
+Do not read `root_index.md` or section indices. Run a broader-than-usual sweep (the top-N example's queries plus extra variants like `"QCOM CPU"`, `"AI CPU"`), each with `--limit 30 --json`. Union, dedupe, rerank, filter generic/cross-sector notes, verify sub-concept coverage, read, synthesize. In the final answer include: "Search-only mode used; index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered."
 
 ### Agent-engine: "Find the top 10 notes about CPU stock investment, use the agent engine"
 
-The trigger phrase "use the agent engine" activates agent-engine mode. Skip the index and skip multi-query FTS5 sweeps.
+Make exactly one call — `notes-search search "CPU stock investment" --engine agent --json --limit 10` — and treat the returned entries as the final candidate set. Jump to Step 2 (size, batch, read every returned note), synthesize in Step 3, and note in the answer: "Retrieval delegated to `--engine agent`; index browsing and FTS5/QMD sweeps were intentionally skipped."
 
-1. Make exactly one call, passing `--limit 10` since the user asked for the top 10:
-   ```bash
-   notes-search search "CPU stock investment" --engine agent --json --limit 10
-   ```
-   For asks like "top 20", use `--limit 20`; for "most recent 50", use `--limit 50 --sort time`. If no count is specified, omit `--limit`.
-2. Parse the returned JSON. Treat the returned entries as the candidate set.
-3. Jump to Step 5: estimate sizes with `wc -c`, batch if needed, read the notes.
-4. Synthesize in Step 6 as usual.
-5. In the final answer, include a brief note: "Retrieval delegated to `--engine agent`; index browsing and FTS5/QMD sweeps were intentionally skipped."
+### Output destination examples
 
-### Wiki output (default): "Research the memory cycle thesis"
-
-No special phrase is needed — wiki output is the default for synthesis-mode research. (Phrases like "save it as a wiki" or "write it up" just reinforce the default; behavior is identical without them.)
-
-1. Run Steps 1–6 as usual: index browsing + multi-query search on `内存周期`, `存储周期`, `memory cycle`, `memory supercycle`, `HBM 周期`, `NAND 周期`, `DRAM 周期`, etc.; union, dedupe, rerank; read the top candidates; produce a synthesis.
-2. Print the console synthesis as usual — the user always sees this first.
-3. **Step 7**: Invoke `/wiki` via the Skill tool with a slim prompt containing:
-   - Topic pointer: one line — "Write a wiki for the research on the memory cycle thesis just synthesized above in this conversation." Do **not** re-inline the synthesis; `/wiki` picks it up from conversation recency.
-   - Source notes list: each note read in Step 5, formatted as `- [[<title>]] — <relevance>`
-   - Coverage caveat: omitted (default index + search mode was used, not search-only)
-   - No title or folder hint — `/wiki` derives both itself
-4. When `/wiki` returns the new file path, append it to the console output so the user can open the persisted article.
-
-### Console-only (opt-out): "Research the memory cycle thesis, no wiki"
-
-The phrase "no wiki" (or "console only", "just answer", "don't save it") opts out of the default wiki.
-
-1. Run Steps 1–6 exactly as in the wiki example above: search, merge, read, synthesize.
-2. Print the console synthesis.
-3. **Skip Step 7 entirely** — do not delegate to `/wiki`, do not write any vault file. The workflow ends at the console answer.
-
-Lookup-only requests ("just list the titles", "JSON only") are also console-only by nature — there is no synthesis to persist, so Step 7 never runs for them either.
+- **"Research the memory cycle thesis"** — wiki output is the default: run the full pipeline, print the console synthesis, then Step 4 delegates to `/wiki` with a slim handoff (topic pointer + source notes list, no inlined synthesis, no title/folder hint) and appends the returned file path to the console output.
+- **"Research the memory cycle thesis, no wiki"** — same pipeline, but skip Step 4 entirely; the workflow ends at the console answer. Lookup-only requests ("just list the titles", "JSON only") are also always console-only.
