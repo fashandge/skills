@@ -39,7 +39,7 @@ Use **search-only mode** when the user's prompt contains instructions such as:
 - "don't browse the index"
 - "use the search engine only"
 
-When using search-only mode, compensate by running a broader query sweep than usual: add extra synonyms, title variants, bilingual terms, ticker/company variants when relevant, and sub-concepts. For top-N requests, still apply the final top-N cap only after unioning and deduping all search-query results.
+When using search-only mode, compensate by running a broader query sweep than usual: add extra synonyms, title variants, bilingual terms, ticker/company variants when relevant, and sub-concepts. Search results include a `summary` field when a DB-backed note summary exists, so use that field to judge whether the topic is the note's primary subject instead of relying only on BM25, title, and snippets. For top-N requests, still apply the final top-N cap only after unioning and deduping all search-query results.
 
 Use **agent-engine mode** when the user's prompt contains instructions such as:
 - "use the agent engine"
@@ -266,7 +266,7 @@ Candidates are **unioned**, not intersected — a note appearing in *any* enable
 2. **Dedupe by filepath** — collapse exact-path duplicates. For each note, track:
    - Which source(s) it came from: index-only, search-only, or both. In search-only mode, every candidate is search-only.
    - Which search queries it matched and its best BM25 score
-   - Its summary from the index, if available and if index browsing was enabled
+   - Its summary, if available, from the search result `summary` field and/or from the section index when index browsing was enabled
 3. **Filter out generic and cross-sector notes.** Before ranking, remove or demote two categories:
    - **Generic meta-notes** whose primary subject is not any specific topic: watchlists, portfolio summaries, PEG/valuation screens, glossaries, and other broad reference notes that mention many topics. A note titled "Watchlist Competitive Landscape" will match queries for memory, optical, AI, etc. — but it's not *about* any of those topics.
    - **Cross-sector notes** whose primary subject is a DIFFERENT or BROADER sector but that mention the research topic as one of several areas. For example, a note about the entire semiconductor supply chain that mentions optical communications should rank below notes specifically about optical communications. The research topic should be the note's PRIMARY subject, not a secondary mention.
@@ -274,7 +274,7 @@ Candidates are **unioned**, not intersected — a note appearing in *any* enable
    - **Appeared in both sources** — strong relevance signal. A note selected from the index AND matched by search queries is almost certainly on-topic.
    - **Title relevance:** Does the note's title directly reference the research topic or its core concepts? Notes with topic keywords in the title are almost always more relevant than notes that only mention the topic in passing within the body.
    - **Best `bm25_score`** across queries (lower is better in this CLI). For index-only notes that have no BM25 score, use title and summary relevance instead.
-   - **Summary relevance** (for index-sourced notes): The section index provides a one-line summary — use it to judge topical fit for notes that search didn't surface.
+   - **Summary relevance:** Search results may include a DB-backed `summary` field, and section indices provide one-line summaries for index-sourced notes. Use any available summary to judge whether the research topic is the note's PRIMARY subject versus a passing mention or cross-sector aside. If both search and index summaries exist, treat them as complementary signals. A missing summary is neutral — never demote a note solely because the field is absent.
    - **Number of search queries matched** — a useful signal but not dominant.
    - Note type (prefer `personal synthesis` and `research paper` for depth)
    - Recency — for time-sorted asks ("latest", "recent"), sort by `frontmatter_sort_time` or `file_mtime` across the unioned set, NOT within a single query's results
