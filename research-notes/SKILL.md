@@ -28,7 +28,7 @@ This workflow has **three retrieval modes**:
 3. **Agent-engine mode: delegate retrieval to the AI agent search engine.** If the user explicitly asks to use the agent engine, skip index browsing and skip the multi-query FTS5 sweep. Instead, make a single call to `notes-search search "<topic>" --engine agent --json` and treat its results as the full candidate set. See **Track C** below.
 
 - **Index browsing** gives complete coverage of relevant folders and catches notes that use different vocabulary than any search query. It also provides note-type metadata and one-line summaries for quick relevance assessment without reading the full note.
-- **Keyword search** catches notes scattered across OTHER folders that index browsing wouldn't surface, and provides BM25 scores for ranking.
+- **Keyword search** catches notes scattered across OTHER folders that index browsing wouldn't surface, and provides BM25 scores plus a DB-backed one-line `summary` field (when one exists) for ranking.
 
 In default mode, neither source alone is sufficient. The index misses notes in unexpected folders; search misses notes that use synonyms not in any query.
 
@@ -270,6 +270,8 @@ Candidates are **unioned**, not intersected — a note appearing in *any* enable
 3. **Filter out generic and cross-sector notes.** Before ranking, remove or demote two categories:
    - **Generic meta-notes** whose primary subject is not any specific topic: watchlists, portfolio summaries, PEG/valuation screens, glossaries, and other broad reference notes that mention many topics. A note titled "Watchlist Competitive Landscape" will match queries for memory, optical, AI, etc. — but it's not *about* any of those topics.
    - **Cross-sector notes** whose primary subject is a DIFFERENT or BROADER sector but that mention the research topic as one of several areas. For example, a note about the entire semiconductor supply chain that mentions optical communications should rank below notes specifically about optical communications. The research topic should be the note's PRIMARY subject, not a secondary mention.
+
+   Base this primary-subject judgment on the search result `summary` field (or the section index one-liner) when available — snippets show keyword context and routinely overstate relevance for passing mentions. Fall back to title + snippet only when no summary exists.
 4. **Rerank the merged pool.** Use all available signals:
    - **Appeared in both sources** — strong relevance signal. A note selected from the index AND matched by search queries is almost certainly on-topic.
    - **Title relevance:** Does the note's title directly reference the research topic or its core concepts? Notes with topic keywords in the title are almost always more relevant than notes that only mention the topic in passing within the body.
