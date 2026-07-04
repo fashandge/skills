@@ -15,7 +15,14 @@ Inject knowledge from `raw/` source notes (or the current conversation) into the
 - A topic/folder (e.g. "absorb my recent notes on RL entropy" → find candidates first), or
 - Insights from the current session that reference raw notes.
 
-Read each source note fully before deciding anything. Routing (Step 1) and decomposition (Step 2) are **interleaved, not sequential**: the source's candidate topics drive which wiki regions to survey, and the surveyed structure drives how the source is split. For a rich source, expect a second, narrower Step 1 pass once decomposition reveals a unit whose subject wasn't in the initial survey.
+Read each source note fully before deciding anything — **and read the title together with the body as one unit.** Here "title" means whatever carries it: frontmatter `title`, else the **filename stem**, else the first H1 (same precedence the parser uses) — often it's the filename, not a frontmatter field, and for a note with no frontmatter the filename stem is the *only* carrier. In this vault, clipped forum posts and tweets often carry the thesis or framing in the (concept-level) title and only a short elaboration in the body; the title is content, not a label. So decompose title + body jointly — the title supplies context the body assumes.
+
+This has a limiting case: a **degenerate source** whose body is empty or near-empty but whose title is a self-contained claim. Handle by branch:
+- **Recoverable** — empty body but a `source:` URL that's a failed clip or an un-expanded link-stub → stop and route to refetch / `expand-link-stubs`; don't absorb the lossy title when the real content is one fetch away.
+- **Title is a self-contained claim**, no recoverable body → treat the title as legitimate promotable content and run the normal merge > create > cite decision on it (still apply the delta test in Step 2; annotate any resulting `## References` entry as title-derived).
+- **Title is only a topic label** (no claim) → Skip; say so in the report.
+
+Routing (Step 1) and decomposition (Step 2) are **interleaved, not sequential**: the source's candidate topics drive which wiki regions to survey, and the surveyed structure drives how the source is split. For a rich source, expect a second, narrower Step 1 pass once decomposition reveals a unit whose subject wasn't in the initial survey.
 
 ## Step 1: Route
 
