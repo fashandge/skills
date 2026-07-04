@@ -7,6 +7,8 @@ description: Generate a wiki article in the user's Obsidian vault. Use when the 
 
 Generate structured wiki articles in the user's Obsidian vault at `~/notes/wiki/`.
 
+> **Vault schema**: `~/notes/wiki/Wiki Organization Conventions.md` is the single source of truth for vault structure (tree-first organization, MECE at top 2 levels, Overview notes, merge-over-create compounding). This skill implements those conventions for article creation; read that note when a placement or structure decision is ambiguous. For injecting an existing `raw/` note into the wiki, prefer the `/absorb` skill, which decides merge vs create vs cite.
+
 > **Obsidian syntax**: This skill's defaults stay conservative — frontmatter, wikilinks, tables, plain prose. For richer Obsidian-specific syntax (callouts, embeds, block IDs, highlights, footnotes, Mermaid), consult the `obsidian-markdown` skill as a reference. Reach for **callouts** (`> [!abstract]`, `> [!note]`, `> [!warning]`) when the Overview block or a key-insight call-out would read better than a plain blockquote, and for **section embeds** (`![[Note Name#Heading]]`) when surfacing a source paragraph verbatim is clearer than paraphrasing it.
 
 ## When to Use This Skill
@@ -27,24 +29,42 @@ The user provides a description of what to generate. This is typically based on 
 - If backlinks or source documents are referenced, read them for additional context
 - Calling skills (e.g. `ask-chatbots`, `research-notes`) may hand over a temp-file path as the body source, and/or a coverage caveat to include — read the file yourself rather than expecting inlined content, and carry any caveat into the overview or body
 
-## Step 2: Choose Folder Location
+## Step 2: Check for an Existing Note to Update (Merge-over-Create)
 
-The wiki goes under `~/notes/wiki/`. Follow these rules **in order**:
+Per the vault conventions, the wiki compounds by **updating existing notes in place** rather than accumulating near-duplicate siblings. Before creating a new article, find existing wiki notes on the same subject by delegating retrieval to the **`/research-notes` skill** — it owns the retrieval strategy (index browsing + multi-query expansion + union/dedupe/rerank); do not reinvent it with ad-hoc `notes-search` calls. Invoke it with these constraints (they override its defaults):
 
-1. **List existing folders first:**
+- **Lookup-only mode** — return ~top 10 titles + paths; no reading of note bodies, no synthesis.
+- **Console-only** — do NOT persist a wiki (its default output destination is this very skill; persisting would recurse).
+- **Scoped to `wiki/`** — browse `index/wiki/root_index.md` only and restrict searches with `--folder wiki`.
+
+Then judge the returned candidates yourself (read the top few — overview blockquote + headings suffice):
+
+- If an existing wiki note covers the same subject, **update that note** (integrate the new material, bump `updated:` in frontmatter, extend `## References`) instead of creating a duplicate.
+- Only create a new article for a genuinely new subject.
+- **If the requested content spans multiple distinct subjects**, don't produce one grab-bag article — propose splitting into separate articles/updates (one per subject, each with its own unique title and folder home, cross-linked in their References), confirm the split with the user, then handle each subject through this workflow. One coherent argument = one note; wiki notes are single-subject so titles stay unique and linkable.
+- Skip this step only when the check was already done by the caller (e.g. the `/absorb` skill states it routed and deduped already).
+
+## Step 2a: Choose Folder Location
+
+The wiki goes under `~/notes/wiki/`. If the caller already routed a target folder (e.g. the `/absorb` skill passes the folder it chose in its own routing step), use that folder and skip rules 1–2 below — re-deriving it would second-guess a decision the caller owns. Otherwise follow these rules **in order**:
+
+1. **Route via the generated wiki index first** — read `~/notes/index/wiki/root_index.md`. It opens with a **Section Tree** (each section linked with its assigned-note count), followed by one block per section with a `Description` — curated from the folder's `Overview of <Folder>` note where one exists (authoritative, states boundaries), otherwise generated (a hint). Pick the section whose Description fits the topic, **preferring the deepest section that fits**, and respect stated boundaries (e.g., market investing → `Investment/`, but taxes/benefits → `Life/`). **The Section Tree is coarser than the real folder tree**: small folder subtrees (≤20 notes) don't get their own section — their notes are listed in the nearest ancestor section — so the deepest section may be shallower than the deepest existing folder. Before finalizing, open the chosen section's index under `~/notes/index/wiki/section_indices/` and scan its notes' `Path`s and `Subsections:` line: if an existing deeper subfolder fits the topic better, place the note there instead of the section's own folder.
+
+2. **Fall back to listing folders** when the index is missing or ambiguous:
    ```bash
    find ~/notes/wiki -maxdepth 4 -type d | sort
    ```
-
-2. **Use an existing folder** if one clearly fits the topic. Judge only from the `find` output above — the vault changes often, so never rely on a remembered snapshot of its folders.
+   Judge only from live output (index or `find`) — the vault changes often, so never rely on a remembered snapshot of its folders.
 
 3. **Create a new folder** if no existing folder fits. New folders must be:
-   - At least **2 levels deep** under `wiki/` (e.g., `wiki/topic/subtopic/`)
-   - Ideally **3 levels deep** for specificity (e.g., `wiki/topic/subtopic/area/`)
+   - At least **2 levels deep** under `wiki/` (e.g., `wiki/Topic/subtopic/`)
+   - Ideally **3 levels deep** for specificity (e.g., `wiki/Topic/subtopic/area/`)
    - Never a single flat folder directly under `wiki/` (e.g., NOT `wiki/my-new-topic/`)
+   - Never a new **top-level** topic without asking the user — that is a rare, deliberate act per the conventions
 
 4. **Naming conventions:**
-   - Folder names: lowercase with spaces or hyphens, English preferred (e.g., `Software Engineering/skills/`)
+   - Top-level topic folders: Title Case English (`AI`, `Investment`, `Software Engineering`)
+   - Deeper folder names: lowercase with spaces or hyphens, English preferred (e.g., `Software Engineering/skills/`)
 
 ## Step 2b: Choose Title and Filename
 
@@ -55,7 +75,7 @@ The title, filename, and `# H1` heading must all be **identical**.
 - Lead with the core subject, add a short qualifier only if needed to disambiguate
 - Include concrete nouns (names, technologies, concepts) rather than generic words
 - Must be valid for Obsidian backlinking: **no `/`, `\`, `#`, `^`, `[`, `]`, `|`, `:` characters** (`#` in a title breaks `[[Title#Heading]]` links)
-- Can be English or Chinese depending on content language
+- English or Chinese per the language rule in Step 2c (title, filename, and H1 follow the article's language)
 
 **Good titles:** `DHH on Agent-First Programming and Engineer Value Shifts`, `Kent Beck Smalltalk Best Practice Patterns`, `CLI as the Ideal Agent Interface`
 **Bad titles:** `AI Summary`, `Design Notes`, `Interview Thoughts`, `wiki entry`
@@ -72,11 +92,21 @@ If this returns a hit, add a qualifier to the title and re-check.
 
 This enables clean backlinking: `[[DHH on Agent-First Programming and Engineer Value Shifts]]` — no path needed when the title is unambiguous.
 
+## Step 2c: Choose Article Language
+
+Write the article in the **dominant language of the material**, not a fixed default:
+
+- If the source note(s) being written up — or, when updating in place, the destination wiki note — are **mainly Chinese**, write the article in Chinese (prose, section headings, and the title/filename/H1).
+- When **most sources are English**, write in English.
+- When updating an existing note, match that note's existing language; don't flip a Chinese note to English (or vice versa) just because one new source differs.
+
+The fixed convention headings `## 📚 目录` and `## References` stay verbatim regardless of language. Keep technical terms (tool names, API params, code, product names) in their original form inline.
+
 ## Step 3: Generate the Wiki Article
 
 Use the following structure. All sections are required unless noted.
 
-The section headings `## 📚 目录` and `## 参考资料` are fixed conventions — use them verbatim even when the article body is in English (do not switch to `## Table of Contents` / `## References`).
+The section headings `## 📚 目录` and `## References` are fixed conventions — use them verbatim for **both English and Chinese** articles (do not switch to `## Table of Contents` or `## 参考资料`). Existing notes written before this convention may still use `## 参考资料`; treat it as equivalent when reading or merging, and rename it to `## References` when substantively updating such a note.
 
 ### 3a. Frontmatter
 
@@ -84,12 +114,15 @@ The section headings `## 📚 目录` and `## 参考资料` are fixed convention
 ---
 title: <same as filename, without .md>
 date: <today's date, YYYY-MM-DD — take it from the session context or `date +%F`, don't guess>
+updated: <today's date, YYYY-MM-DD>
 tags:
   - <relevant tag 1>
   - <relevant tag 2>
   - <...3-6 tags total>
 ---
 ```
+
+`date` is the creation date and never changes; `updated` is bumped on every substantive edit of the article. Do **not** add a `sources:` frontmatter field — provenance lives only in the `## References` section.
 
 For tag consistency, check what sibling articles in the chosen folder already use before inventing new tags:
 
@@ -152,8 +185,8 @@ Write the main content with:
   item. Never leave bare `https://…` URLs or dump a standalone list of raw links
   under a table/section as an afterthought. A reader should click the words, not a
   URL string. (Raw URLs are acceptable inside code blocks where the literal
-  string matters, and in the `## 参考资料` references section, which is a link
-  index by design.)
+  string matters, and in the `## References` section, which is a link index by
+  design.)
 
 ### 3e. References Section
 
@@ -162,16 +195,17 @@ End with a references section containing backlinks to relevant notes in the vaul
 ```markdown
 ---
 
-## 参考资料
+## References
 
+- [[source raw note]] — source: original interview transcript this wiki is built from
 - [[related note 1]] — brief description of relevance
 - [[related note 2]] — brief description of relevance
 - [External Link Title](https://url) — for external sources (markdown link, NOT `[[...]](url)`)
 ```
 
 **Rules for references:**
-- **All backlinks go here** — this is the single place for all links (no source backlinks at the top)
-- Link to the original source document(s) that informed this wiki
+- **All backlinks go here** — this is the single place for all links (no source backlinks at the top, no `sources:` frontmatter)
+- Link to the original source document(s) that informed this wiki, annotated with a `source:` prefix in the annotation so sources are distinguishable from see-also links
 - Link to related wiki articles in the vault
 - Link to any notes mentioned or quoted in the body
 - Include external URLs for books, articles, or tools mentioned
@@ -192,12 +226,14 @@ After writing the file:
 
 Before finishing, verify:
 
+- [ ] Checked for an existing wiki note on the same subject first (merge-over-create)
 - [ ] **Title = filename = H1** — all three are identical
 - [ ] Title is globally unique (verified with `find ~/notes -name "<Title>.md"`), concrete, and contains no `/`, `\`, `#`, `^`, `[`, `]`, `|`, `:` characters
 - [ ] Overview section answers "what is this, why does it exist?"
 - [ ] Table of contents uses `[[#Heading Text]]` with exact heading matches, and heading text is unique document-wide
 - [ ] No quotes or special characters in heading text that could break links
-- [ ] References section has all backlinks (source docs, related wikis, external URLs)
+- [ ] `## References` section has all backlinks (source docs annotated `source:`, related wikis, external URLs)
+- [ ] Frontmatter has `updated:`; no `sources:` field
 - [ ] Tags in frontmatter are relevant and consistent with existing vault tags
 - [ ] Folder is at least 2 levels deep under `wiki/`
 - [ ] Content is specific and concrete, not vague generalities
@@ -212,9 +248,11 @@ wiki/Software Engineering/skills/DHH on Improving Software Design Skill in the A
 ---
 title: DHH on Improving Software Design Skill in the Agent Era
 date: 2026-04-11
+updated: 2026-04-11
 tags:
   - 软件工程
   - 设计能力
+  - AI时代
 ---
 
 # DHH on Improving Software Design Skill in the Agent Era
@@ -229,7 +267,7 @@ tags:
 
 - [[#什么是软件设计能力]]
 - [[#第一步：理解材料]]
-- [[#参考资料]]
+- [[#References]]
 
 ---
 
@@ -239,9 +277,9 @@ tags:
 
 ---
 
-## 参考资料
+## References
 
-- [[从拒绝AI到一切先问Agent，DHH]] — 原始访谈全文
+- [[从拒绝AI到一切先问Agent，DHH]] — source: 原始访谈全文
 - [[DHH on Agent-First Programming and Engineer Value Shifts]] — DHH 观点的完整 wiki
 - [Shape Up](https://basecamp.com/shapeup) — Basecamp 的产品开发方法论
 ```

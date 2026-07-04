@@ -56,7 +56,7 @@ If possible, open the lesson file for the user by running a CLI command.
 
 Each lesson should link via HTML anchors to other lessons and reference documents.
 
-Each lesson should recommend a primary source for the user to read or watch. This should be the most high-quality, high-trust resource you found on the topic.
+Each lesson should recommend a primary source for the user to read or watch. This should be the most high-quality, high-trust resource you found on the topic. **Every source must be a clickable link (HTML `<a href="...">`)** — never a bare text reference. For local vault files, use the `obsidian://open?vault=notes&file=...` format so clicking opens the note in Obsidian; for external resources, use the full URL with `target="_blank"`. **Before finalizing a lesson, validate every external link: run `curl -sIL -o /dev/null -w "%{http_code}" <URL>` in terminal and confirm it returns 2xx or 3xx.** If a URL returns 4xx/5xx or connection error, replace it with a working alternative or remove it rather than embedding a dead link. For Obsidian vault links, verify the file path exists on disk.
 
 Each lesson should contain a reminder to ask followup questions to the agent. The agent is their teacher, and can assist with anything that's unclear.
 

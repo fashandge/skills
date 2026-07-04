@@ -87,32 +87,43 @@ In lookup-only mode, still perform the normal retrieval, union, dedupe, rerank, 
 
 #### Step A1: Identify Relevant Sections
 
-Read the root index to find sections related to the research topic. **Use the Read tool** (not `cat`) so the full file is loaded without rtk rewriting or any output truncation:
+The vault has **two generated root indexes**, one per source tree:
+
+- `~/notes/index/raw/root_index.md` — source clippings under `raw/` (evidence)
+- `~/notes/index/wiki/root_index.md` — the synthesis knowledgebase under `wiki/` (conclusions; sections carry curated scope descriptions from `Overview of <Folder>` notes)
+
+Browse **both** by default — research questions usually benefit from wiki conclusions *and* raw evidence. When the request is explicitly scoped to one tree (a `--folder` constraint, "in my wiki", a `/wiki`- or `/absorb`-driven duplicate check against existing wiki notes), read only that tree's index.
+
+Read the root index(es) to find sections related to the research topic. **Use the Read tool** (not `cat`) so the full file is loaded without rtk rewriting or any output truncation:
 
 ```
 Read ~/notes/index/raw/root_index.md
+Read ~/notes/index/wiki/root_index.md
 ```
 
-The root index is currently well under the Read tool's default 2000-line limit, so a single Read loads it fully. Do not pipe it through `cat`, `head`, or any shell tool — the rtk PreToolUse hook rewrites `cat` to `rtk read`, and any caller that wraps the output (subagent summaries, etc.) may clip it. If a future Read ever truncates (the file has grown past the limit), read it in two chunks with `offset`.
+Each root index is currently well under the Read tool's default 2000-line limit, so a single Read loads it fully. Do not pipe it through `cat`, `head`, or any shell tool — the rtk PreToolUse hook rewrites `cat` to `rtk read`, and any caller that wraps the output (subagent summaries, etc.) may clip it. If a future Read ever truncates (the file has grown past the limit), read it in two chunks with `offset`.
 
-**Token-efficient variant — grep-first when the topic has distinctive keywords.** Loading the full index every time is wasteful when the topic has specific, high-signal terms (e.g. `光通信`/`optical`/`CPO`, not generic words like "investment"). In that case, instead of reading the whole file, first `grep` it to find candidate sections:
+**Token-efficient variant — grep-first when the topic has distinctive keywords.** Loading the full index every time is wasteful when the topic has specific, high-signal terms (e.g. `光通信`/`optical`/`CPO`, not generic words like "investment"). In that case, instead of reading the whole file, first `grep` it to find candidate sections (run over each root index in scope):
 
 ```
-grep -inE "光通信|光互连|光模块|硅光|optical|photonic|transceiver|CPO|DWDM|coherent" ~/notes/index/raw/root_index.md
-grep -nE "^## \[" ~/notes/index/raw/root_index.md   # section-header → section_indices/<file>.md map
+grep -inE "光通信|光互连|光模块|硅光|optical|photonic|transceiver|CPO|DWDM|coherent" ~/notes/index/raw/root_index.md ~/notes/index/wiki/root_index.md
+grep -ilE "光通信|光互连|光模块|硅光|optical|photonic|transceiver|CPO|DWDM|coherent" ~/notes/index/raw/section_indices/*.md ~/notes/index/wiki/section_indices/*.md   # candidate section FILES via note titles/summaries (bilingual)
+grep -nE "^## \[" ~/notes/index/raw/root_index.md   # section-header → section_indices/<file>.md map (same layout under index/wiki/)
 ```
 
 - Build the alternation from the **same query expansion you construct for Track B Step B1** (synonyms, both languages, sub-concepts), OR'd into one case-insensitive `grep -iE` pattern. The more complete the alternation, the lower the miss risk — under-expanding the pattern is the main failure mode, so err toward more terms.
-- A hit may land on a folder prefix, a theme, or a representative note title; the enclosing section is the nearest preceding `## [folder](section_indices/<file>.md)` line (use the second grep as the map). Read only those matched section indices in Step A2.
-- **Recall caveat and fallback.** root_index lists only each section's folder name, themes, and ~3 representative titles, so grep can miss a section whose name/titles don't contain your terms (e.g. an optical note filed under an `AI Chips` section). Two backstops: (1) Track B's full-vault FTS sweep catches on-topic notes regardless of which folder they sit in — it always runs, so a grep miss here is recoverable; (2) when keywords are generic, the topic is broad, or grep returns suspiciously few sections, **fall back to the full `Read` of root_index** for maximum recall. This grep-first path applies *only* to the root index — once a section is selected, Step A2 still **reads its section index in full** (that's where the per-note summaries that catch vocabulary mismatches live).
+- **Run both greps.** The root-index grep hits section paths (in the Section Tree or `## [...]` headers), Descriptions, and themes; the enclosing section for a hit is the nearest preceding `## [folder](section_indices/<file>.md)` line (use the third grep as the map). The section-files grep (`-l` lists matching files) hits per-note titles and summaries — this is where bilingual recall lives, since generated root Descriptions are mostly English while note titles stay in their original language. Read the union of matched section indices in Step A2.
+- **Recall caveat and fallback.** Even both greps can miss a section whose Description, folder name, and note titles all avoid your terms. Two backstops: (1) Track B's full-vault FTS sweep catches on-topic notes regardless of which folder they sit in — it always runs, so a grep miss here is recoverable; (2) when keywords are generic, the topic is broad, or grep returns suspiciously few sections, **fall back to the full `Read` of root_index** for maximum recall. Once a section is selected, Step A2 still **reads its section index in full** (that's where the per-note summaries that catch vocabulary mismatches live).
 
-The root index lists sections with:
-- Folder prefix (e.g., `raw/AI/Agent/harness`)
-- Note count
-- Section themes
-- Representative notes with wiki-links
+The root index has two parts:
 
-Scan for sections whose folder name, themes, or representative notes relate to the topic. Include adjacent sections — for CPU investment, check not only `AI Chips & Foundry` but also sub-folders like `AMD/`, `INTC/`, `ARM/`, and related sections like `macro analysis/AI/`.
+- A **Section Tree** at the top — a nested bullet list of every section with its assigned-note count, each linking to its section index file. Use it to see the section hierarchy at a glance and pick branches top-down. Note the tree shows *sections*, not the full folder tree — small subfolders are folded into their ancestor's section and don't appear as their own entries.
+- **Per-section blocks** (`## [folder path](section_indices/<file>.md)`), sorted by path, each with:
+  - `Description` — the section's scope. Curated ones (from the folder's `Overview of <Folder>` note) are authoritative and may state boundaries ("X lives elsewhere"); the rest are generated one-liners. Some tiny or non-routing sections (`raw/inbox`, `raw/daily`) have no description.
+  - `Note count` — **sections are disjoint** (every note is listed in exactly one section), but a section is not limited to its folder's direct notes: small folder subtrees (≤20 notes) don't get their own section, so their notes are absorbed into the nearest ancestor section, and splitting only ever goes one folder level deep. A count labeled `(direct notes only)` means the section has child sections and nested notes live there; an unlabeled count silently includes notes from deeper subfolders that have no section of their own.
+  - `Section themes` — shared tags, present only when the section's notes have them.
+
+Scan for sections whose folder name, Description, or themes relate to the topic. **When a parent section matches, also take its children from the Section Tree as candidates** — reading a parent's section file does NOT cover its subtree. Include adjacent sections too — for CPU investment, check not only `AI Chips & Foundry` but also sibling sections like `Memory & Storage` and related branches under macro analysis.
 
 #### Step A2: Select Candidates from Section Indices
 
@@ -129,6 +140,8 @@ Section indices contain per-note metadata:
 - Tags: note tags
 - Type: `note`, `clipping`, `research paper`, `personal synthesis`, etc.
 - Summary: one-line summary of the note
+
+A section file lists the notes **assigned** to that section — its folder's direct notes plus, when a subfolder is too small (≤20 notes in its subtree) to earn its own section, all of that subfolder's notes too (check each note's `Path` for its real folder). Sections are disjoint, so no note appears in two section files. When the section *does* have child sections, its `Section Summary` block includes a `Subsections:` line linking them — if the parent looked relevant, its children usually are too; read those as well.
 
 **Scan summaries and titles to select candidates.** Pick notes whose title or summary is relevant to the research topic — even if they wouldn't match any keyword search. This is the index's main advantage: it catches vocabulary mismatches (e.g., a note titled "AMD FA 大涨的部分原因" is about a CPU company's stock but wouldn't match "CPU" searches).
 
@@ -322,14 +335,14 @@ Invoke `/wiki` with a prompt containing only:
 
 1. **Topic pointer.** One line stating the research topic and instructing `/wiki` to base the article on the synthesis just printed above in this conversation. Do **not** re-inline the synthesis.
 
-2. **Source notes list.** Every note read in Step 2, with its vault path and (where available) one-line description of why it's relevant. This is the one item `/wiki` cannot reliably reconstruct from recency — Step 2 note paths are scattered across earlier tool results. Format each entry so `/wiki` can drop it into the `## 参考资料` section with minimal transformation:
+2. **Source notes list.** Every note read in Step 2, with its vault path and (where available) one-line description of why it's relevant. This is the one item `/wiki` cannot reliably reconstruct from recency — Step 2 note paths are scattered across earlier tool results. Format each entry so `/wiki` can drop it into the `## References` section with minimal transformation:
    ```
    - [[<note title>]] — <why it's relevant to this research>
    ```
 
 3. **Coverage caveat (only if search-only mode was used).** Pass a single-sentence flag so `/wiki` includes the standard caveat ("index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered") in the wiki body or overview. Omit entirely when default mode was used.
 
-Do **not** pass a title hint or folder suggestion — `/wiki` derives the title from the body content per its uniqueness rules, and picks the folder via its own `find ~/notes/wiki -type d` check. Leave both decisions entirely to `/wiki`.
+Do **not** pass a title hint or folder suggestion — `/wiki` derives the title from the body content per its uniqueness rules, and picks the folder via its own routing rules. Leave both decisions entirely to `/wiki`.
 
 After `/wiki` returns, append its reported file path to the console output so the user knows where the artifact landed.
 
