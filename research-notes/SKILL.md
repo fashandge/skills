@@ -137,8 +137,7 @@ Section indices also fit within the Read tool's default 2000-line limit today. S
 
 Section indices contain per-note metadata:
 - Path: exact file path
-- Tags: note tags
-- Type: `note`, `clipping`, `research paper`, `personal synthesis`, etc.
+- Tags: note tags (line omitted when the note has none)
 - Summary: one-line summary of the note
 
 A section file lists the notes **assigned** to that section — its folder's direct notes plus, when a subfolder is too small (≤20 notes in its subtree) to earn its own section, all of that subfolder's notes too (check each note's `Path` for its real folder). Sections are disjoint, so no note appears in two section files. When the section *does* have child sections, its `Section Summary` block includes a `Subsections:` line linking them — if the parent looked relevant, its children usually are too; read those as well.
@@ -270,7 +269,6 @@ Candidates are **unioned**, not intersected — a note appearing in *any* enable
    - **Appeared in both sources** — strong relevance signal. A note selected from the index AND matched by search queries is almost certainly on-topic.
    - **Summary relevance:** Search results may include a DB-backed `summary` field, and section indices provide one-line summaries for index-sourced notes. Use any available summary to judge whether the research topic is the note's PRIMARY subject versus a passing mention or cross-sector aside. If both search and index summaries exist, treat them as complementary signals. A missing summary is neutral — never demote a note solely because the field is absent.
    - **Title relevance:** use it for the primary-subject judgment (the engine's title boost only checks term presence, not whether the title is *about* the topic), and as the main signal for index-only notes that have no `rrf_score`.
-   - Note type (prefer `personal synthesis` and `research paper` for depth)
    - Recency — for time-sorted asks ("latest", "recent"), use `search-multi --sort time` and slot index candidates in by effective time (wiki notes → `file_mtime`; raw notes → `frontmatter_sort_time`, falling back to `file_mtime`), NOT within a single query's results
 5. **Apply top-N cap AFTER union** — if the user asked for "latest 10" or "top N", apply the cap to the unioned/deduped/reranked list. Never apply `--limit N` to a single query and call that the answer.
 6. **Verify sub-concept coverage.** After selecting the top N, check that each core sub-concept from your query plan has at least one representative in the list. For example, if you ran queries for CPO, silicon photonics, 光模块, and 光互连, verify that the top 10 includes notes covering each of these angles — not just notes that happened to match the broadest query. If a sub-concept query returned a strong result (top 3 of that query) but no note from that sub-concept made the final list, replace the weakest entry in the top N with the best result from the underrepresented sub-concept. This prevents the broadest queries from monopolizing the top N and ensures the final list covers the topic's full breadth. **In default mode, also check that index-only notes got fair consideration** — if the index surfaced relevant notes that no search query matched, at least one should appear in the top N if its summary is clearly on-topic.
