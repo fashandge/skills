@@ -24,26 +24,16 @@ When in doubt, run a candidate query with `--limit 5` and skim the top results: 
 
 ## Building the Query Plan
 
-Build a query list from the kept terms, then run them as separate AND queries. Start with the broadest single-term queries first (priorities 1–2), then narrow with 2-term combinations only if a single-term query returns too much.
+Build a query list from the kept terms — each query is a separate AND expression. Start with the broadest single-term queries (priorities 1–2), add 2-term combinations only if a single-term query returns too much, then run the whole plan through one `search-multi` call (it dedupes by filepath and rank-fuses with RRF server-side).
 
 **Example query plan for "光通信" (optical communications):**
 
 ```bash
-# Broad single-term sweeps (run separately, dedupe results)
-notes-search search "光通信"
-notes-search search "光互连"
-notes-search search "optical communications"
-notes-search search "silicon photonics"
-notes-search search "硅光"
-notes-search search "CPO"
-
-# Narrowing with 2-term AND (only if single-term returns too much)
-notes-search search "光通信 CPO"      # mixed lang, fine
-notes-search search "硅光 InP"         # mixed lang, fine
-notes-search search "CPO CW laser"    # English-only
-notes-search search "光模块 1.6T"      # Chinese-only
-
-# Ticker-scoped
-notes-search search "LITE"
-notes-search search "TSEM PH18"
+notes-search search-multi \
+  "光通信" "光互连" "optical communications" "silicon photonics" "硅光" "CPO" \
+  "光通信 CPO" "硅光 InP" "CPO CW laser" "光模块 1.6T" \
+  "LITE" "TSEM PH18" \
+  --json --limit 30
 ```
+
+To vet an individual candidate keyword first, probe it alone: `notes-search search "<term>" --limit 5` (see the precision test above).

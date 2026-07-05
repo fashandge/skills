@@ -28,7 +28,7 @@ This workflow has **three retrieval modes**:
 3. **Agent-engine mode: delegate retrieval to the AI agent search engine.** If the user explicitly asks to use the agent engine, skip index browsing and skip the multi-query FTS5 sweep. Instead, make a single call to `notes-search search "<topic>" --engine agent --json` and treat its results as the full candidate set. See **Track C** below.
 
 - **Index browsing** gives complete coverage of relevant folders and catches notes that use different vocabulary than any search query. It also provides note-type metadata and one-line summaries for quick relevance assessment without reading the full note.
-- **Keyword search** catches notes scattered across OTHER folders that index browsing wouldn't surface, and provides BM25 scores plus a DB-backed one-line `summary` field (when one exists) for ranking.
+- **Keyword search** catches notes scattered across OTHER folders that index browsing wouldn't surface, and provides per-query rankings plus a DB-backed one-line `summary` field (when one exists) for reranking.
 
 In default mode, neither source alone is sufficient. The index misses notes in unexpected folders; search misses notes that use synonyms not in any query.
 
@@ -39,7 +39,7 @@ Use **search-only mode** when the user's prompt contains instructions such as:
 - "don't browse the index"
 - "use the search engine only"
 
-When using search-only mode, compensate by running a broader query sweep than usual: add extra synonyms, title variants, bilingual terms, ticker/company variants when relevant, and sub-concepts. Search results include a `summary` field when a DB-backed note summary exists, so use that field to judge whether the topic is the note's primary subject instead of relying only on BM25, title, and snippets. For top-N requests, still apply the final top-N cap only after unioning and deduping all search-query results.
+When using search-only mode, compensate by running a broader query sweep than usual: add extra synonyms, title variants, bilingual terms, ticker/company variants when relevant, and sub-concepts. Search results include a `summary` field when a DB-backed note summary exists, so use that field to judge whether the topic is the note's primary subject instead of relying only on search rank, title, and snippets. For top-N requests, still apply the final top-N cap only after the `search-multi` fusion and the Step 1 shortlist filter.
 
 Use **agent-engine mode** when the user's prompt contains instructions such as:
 - "use the agent engine"
@@ -48,7 +48,7 @@ Use **agent-engine mode** when the user's prompt contains instructions such as:
 - "use agent search"
 - "delegate the search to the agent engine"
 
-In agent-engine mode, the agent engine has already done its own multi-query retrieval and ranking internally, so do **not** read the index and do **not** run any additional `notes-search` queries (FTS5 or QMD). Make exactly one `notes-search search "<topic>" --engine agent --json` call, parse the returned note list, then jump directly to Step 2 (Read Relevant Notes) on those notes. See **Track C** for details.
+In agent-engine mode, the agent engine has already done its own multi-query retrieval and ranking internally, so do **not** read the index and do **not** run any additional `notes-search` queries (FTS5 or QMD). See **Track C**, which points to `references/agent-engine-mode.md` for the full guidance.
 
 ### Output Destinations
 
@@ -76,12 +76,12 @@ Use **lookup-only mode** when the user asks to find/list top, latest, or relevan
 - "JSON only"
 - "exact shape"
 
-In lookup-only mode, still perform the normal retrieval, union, dedupe, rerank, and top-N selection rules for the chosen search mode. Then stop at the selected note list:
+In lookup-only mode, still perform the normal retrieval, fusion, filtering, and top-N selection rules for the chosen search mode. Then stop at the selected note list:
 - Do **not** read the full note bodies in Step 2.
 - Do **not** synthesize themes, takeaways, or evidence.
 - Output only the fields the user requested. If no schema is specified, use title and vault-relative path.
 - If the user requests JSON-only, the final answer must be valid JSON with no Markdown, commentary, rankings, scores, snippets, or prose outside the JSON.
-- If the user requests "latest", sort the unioned candidate set by `frontmatter_sort_time` or `file_mtime` before applying the final top-N cap.
+- If the user requests "latest", sort the unioned candidate set by effective time — `file_mtime` for `wiki/` notes, `frontmatter_sort_time` (falling back to `file_mtime`) for raw notes, matching the CLI's `--sort time` rule — before applying the final top-N cap.
 
 ### Track A: Index Browsing
 
@@ -92,7 +92,7 @@ The vault has **two generated root indexes**, one per source tree:
 - `~/notes/index/raw/root_index.md` — source clippings under `raw/` (evidence)
 - `~/notes/index/wiki/root_index.md` — the synthesis knowledgebase under `wiki/` (conclusions; sections carry curated scope descriptions from `Overview of <Folder>` notes)
 
-Browse **both** by default — research questions usually benefit from wiki conclusions *and* raw evidence. When the request is explicitly scoped to one tree (a `--folder` constraint, "in my wiki", a `/wiki`- or `/absorb`-driven duplicate check against existing wiki notes), read only that tree's index.
+Browse **both** by default — research questions usually benefit from wiki conclusions *and* raw evidence. When the request is explicitly scoped to one tree (a `--folder` constraint, "in my wiki", an `/absorb`-driven duplicate check against existing wiki notes), read only that tree's index. (The `/wiki` skill's vault check deliberately spans both trees — wiki hits for merge-over-create, raw hits for sources — so it arrives unscoped.)
 
 Read the root index(es) to find sections related to the research topic. **Use the Read tool** (not `cat`) so the full file is loaded without rtk rewriting or any output truncation:
 
@@ -158,7 +158,9 @@ These are upper bounds — only select notes that are genuinely relevant based o
 
 For normal keyword searches, `notes-search` treats multi-word queries as **AND** — every word must appear in the note for it to match. It is not OR, not phrase match. This shapes how to design queries.
 
-**The default is always multiple queries, then union + dedupe.** This applies even to seemingly simple asks like "latest 10 notes about X" or "top N notes on Y". A single query — no matter how well-chosen — only surfaces notes containing that exact term. Notes using a synonym (光互连 vs 光通信), the other language (optical communications vs 光通信), or a sub-concept (CPO, silicon photonics, EML) will be missed. **Never satisfy a research request with a single `notes-search` call unless prompted to do so.** Run at least 5–8 separate queries (10–15 for broad or bilingual investment topics) covering synonyms, both languages, and key sub-terms, then union and dedupe results before applying any `--limit` or top-N cap.
+**The default is always multiple queries, fused into one ranked list.** This applies even to seemingly simple asks like "latest 10 notes about X" or "top N notes on Y". A single query — no matter how well-chosen — only surfaces notes containing that exact term. Notes using a synonym (光互连 vs 光通信), the other language (optical communications vs 光通信), or a sub-concept (CPO, silicon photonics, EML) will be missed. **Never satisfy a research request with a single query unless prompted to do so.** Plan at least 5–8 queries (10–15 for broad or bilingual investment topics) covering synonyms, both languages, and key sub-terms, then run them all through one `notes-search search-multi` call (Step B2) — it dedupes and rank-fuses them server-side. The top-N cap is applied after fusion and filtering, never within a single query.
+
+**Seed-note keyword generation.** If the user provides a seed note, wiki article, or report on the topic (or one clearly exists in the vault), read `references/keyword-generation-from-seed.md` before building the query list — it covers extracting candidate keywords by priority tier plus the exclusion lists (analyst/publisher names, generic macro terms, cross-cutting tech terms, trading-tactic terms). Its precision test applies even without a seed: for every candidate query term ask *"if a note contains this term, is it almost certainly about the topic?"* — if no, drop it. A single noisy keyword can flood the union with off-topic notes.
 
 **Advanced FTS5 syntax is an exception, not the default.** The FTS5 engine supports full FTS5 query syntax, but use it only when the user's prompt includes explicit search-query constraints that are awkward to express with ordinary multi-query sweeps, such as excluding titles containing a keyword or key phrase. Example: for "CPU investment but exclude quick screen notes", pair each normal query with an FTS5 exclusion such as `NOT (title:"quick screen")`. Always wrap field filters in parentheses, e.g. `(title:memory cycle)` or `(title:"memory cycle")`, so they parse robustly. For syntax details, read `references/fts5-search-syntax.md`; otherwise keep using the multi-query workflow above.
 
@@ -168,7 +170,7 @@ For normal keyword searches, `notes-search` treats multi-word queries as **AND**
 
 2. **List topic-name synonyms in both languages.** Write down every way the topic is named — Chinese, English, abbreviations. Include synonyms of both the *subject* and the *framing*. For 内存周期: the subject (内存/存储/memory) and the framing (周期/cycle/supercycle/超级周期) combine into: 内存周期, 存储周期, memory cycle, 存储超级周期, memory supercycle. For 光通信产业趋势: 光通信, 光互连, optical communications, optical networking.
 
-3. **For each compound Chinese term, also create a word-split variant.** CJK unigram tokenization indexes `内存周期` as `内 存 周 期` — four separate tokens. In practice, `内存` and `周期` may appear in different parts of a note. Searching `内存 周期` (two words, AND) catches these. **Always run both**: the unsplit compound and the meaningful word-split. More examples: `光通信` + `光 通信`, `存储周期` + `存储 周期`, `人工智能` + `人工 智能`. Split at word boundaries, not into single characters.
+3. **For each compound Chinese term, also create a word-split variant.** CJK text is indexed as unigrams (`内存周期` → `内 存 周 期`), but on the query side a bare compound is wrapped in quotes, so `内存周期` matches those four characters only **contiguously** — a phrase match. `内存` and `周期` often appear in different parts of a note, and the phrase form misses all of those. Searching `内存 周期` (two words, AND, each matched anywhere) catches them — a live check found `内存周期` returning 2 notes vs 50 for `内存 周期`. **Always run both**: the unsplit compound and the meaningful word-split. More examples: `光通信` + `光 通信`, `存储周期` + `存储 周期`, `人工智能` + `人工 智能`. Split at word boundaries, not into single characters.
 
 4. **Identify 3–5 core sub-concepts.** These are the major sub-segments or technical pillars of the topic. For memory/storage: DRAM, HBM, NAND. For optical communications: CPO, silicon photonics, 光模块, 硅光. For agent harness: harness engineering, agent loop, coding agent.
 
@@ -194,59 +196,52 @@ For normal keyword searches, `notes-search` treats multi-word queries as **AND**
 
 4. **Avoid pairing a Chinese term with its direct English translation** in the same query (e.g. `光通信 optical communications`). Authors pick one or the other, so AND returns near-empty.
 
+5. **Don't add English singular/plural variants as separate queries.** The engine auto-expands them (`cycle` ↔ `cycles`, `memory` ↔ `memories`), so one form suffices. Spend the query budget on synonyms and sub-concepts instead.
+
 #### Step B2: Run Searches with CLI
 
-Use the search CLI for keyword or semantic search:
+**Run the whole query plan through one `search-multi` call** — it executes every query, dedupes by filepath, and computes reciprocal rank fusion (RRF) server-side, returning a single ranked list:
 
 ```bash
-# Basic FTS5 search (fast, keyword-based)
-notes-search search "agent harness"
+# Primary invocation: all planned queries in one call (FTS5 only)
+notes-search search-multi "内存周期" "内存 周期" "memory cycle" "HBM 周期" "存储 周期" \
+  --json --limit 30 --per-query-limit 30
 
-# JSON output for structured processing
-notes-search search "agent harness" --json
+# Sort the fused list by note time instead (for "latest"/"recent" asks)
+notes-search search-multi "AI agents" "agent harness" "LLM agent" --json --sort time --limit 30
 
 # Restrict to a folder
-notes-search search "fine-tuning" --folder "raw/AI"
-
-# Sort by time (most recent first, uses frontmatter published/created/date then mtime)
-notes-search search "agent harness" --sort time --limit 50
-
-# QMD semantic search (slower, ~1.5s, finds conceptually related notes)
-notes-search search "how to build autonomous agents" --engine qmd --mode vsearch
-
-# QMD hybrid with LLM reranking (slowest, ~17s, best quality)
-notes-search search "agent memory systems" --engine qmd --mode query
+notes-search search-multi "fine-tuning" "LoRA" --folder "raw/AI" --json
 ```
 
-Run `notes-search search --help` for the full flag list.
+Each fused result carries `rrf_score` (higher is better), `matched_queries` with the note's 1-based rank in every query it matched, the snippet from its best-ranked query, plus `summary`, `file_mtime`, and `frontmatter_sort_time`. The `per_query` field reports each query's `total` vs `returned` counts.
+
+Single-query `search` remains useful for probing (checking a candidate keyword's precision with `--limit 5`) and for QMD semantic search:
+
+```bash
+notes-search search "agent harness" --json                                  # single-query probe
+notes-search search "how to build autonomous agents" --engine qmd --mode vsearch   # semantic (~1.5s)
+notes-search search "agent memory systems" --engine qmd --mode query        # hybrid+rerank (~17s)
+```
+
+Run `notes-search search-multi --help` and `notes-search search --help` for the full flag lists.
+
+**When to add QMD queries:** for conceptual or abstract topics where keyword recall is inherently weak (e.g., "how I think about position sizing", "lessons from failed trades"), add 1–2 `--engine qmd --mode vsearch` queries as an extra recall source alongside the FTS5 sweep. Merge QMD hits into the union **by rank, never by score** — QMD scores are higher-is-better and on a different scale from FTS5 (see Step 1). Skip QMD for well-named concrete topics; the multi-query FTS5 sweep covers those.
 
 **Sort and limit guidance:**
-- Use `--sort time` only when the user asks about "recent", "latest", or time-sensitive topics
+- Use `--sort time` only when the user asks about "recent", "latest", or time-sensitive topics. On `search-multi` it orders the fused list by effective note time; on single-query `search` it re-sorts only the top ~500 relevance-ranked matches, so a recent-but-weakly-matching note can fall outside the pool — one more reason the multi-query plan matters.
 - Use `--sort relevance` (default) for depth and quality
-- **Per-query `--limit`:** Set `--limit` to at least 2–3x the requested top-N on each individual query. For "top 10" requests, use `--limit 20` or `--limit 30` per query. The top-N cap is applied AFTER union, not within any single query. Broad sub-concept queries (e.g., `NAND`, `HBM`, `CPO`) often return 30+ hits; use `--limit 30` for these to avoid losing relevant notes that rank lower in one query but would rank highly in the union.
-- For large-scale research, use `--limit 100` or higher to get a broad candidate pool
+- **`--per-query-limit`** (candidate depth per query before fusion): the default 30 suits most runs. **`--limit`** (fused list cap): set it to at least 2–3× the requested top-N so the post-fusion filter in Step 1 has slack.
+- **Check `per_query` totals in the JSON output.** Each query reports `total` matches vs `returned`. If a highly relevant query shows `total` far above `returned` (e.g., 30 returned of 104), re-run with a larger `--per-query-limit` or split it into narrower variants instead of silently losing candidates.
+- For large-scale research, raise both: `--per-query-limit 100 --limit 150` or higher for a broad candidate pool
 
 ### Track C: Agent-Engine Retrieval (agent-engine mode only)
 
-In agent-engine mode, skip Tracks A and B entirely and run a single agent-engine call:
+**When agent-engine mode triggers, read `references/agent-engine-mode.md` and follow it** — it owns the full invocation guidance (`--limit` semantics, backend variants, worked example). The core invariants:
 
-```bash
-notes-search search "<research topic>" --engine agent --json
-```
-
-Guidance:
-
-- Pass the user's research topic as the query string. Phrase it naturally (e.g., "memory cycle thesis", "CPU stock investment"); the agent engine handles its own keyword expansion.
-- For time-sensitive asks ("latest", "recent"), add `--sort time`.
-- For folder-scoped asks, add `--folder <prefix>`.
-- **For top-N asks ("top 20", "most recent 50", "find me 30 notes about..."), pass `--limit <N>`** to the agent engine call so it returns at most N notes. Example: `notes-search search "华为韬定律" --engine agent --json --limit 20`. Unlike default/search-only modes (where `--limit` is per-query and the cap is applied after unioning), in agent-engine mode `--limit` IS the final cap — the agent engine returns the ranked list directly.
-- **If the user does not specify a count, the CLI default `--limit 20` applies** — the limit is baked into the prompt sent to the engine ("find the top 20 most relevant notes"), so omitting the flag asks for exactly 20; it does not let the engine choose. Pass a larger explicit `--limit` when the ask implies broader coverage.
-- `--engine agent` runs a Codex→Claude→Gemini fallback chain. Pinned variants `agent-claude` and `agent-gemini` exist (see `notes-search search --help`); use one only when the user names a specific backend.
-- The agent engine returns its own ranked list with titles and paths. Treat that list as the final candidate set — no union, no extra reranking, no extra FTS5/QMD queries.
-- If the user asked for a top-N, prefer passing `--limit N` to the agent engine call (see above) rather than slicing the returned list after the fact.
-- **The returned list is the Step 2 reading list** — every entry must be read there. Don't shrink it here on filename/folder priors; see Step 2 for the full rule.
-- Then proceed directly to **Step 2** (Read Relevant Notes) on those notes, followed by **Step 3** (Synthesize) and, if applicable, **Step 4** (Persist as Wiki).
-- In the final synthesis, mention that retrieval was delegated to the agent search engine and that index browsing plus FTS5/QMD sweeps were intentionally skipped.
+- Make exactly one call — `notes-search search "<research topic>" --engine agent --json` (add `--limit N` for top-N asks; here it IS the final cap) — and skip Tracks A and B entirely.
+- Treat the returned ranked list as the final candidate set: no union, no reranking, no extra FTS5/QMD queries. Every returned note is the Step 2 reading list (see Step 2's no-drop rule).
+- Proceed directly to Step 2 → Step 3 → Step 4, and in the synthesis note that retrieval was delegated to the agent engine with index browsing and FTS5/QMD sweeps intentionally skipped.
 
 ## Shared Pipeline
 
@@ -262,26 +257,23 @@ You now have candidates from one or two sources:
 
 Candidates are **unioned**, not intersected — a note appearing in *any* enabled source is a candidate.
 
-1. **Union all candidates** — concatenate filepaths from every search query's results and, in default mode, from index selections into one list. Do NOT filter to notes that appeared in multiple queries; that defeats the purpose of running synonym/sub-term sweeps.
-2. **Dedupe by filepath** — collapse exact-path duplicates. For each note, track:
+1. **Take the fused list from `search-multi` as the search-side candidates.** The CLI already deduped by filepath and computed RRF (`rrf_score`, higher is better; per-query ranks in `matched_queries`) — do not recompute it, and do NOT filter to notes that matched multiple queries (single-query matches are legitimate candidates; multi-query presence is already rewarded inside `rrf_score`). Never compare raw `bm25_score` values across queries or engines: single-query FTS5 scores are boosted composites (folder −6.0/−3.0, title, and investment-recency boosts baked in; lower is better) whose scale depends on each query's term count and rarity, and QMD scores flip direction (higher is better). If supplemental QMD queries were run, merge their hits into the candidate pool by rank, never by score.
+2. **Union with index candidates** — in default mode, add the Track A selections to the fused list (union, not intersection — a note from *any* enabled source is a candidate). For each note track:
    - Which source(s) it came from: index-only, search-only, or both. In search-only mode, every candidate is search-only.
-   - Which search queries it matched and its best BM25 score
    - Its summary, if available, from the search result `summary` field and/or from the section index when index browsing was enabled
-3. **Filter out generic and cross-sector notes.** Before ranking, remove or demote two categories:
-   - **Generic meta-notes** whose primary subject is not any specific topic: watchlists, portfolio summaries, PEG/valuation screens, glossaries, and other broad reference notes that mention many topics. A note titled "Watchlist Competitive Landscape" will match queries for memory, optical, AI, etc. — but it's not *about* any of those topics.
+3. **Filter the shortlist — the mandatory counterweight to RRF.** Generic meta-notes match many queries by construction, so RRF over-ranks them (a live memory-cycle fusion put "Watchlist Competitive Landscape" at #1). On the top ~2–3×N of the fused pool, remove or demote two categories, extending deeper into the fused list if filtering leaves fewer than N:
+   - **Generic meta-notes** whose primary subject is not any specific topic: watchlists, portfolio summaries, PEG/valuation screens, glossaries, and other broad reference notes that mention many topics.
    - **Cross-sector notes** whose primary subject is a DIFFERENT or BROADER sector but that mention the research topic as one of several areas. For example, a note about the entire semiconductor supply chain that mentions optical communications should rank below notes specifically about optical communications. The research topic should be the note's PRIMARY subject, not a secondary mention.
 
    Base this primary-subject judgment on the search result `summary` field (or the section index one-liner) when available — snippets show keyword context and routinely overstate relevance for passing mentions. Fall back to title + snippet only when no summary exists.
-4. **Rerank the merged pool.** Use all available signals:
+4. **Adjust the ranking with the judgment signals the engine can't compute:**
    - **Appeared in both sources** — strong relevance signal. A note selected from the index AND matched by search queries is almost certainly on-topic.
-   - **Title relevance:** Does the note's title directly reference the research topic or its core concepts? Notes with topic keywords in the title are almost always more relevant than notes that only mention the topic in passing within the body.
-   - **Best `bm25_score`** across queries (lower is better in this CLI). For index-only notes that have no BM25 score, use title and summary relevance instead.
    - **Summary relevance:** Search results may include a DB-backed `summary` field, and section indices provide one-line summaries for index-sourced notes. Use any available summary to judge whether the research topic is the note's PRIMARY subject versus a passing mention or cross-sector aside. If both search and index summaries exist, treat them as complementary signals. A missing summary is neutral — never demote a note solely because the field is absent.
-   - **Number of search queries matched** — a useful signal but not dominant.
+   - **Title relevance:** use it for the primary-subject judgment (the engine's title boost only checks term presence, not whether the title is *about* the topic), and as the main signal for index-only notes that have no `rrf_score`.
    - Note type (prefer `personal synthesis` and `research paper` for depth)
-   - Recency — for time-sorted asks ("latest", "recent"), sort by `frontmatter_sort_time` or `file_mtime` across the unioned set, NOT within a single query's results
+   - Recency — for time-sorted asks ("latest", "recent"), use `search-multi --sort time` and slot index candidates in by effective time (wiki notes → `file_mtime`; raw notes → `frontmatter_sort_time`, falling back to `file_mtime`), NOT within a single query's results
 5. **Apply top-N cap AFTER union** — if the user asked for "latest 10" or "top N", apply the cap to the unioned/deduped/reranked list. Never apply `--limit N` to a single query and call that the answer.
-6. **Verify sub-concept coverage.** After selecting the top N, check that each core sub-concept from your query plan has at least one representative in the list. For example, if you ran queries for CPO, silicon photonics, 光模块, and 光互连, verify that the top 10 includes notes covering each of these angles — not just notes that happened to match the broadest query. If a sub-concept query returned a strong result (top 3 of that query with a good BM25 score) but no note from that sub-concept made the final list, replace the weakest entry in the top N with the best result from the underrepresented sub-concept. This prevents the broadest queries from monopolizing the top N and ensures the final list covers the topic's full breadth. **In default mode, also check that index-only notes got fair consideration** — if the index surfaced relevant notes that no search query matched, at least one should appear in the top N if its summary is clearly on-topic.
+6. **Verify sub-concept coverage.** After selecting the top N, check that each core sub-concept from your query plan has at least one representative in the list. For example, if you ran queries for CPO, silicon photonics, 光模块, and 光互连, verify that the top 10 includes notes covering each of these angles — not just notes that happened to match the broadest query. If a sub-concept query returned a strong result (top 3 of that query) but no note from that sub-concept made the final list, replace the weakest entry in the top N with the best result from the underrepresented sub-concept. This prevents the broadest queries from monopolizing the top N and ensures the final list covers the topic's full breadth. **In default mode, also check that index-only notes got fair consideration** — if the index surfaced relevant notes that no search query matched, at least one should appear in the top N if its summary is clearly on-topic.
 7. **Stop for lookup-only mode** — if the user asked only for titles/paths/JSON and no synthesis, output the selected list now using the requested shape.
 8. **Select notes to read** — for synthesis mode, pick the top candidates (may be dozens or hundreds for large research)
 
@@ -357,11 +349,11 @@ After `/wiki` returns, append its reported file path to the console output so th
 2. Read section indices → scan all 74 summaries, select ~20 whose title/summary relates to CPU investment (e.g., "AMD FA 大涨的部分原因" wouldn't match "CPU" searches but IS about a CPU company)
 
 **Track B (search):** Run in parallel with Track A.
-3. Run 10–13 queries: `"CPU 投资"`, `"CPU stock"`, `"服务器 CPU"`, `"server CPU"`, `"CPU demand"`, `"CPU 需求"`, `"Intel investment"`, `"AMD investment"`, `"ARM CPU"`, `"CPU 芯片"`, etc.
+3. One fused call with 10–13 queries: `notes-search search-multi "CPU 投资" "CPU stock" "服务器 CPU" "server CPU" "CPU demand" "CPU 需求" "Intel investment" "AMD investment" "ARM CPU" "CPU 芯片" --json --limit 30`
 
 **Merge:**
-4. Union ~20 index candidates + ~60 search hits, dedupe by filepath → ~50 unique
-5. Rerank: notes in both sources rank highest; then by title relevance + BM25 + summary; filter out generic watchlist/glossary notes
+4. Union ~20 index candidates with the fused list (already deduped, RRF-ranked)
+5. Filter the shortlist (drop generic watchlist/glossary notes RRF over-ranked); then adjust: both-sources notes rank highest, then by `rrf_score` + summary relevance
 6. Verify sub-concept coverage (AMD, Intel, ARM, QCOM each represented)
 7. Take top 10
 
@@ -370,22 +362,22 @@ After `/wiki` returns, append its reported file path to the console output so th
 Even though the user asked for just 10 notes, **do not** run a single query and cap at 10 — that misses notes using synonym terms.
 
 1. **Track A:** read root index → `raw/AI/Agent` sections → select ~20 candidates (2×N budget), noting timestamps.
-2. **Track B (parallel):** run multiple time-sorted queries — `"AI agents"`, `"agent"`, `"autonomous agents"`, `"agent harness"`, `"LLM agent"` — each with `--sort time --limit 30 --json`.
-3. Union + dedupe, sort the unioned set by `frontmatter_sort_time` (fallback `file_mtime`) descending, take the top 10.
+2. **Track B (parallel):** `notes-search search-multi "AI agents" "agent" "autonomous agents" "agent harness" "LLM agent" --json --sort time --limit 30` — fuses all queries, then orders by effective note time.
+3. Union with index candidates, slot them in by effective time (wiki notes → `file_mtime`; raw notes → `frontmatter_sort_time`, fallback `file_mtime`), take the top 10.
 
 The same pattern applies for bilingual topics — add Chinese synonym queries alongside English ones before unioning.
 
 ### Large research: "Research my top 100 notes on investment"
 
-Same as top-N, scaled: index budget = N = 100; run `notes-search search "investment" --limit 100 --json` plus topic-specific queries; union → ~150 candidates → rerank → top 100. `wc -c` shows ~400KB total → split into ~5 batches of ~80KB, process each, merge summaries, synthesize, then Step 4 (wiki, the default).
+Same as top-N, scaled: index budget = N = 100; run `notes-search search-multi "investment" <topic-specific queries...> --json --per-query-limit 100 --limit 150`; union with index candidates → filter → top 100. `wc -c` shows ~400KB total → split into ~5 batches of ~80KB, process each, merge summaries, synthesize, then Step 4 (wiki, the default).
 
 ### Search-only: "Find the top 10 notes about CPU stock investment, skip index"
 
-Do not read `root_index.md` or section indices. Run a broader-than-usual sweep (the top-N example's queries plus extra variants like `"QCOM CPU"`, `"AI CPU"`), each with `--limit 30 --json`. Union, dedupe, rerank, filter generic/cross-sector notes, verify sub-concept coverage, read, synthesize. In the final answer include: "Search-only mode used; index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered."
+Do not read `root_index.md` or section indices. Run a broader-than-usual sweep — one `search-multi` call with the top-N example's queries plus extra variants like `"QCOM CPU"`, `"AI CPU"` — with `--json --limit 30`. Filter the fused shortlist for generic/cross-sector notes, verify sub-concept coverage, read, synthesize. In the final answer include: "Search-only mode used; index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered."
 
 ### Agent-engine: "Find the top 10 notes about CPU stock investment, use the agent engine"
 
-Make exactly one call — `notes-search search "CPU stock investment" --engine agent --json --limit 10` — and treat the returned entries as the final candidate set. Jump to Step 2 (size, batch, read every returned note), synthesize in Step 3, and note in the answer: "Retrieval delegated to `--engine agent`; index browsing and FTS5/QMD sweeps were intentionally skipped."
+Read `references/agent-engine-mode.md` and follow its worked example: one `--engine agent --json --limit 10` call, then read every returned note in Step 2 and synthesize.
 
 ### Output destination examples
 

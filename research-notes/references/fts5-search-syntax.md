@@ -63,6 +63,7 @@ notes-search search '"moving average" trading' --limit 30 --json
 ## Operational Notes
 
 - FTS5 syntax applies to the default FTS5 engine. Do not use it with QMD semantic modes.
-- Keep per-query limits generous, then apply top-N after unioning all query results.
+- FTS5 syntax works inside `search-multi` query strings too — each query is normalized independently before fusion.
+- Keep per-query limits generous, then apply top-N after fusion and the shortlist filter.
 - If an advanced FTS query returns suspiciously few results, rerun a plain version of the query and compare before trusting the constraint.
 - For CJK topics, still run both compound and split query variants unless the user explicitly asks for a single constrained query.
