@@ -29,20 +29,29 @@ The user provides a description of what to generate. This is typically based on 
 - If backlinks or source documents are referenced, read them for additional context
 - Calling skills (e.g. `ask-chatbots`, `research-notes`) may hand over a temp-file path as the body source, and/or a coverage caveat to include — read the file yourself rather than expecting inlined content, and carry any caveat into the overview or body
 
-## Step 2: Check for an Existing Note to Update (Merge-over-Create)
+## Step 2: Check the Vault — Merge Target in wiki, Source Notes in raw
 
-Per the vault conventions, the wiki compounds by **updating existing notes in place** rather than accumulating near-duplicate siblings. Before creating a new article, find existing wiki notes on the same subject by delegating retrieval to the **`/research-notes` skill** — it owns the retrieval strategy (index browsing + multi-query expansion + union/dedupe/rerank); do not reinvent it with ad-hoc `notes-search` calls. Invoke it with these constraints (they override its defaults):
+This one vault check serves two purposes: find an existing **wiki** note to update instead of duplicating (merge-over-create), and find existing **raw** notes on the same topic to use and cite as sources. Delegate retrieval to the **`/research-notes` skill** — it owns the retrieval strategy (index browsing + multi-query expansion + union/dedupe/rerank); do not reinvent it with ad-hoc `notes-search` calls. Invoke it with these constraints (they override its defaults):
 
-- **Lookup-only mode** — return ~top 10 titles + paths; no reading of note bodies, no synthesis.
+- **Lookup-only mode** — return ~top 10 titles + paths per tree; no reading of note bodies, no synthesis.
 - **Console-only** — do NOT persist a wiki (its default output destination is this very skill; persisting would recurse).
-- **Scoped to `wiki/`** — browse `index/wiki/root_index.md` only and restrict searches with `--folder wiki`.
+- **Both trees** — its default retrieval already covers `wiki/` and `raw/`; do not scope it to one folder.
 
-Then judge the returned candidates yourself (read the top few — overview blockquote + headings suffice):
+Then split the returned candidates by path and judge each group yourself:
+
+**`wiki/` hits — merge-over-create.** Per the vault conventions, the wiki compounds by **updating existing notes in place** rather than accumulating near-duplicate siblings. Read the top few (overview blockquote + headings suffice):
 
 - If an existing wiki note covers the same subject, **update that note** (integrate the new material, bump `updated:` in frontmatter, extend `## References`) instead of creating a duplicate.
 - Only create a new article for a genuinely new subject.
 - **If the requested content spans multiple distinct subjects**, don't produce one grab-bag article — propose splitting into separate articles/updates (one per subject, each with its own unique title and folder home, cross-linked in their References), confirm the split with the user, then handle each subject through this workflow. One coherent argument = one note; wiki notes are single-subject so titles stay unique and linkable.
-- Skip this step only when the check was already done by the caller (e.g. the `/absorb` skill states it routed and deduped already).
+
+**`raw/` hits — candidate sources.** These are clippings/collected material the article should build on, not merge targets (never edit raw notes; synthesis lives in the wiki):
+
+- Read the clearly on-topic ones and fold their relevant material into the article body alongside the conversation content.
+- Cite every raw note actually used in `## References` with the `source:` annotation prefix (Step 3e).
+- A raw hit that is only tangential can be linked as a plain see-also reference or dropped — but a raw note on the *same question* as the article must never go unlinked.
+
+Skip this step only when the check was already done by the caller (e.g. the `/absorb` skill states it routed and deduped already — there the raw source is the input itself).
 
 ## Step 2a: Choose Folder Location
 
@@ -226,7 +235,7 @@ After writing the file:
 
 Before finishing, verify:
 
-- [ ] Checked for an existing wiki note on the same subject first (merge-over-create)
+- [ ] Checked the vault (both trees) first: wiki hits judged for merge-over-create, raw hits on the same topic read and cited as `source:` references
 - [ ] **Title = filename = H1** — all three are identical
 - [ ] Title is globally unique (verified with `find ~/notes -name "<Title>.md"`), concrete, and contains no `/`, `\`, `#`, `^`, `[`, `]`, `|`, `:` characters
 - [ ] Overview section answers "what is this, why does it exist?"
