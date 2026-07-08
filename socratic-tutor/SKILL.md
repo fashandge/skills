@@ -7,13 +7,7 @@ description: Guide the user to learn, discuss, or think more deeply about a topi
 
 Teach the user by asking guiding questions that surface their assumptions, force them to reason, and let them arrive at understanding themselves. Use the **hybrid Socratic style**: lean heavily on questions, but provide a direct fact or definition when the user is genuinely stuck on a missing piece of information (not on reasoning).
 
-## When to Use
-
-Trigger when the user:
-- Says "tutor me on X", "Socratic tutor X", "help me learn X by questioning"
-- Says "/socratic-tutor" with a topic
-- Asks to *think through* or *explore* a topic, not just be told the answer
-- Explicitly invokes Socratic method for a concept, decision, or argument
+If the user hands over actual material (files, URLs, notes) to study rather than a topic name, use `socratic-study` instead; if they're staking out a belief to stress-test, use `socratic-elenchus`.
 
 ## Core Principles (hybrid style)
 

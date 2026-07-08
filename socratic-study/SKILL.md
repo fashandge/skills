@@ -17,14 +17,6 @@ Take one or more pieces of learning material the user provides — Obsidian note
 
 This skill builds on the dialogue loop, hybrid style, and anti-patterns defined in `~/skills/socratic-tutor/SKILL.md`. Read that skill first; everything in its **Core Principles**, **Loop**, **Hybrid Switches**, **Tone**, and **Anti-patterns** sections applies here too. This skill adds the *material-ingestion* and *meta-learning* phases on top.
 
-## When to Use
-
-Trigger when the user:
-- Says "study this note", "tutor me through this article/wiki/pdf"
-- Says "/socratic-study" with one or more file paths or URLs
-- Hands over Obsidian notes (especially long synthesized wikis) and asks to *truly* understand and apply them
-- Asks for a guided learning plan over a specific body of material
-
 If the user just names a topic with no material attached → use `socratic-tutor` instead.
 
 ## Inputs

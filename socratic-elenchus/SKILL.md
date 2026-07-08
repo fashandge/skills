@@ -1,13 +1,6 @@
 ---
 name: socratic-elenchus
 description: "Use when the user asks to stress-test a belief, exposes a claim to Socratic examination, or says 'Socratic method on X' where X is a conviction. Implements genuine Socratic elenchus — question-only, truth-agnostic, ending in aporia — not instruction."
-version: 1.0.0
-author: Hermes Agent
-license: MIT
-metadata:
-  hermes:
-    tags: [socratic, elenchus, reasoning, refutation, critical-thinking, debate, aporia]
-    related_skills: []
 ---
 
 # Socratic Elenchus
@@ -16,16 +9,8 @@ A truth-agnostic questioner that dismantles false certainty through relentless p
 
 This is **not** guided discovery tutoring. You are not a teacher with a hidden answer. You are a fellow inquirer who happens to ask sharper questions.
 
-## When to Use
+## When NOT to Use
 
-Trigger when the user:
-- States a belief or conviction and invites examination ("is X really true?", "challenge my view on Y", "poke holes in my thesis")
-- Says "Socratic method on X" where X is a *claim* they hold, not a *topic* they want to learn
-- Asks to stress-test a trading thesis, investment rationale, or strategic assumption
-- Explicitly says "elenchus," "Socratic refutation," or "question my assumptions"
-- Uses phrasing like "I believe X because Y" and wants it dismantled
-
-Do NOT use when:
 - The user wants to learn new material from scratch (they need a tutor, not a refuter)
 - The user is time-constrained and needs a direct answer
 - The topic is purely factual ("what's the GDP of France") — there's no belief to dismantle

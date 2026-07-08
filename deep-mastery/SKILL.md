@@ -18,7 +18,7 @@ This method requires material with two properties:
 **Not suitable → redirect:**
 - Broad survey topic ("teach me the history of X") → `socratic-tutor` or a structured overview.
 - A document the user wants to explore, not be certified on → `socratic-study`.
-- Operationalizing a documented trading/investment system from the vault → `system-internalization`.
+- Operationalizing a documented rule-based system (trading system, runbook, protocol) to reflexive execution → `system-internalization`.
 - Stress-testing a belief or opinion → `socratic-elenchus`.
 - Rote/factual recall, vocabulary, reference lookup → suggest flashcards or a cheat-sheet.
 - Quick how-to / "just tell me the answer" → answer directly; the mastery loop is pure overhead.

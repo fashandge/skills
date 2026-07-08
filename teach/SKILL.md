@@ -9,7 +9,12 @@ The user has asked you to teach them something. This is a stateful request - the
 
 ## Teaching Workspace
 
-Treat the current directory as a teaching workspace. The state of their learning is captured in this directory in several files:
+The workspace is a dedicated directory — never scatter teaching files into an unrelated repo or the home directory. Pick it like this:
+
+1. If the current directory is already a teaching workspace (it has a `MISSION.md`), use it.
+2. Otherwise, default to `~/learning/<topic-slug>/` and confirm the location with the user before creating anything.
+
+The state of their learning is captured in the workspace in several files:
 
 - `MISSION.md`: A document capturing the _reason_ the user is interested in the topic. This should be used to ground all teaching. Use the format in [MISSION-FORMAT.md](./MISSION-FORMAT.md).
 - `./reference/*.html`: A directory of reference materials. These are the compressed learnings from the lessons - cheat sheets, reference algorithms, syntax, yoga poses, glossaries. They are the raw units of learning. They should be beautiful documents which print out well, and are designed for quick reference.
