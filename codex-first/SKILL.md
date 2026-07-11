@@ -1,30 +1,30 @@
 ---
 name: codex-first
-description: "Route implementation work to Codex CLI; Claude specs, reviews, verifies. Anthropic-model Claude Code sessions only — skip when running a non-Anthropic model (GLM, muse-spark, etc.)."
+description: "Route implementation work to Codex CLI only from Anthropic Claude Code sessions running Opus or Fable; keep Sonnet, Haiku, and non-Anthropic sessions local. Claude specs, reviews, verifies."
 ---
 
 # Codex First
 
 Claude Code sessions only. Codex/other harnesses: skip; never self-delegate.
 
-Anthropic models only. If the session runs a non-Anthropic model (e.g. GLM 5.2, Meta muse-spark): skip this skill entirely and implement directly. The economics below don't apply, and the routing assumptions (Claude ergonomics vs Codex generation) are calibrated to Claude models.
+Opus/Fable models only. If the session runs Sonnet, Haiku, an unknown Claude model, or a non-Anthropic model (e.g. GLM 5.2, Meta muse-spark): skip this skill entirely and implement directly. The economics below don't apply, and the routing assumptions (Claude ergonomics vs Codex generation) are calibrated to Opus/Fable models.
 
-Detecting a non-Anthropic session (check before first delegation, once per session):
+Detecting an eligible session (check before first delegation, once per session):
 
-1. Model name — "You are powered by the model named ..." in the system prompt. Non-`claude-*` name → skip. Not sufficient alone: wrappers can spoof Claude model ids.
-2. Env check (authoritative; run in Bash):
+1. Model name — read "You are powered by the model named ..." in the system prompt. Only a model whose normalized name contains `claude-opus` or `claude-fable` is eligible. `claude-sonnet-*`, `claude-haiku-*`, unknown Claude models, and non-`claude-*` names → skip. This is a hard gate; `CODEX_FIRST=1` does not override it. Not sufficient alone: wrappers can spoof Claude model ids.
+2. Env check for an eligible model (authoritative; run in Bash):
    ```bash
    echo "CODEX_FIRST=${CODEX_FIRST:-unset} ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-unset}"
    ```
    - `CODEX_FIRST=0` → skip (explicit off — set by claude-go / claude-meta / ccr wrappers).
-   - `CODEX_FIRST=1` → use the skill (explicit on, overrides base-URL inference — e.g. an Anthropic-compatible gateway serving real Claude models).
-   - unset → infer from `ANTHROPIC_BASE_URL`: unset or `*.anthropic.com` → Anthropic, use the skill; anything else (localhost proxy, api.meta.ai, ccr router) → skip.
+   - `CODEX_FIRST=1` → use the skill, provided the model gate passed (explicit on, overrides base-URL inference — e.g. an Anthropic-compatible gateway serving Opus/Fable).
+   - unset → infer from `ANTHROPIC_BASE_URL`: unset or `*.anthropic.com` → use the skill; anything else (localhost proxy, api.meta.ai, ccr router) → skip.
 
-Rationale: Claude (Fable/Opus) tokens metered + expensive; Codex flat-rate. GPT-5.5+ is usually the better and faster model at writing/implementing code; Claude wins at ergonomics — judgment, design, spec-writing, review, orchestration. So Codex types, Claude thinks and verifies.
+Rationale: Claude (Fable/Opus) tokens metered + expensive; Codex flat-rate. GPT-5.6 Luna is the default Codex model for writing/implementing code, with extra-high reasoning enabled; Claude wins at ergonomics — judgment, design, spec-writing, review, orchestration. So Codex types, Claude thinks and verifies.
 
 ## Route
 
-Delegate to Codex (default for hands-on work):
+When the Opus/Fable model gate above passes, delegate proper hands-on implementation work to Codex:
 
 - implementation from a frozen spec; refactors; mechanical migrations
 - bug fixes with known repro; test writing; coverage fills
@@ -33,6 +33,7 @@ Delegate to Codex (default for hands-on work):
 
 Keep in Claude:
 
+- all work when running Sonnet, Haiku, an unknown Claude model, or a non-Anthropic model
 - design, API design, architecture, naming, UX judgment
 - tasks where writing the spec IS the work (ambiguity = design)
 - tiny edits (~<20 lines, single obvious change) — delegation overhead loses
@@ -53,9 +54,12 @@ P=$(mktemp); cat >"$P" <<'EOF'
 <goal, repo + key paths, constraints ("don't touch X"), non-goals, proof expected, output shape>
 EOF
 command codex exec --yolo -C <repo> \
-  -c model_reasoning_effort="high" \
+  --model gpt-5.6-luna \
+  -c model_reasoning_effort="xhigh" \
   -o /tmp/codex-last.md - <"$P" 2>/dev/null
 ```
+
+The default Codex configuration is `gpt-5.6-luna` with extra-high reasoning (`xhigh`).
 
 - `--yolo` is the house default; Codex may run commands/tests freely. Keep prompts scoped to the target repo.
 - `command codex` bypasses the interactive zsh wrapper; if not on PATH: `fnm exec --using default -- codex`
