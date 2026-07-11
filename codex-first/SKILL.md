@@ -20,7 +20,7 @@ Detecting an eligible session (check before first delegation, once per session):
    - `CODEX_FIRST=1` → use the skill, provided the model gate passed (explicit on, overrides base-URL inference — e.g. an Anthropic-compatible gateway serving Opus/Fable).
    - unset → infer from `ANTHROPIC_BASE_URL`: unset or `*.anthropic.com` → use the skill; anything else (localhost proxy, api.meta.ai, ccr router) → skip.
 
-Rationale: Claude (Fable/Opus) tokens metered + expensive; Codex flat-rate. GPT-5.6 Luna is the default Codex model for writing/implementing code, with extra-high reasoning enabled; Claude wins at ergonomics — judgment, design, spec-writing, review, orchestration. So Codex types, Claude thinks and verifies.
+Rationale: Claude (Fable/Opus) tokens metered + expensive; Codex flat-rate. The skill defaults Codex to `gpt-5.6-terra` at extra-high reasoning for writing/implementing code (override with `--model`); Claude wins at ergonomics — judgment, design, spec-writing, review, orchestration. So Codex types, Claude thinks and verifies.
 
 ## Route
 
@@ -54,12 +54,12 @@ P=$(mktemp); cat >"$P" <<'EOF'
 <goal, repo + key paths, constraints ("don't touch X"), non-goals, proof expected, output shape>
 EOF
 command codex exec --yolo -C <repo> \
-  --model gpt-5.6-luna \
+  --model gpt-5.6-terra \
   -c model_reasoning_effort="xhigh" \
   -o /tmp/codex-last.md - <"$P" 2>/dev/null
 ```
 
-The default Codex configuration is `gpt-5.6-luna` with extra-high reasoning (`xhigh`).
+The skill pins `gpt-5.6-terra` at `xhigh` effort as its default — deliberately, not relying on `~/.codex/config.toml`'s `model`, which the Codex desktop app mutates on its own. To use a different model for one task, swap the `--model` value (e.g. `--model gpt-5.6-luna`, `--model gpt-5.5`); to fall back to the config default, drop the flag.
 
 - `--yolo` is the house default; Codex may run commands/tests freely. Keep prompts scoped to the target repo.
 - `command codex` bypasses the interactive zsh wrapper; if not on PATH: `fnm exec --using default -- codex`
