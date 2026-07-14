@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review with Agent"
+  short_description: "Second-agent code review with a fix-and-re-review loop"
+  default_prompt: "Use $review-with-agent to have a second model adversarially review the code changes and address its findings."

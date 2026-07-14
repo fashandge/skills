@@ -2,7 +2,7 @@
 
 Roster updated: 2026-07-13
 
-Treat this roster as maintenance data, not a timeless ranking. Preserve the selection principles in `SKILL.md` when model lineups change: never self-review, honor explicit user choices subject to that exclusion, default cross-vendor, and use an at-least-peer reviewer.
+Consumed by the `plan-with-agent` and `review-with-agent` skills. Treat this roster as maintenance data, not a timeless ranking. Preserve the selection principles in the consuming SKILL.md when model lineups change: never self-review, honor explicit user choices subject to that exclusion, default cross-vendor, and use an at-least-peer reviewer.
 
 ## Current tier calibration
 
@@ -27,7 +27,7 @@ If the session model is missing from the table, compare its documented capabilit
 ## Effort mapping
 
 - `gpt-5.6-terra`: always `xhigh`.
-- `gpt-5.6-sol`: `xhigh` for flow 2's independent draft, the first review round, and genuinely hard requirements; `high` for follow-up rounds.
+- `gpt-5.6-sol`: `xhigh` for deep passes — an independent draft (plan-with-agent flow 2), the first review round of a new artifact, a genuinely hard requirement; `high` for follow-up rounds.
 - `claude-fable-5`: use the same deep-pass versus follow-up rule as sol.
 - `claude-opus-4-8`: always `high`.
 
