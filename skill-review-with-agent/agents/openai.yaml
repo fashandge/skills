@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Review with Agent"
+  short_description: "Second-agent review (and optional direct fixing) of a skill"
+  default_prompt: "Use $skill-review-with-agent to have a second model adversarially review this skill and address its findings."
