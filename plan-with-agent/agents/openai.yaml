@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plan with Agent"
+  short_description: "Co-write and review plans with a second agent"
+  default_prompt: "Use $plan-with-agent to co-write and adversarially review an implementation plan with a second model."

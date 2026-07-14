@@ -1,6 +1,6 @@
 ---
 name: plan-with-agent
-description: Co-write a plan/design doc for a requirement together with a second agent (Codex or Claude, called via agents-cli) — the session agent drafts (or both draft independently and the session agent synthesizes), then the reviewer agent reviews and the drafter addresses feedback in a capped loop until approval. Works from any harness and session model (Claude Code, Codex, opencode, etc., running Claude, GPT, GLM, Grok, muse-spark, ...). Use whenever the user asks to plan with codex or claude, wants a plan doc reviewed by a second model, wants a second-model opinion on a design or implementation plan, or says things like "plan this with codex", "have claude review the plan", "co-draft a plan". Also use it for audit-style requirements — find all the bugs/issues in an existing system and propose fixes — where independent sweeps by two models maximize coverage.
+description: Co-write and adversarially review a plan/design doc with a second agent (Codex or Claude, called via agents-cli), using either a draft-review loop or independent dual drafts followed by synthesis. Use when the user explicitly asks to plan with Codex or Claude, requests a second-model opinion or review of a plan, asks for independent co-drafting, or explicitly requests a two-agent audit that produces a remediation plan. Do not auto-trigger for ordinary planning, diagnosis, code review, or audits that do not request a second agent.
 ---
 
 # Plan with Agent
@@ -30,63 +30,48 @@ The user can name a flow explicitly; that wins.
 
 ## Choose the reviewer
 
-Two principles, applied in order:
+Apply these principles in order:
 
-1. **At-least-peer intelligence.** A weaker reviewer rubber-stamps or nitpicks a stronger model's plan; a stronger reviewer is never wasted. Tier ladder (preserve the principle, not the names, as lineups change):
-   - Codex: `gpt-5.6-sol` > `gpt-5.6-terra` > `gpt-5.6-luna`
-   - Claude: `claude-fable-5` (Fable) > `claude-opus-4-8` (Opus)
-   - Cross-vendor calibration: Fable ≈ sol at high effort; Opus ≈ terra at xhigh.
-2. **Cross-vendor by default (unless the user specifies otherwise); never self-review.** Different model families have uncorrelated blind spots, so the default reviewer comes from the other family: Claude sessions get a Codex reviewer, Codex sessions get a Claude reviewer, and everything else (GLM, Grok, muse-spark, …) gets a Claude reviewer. Same vendor at a higher tier (e.g. terra → sol) is a legitimate alternative when the task is genuinely hard and raw intelligence trumps diversity. The reviewer must never be the model this session runs.
+1. **Never self-review.** Do not use the exact model running this session. If the session's exact model is unknown, choose the other vendor.
+2. **Honor an explicit user choice** of vendor, model, or effort unless it violates the self-review exclusion. If the user requests the current model, explain the conflict and use a different model only with their agreement.
+3. **Default to cross-vendor, at-least-peer review.** Use the other model family at the same tier or higher. A stronger same-vendor model is acceptable for unusually hard requirements when diversity matters less than raw capability.
 
-Reviewer effort is fixed per model (a named effort from the user still wins):
+Read [references/model-selection.md](references/model-selection.md) before selecting a concrete model and effort. It owns the dated roster and effort mapping so volatile model names do not dominate this workflow. When the session model is below frontier tier, deliberately choose an above-peer reviewer, then verify its findings against the code before accepting them.
 
-- `gpt-5.6-terra` — always `xhigh`.
-- `gpt-5.6-sol` — `xhigh` for deep passes and genuinely hard requirements, `high` otherwise. Deep passes are where fresh whole-problem thinking pays: flow 2's independent draft and the first review round. Follow-up rounds verify fixes against a shrinking delta — `high` is enough there, and a maxed-out reviewer re-scanning a nearly-converged plan tends to manufacture nitpicks that burn rounds.
-- `claude-fable-5` — same rule as sol: `xhigh` for deep passes and genuinely hard requirements, `high` otherwise.
-- `claude-opus-4-8` — always `high`.
-
-| This session's model | Default reviewer |
-|---|---|
-| Fable | `gpt-5.6-sol` |
-| Opus | `gpt-5.6-terra` |
-| `gpt-5.6-sol` | `claude-fable-5` |
-| `gpt-5.6-terra` | `claude-opus-4-8`; hard tasks: `claude-fable-5` |
-| `gpt-5.6-luna` | `claude-opus-4-8`; hard tasks: `claude-fable-5` |
-| Sonnet / Haiku (Claude below frontier) | `gpt-5.6-terra`; hard tasks: `gpt-5.6-sol` |
-| Non-Claude, non-GPT vendors (GLM, Grok, muse-spark, …) | `claude-opus-4-8`; hard tasks: `claude-fable-5` |
-
-When the session model is below frontier tier, the default reviewer is deliberately above-peer — expect the review to catch more legitimate issues, but still verify findings against the code before accepting. A model/effort/vendor the user names always wins.
-
-**Flow 2's independent draft** uses a *peer-tier*, cross-vendor counterpart (Fable ↔ `gpt-5.6-sol`, Opus ↔ `gpt-5.6-terra`; for a below-frontier session model, the nearest frontier tier above it). Drafting wants equals: a counterpart a tier above would dominate the synthesis and collapse it into "take the stronger model's plan", while peers produce genuinely competitive alternatives. The review path is where extra intelligence enters — same tier for routine requirements, higher tier for hard/complex ones, per the matrix above.
+For flow 2's independent draft, choose a peer-tier cross-vendor counterpart. Drafting wants competitive alternatives; use extra intelligence in the subsequent review path rather than letting a stronger counterpart dominate synthesis.
 
 ## Invoking the reviewer
 
-Prompt via temp file on stdin (avoids quoting/ARG_MAX issues); the answer arrives on stdout — capture it to a file, then read the file. Run long calls in the background and read the output file when it exits; don't kill quiet runs. Full flag list: `agents-cli -h`.
+Pass the prompt through a quoted stdin heredoc (avoids quoting, ARG_MAX, and persistent prompt files); the answer arrives on stdout — capture it to a file, then read the file. Run long calls in the background and read the output file when it exits; don't kill quiet runs. Full flag list: `agents-cli -h`.
 
 **Codex reviewer:**
 
 ```bash
-P=$(mktemp); cat >"$P" <<'PROMPT_EOF'
+REVIEWER_MODEL="selected-codex-model"
+REVIEWER_EFFORT="selected-effort"
+agents-cli -a codex -m "$REVIEWER_MODEL" --codex-reasoning "$REVIEWER_EFFORT" \
+  --codex-working-dir <repo-root> --timeout 3600 \
+  > <round-output-file> <<'PROMPT_EOF'
 <self-contained prompt>
 PROMPT_EOF
-agents-cli -a codex -m gpt-5.6-sol --codex-reasoning high \
-  --codex-working-dir <repo-root> --timeout 3600 <"$P" > <round-output-file>
 ```
 
 **Claude reviewer:**
 
 ```bash
-P=$(mktemp); cat >"$P" <<'PROMPT_EOF'
+REVIEWER_MODEL="selected-claude-model"
+REVIEWER_EFFORT="selected-effort"
+agents-cli -a claude -m "$REVIEWER_MODEL" --claude-effort "$REVIEWER_EFFORT" --no-mcp \
+  --timeout 3600 > <round-output-file> <<'PROMPT_EOF'
 <self-contained prompt>
 PROMPT_EOF
-agents-cli -a claude -m claude-fable-5 --claude-effort high --no-mcp \
-  --timeout 3600 <"$P" > <round-output-file>
 ```
 
 - Always pass `--timeout 3600`: the default is 1200s, which high/xhigh reviews of a substantial plan regularly exceed.
 - Claude only: always pass `--no-mcp` (unattended `claude -p` runs can hang on plugin MCP teardown, and reviews need no MCP tools), and note there is no working-dir flag — run the command from the repo root so the paths in the prompt resolve.
 - No session resume: include the requirement brief, paths, constraints, and review history in every call.
-- Failed call: if the call times out, exits nonzero, or a review call's output is empty or lacks the `VERDICT:` first line, retry it once; a call that produced no usable output doesn't count against the review-call cap.
+- Transient or malformed call: if a call times out, exits nonzero for a transient provider reason, returns empty output, lacks the `VERDICT:` first line, or returns a verdict inconsistent with the severity rubric below, retry it once. A call that produced no usable output doesn't count against the review-call cap.
+- Persistent failure: do not repeat an invalid model, missing binary, authentication failure, or twice-malformed result with the same configuration. If the user did not name an exact model, select the next eligible reviewer from the roster; if they did, report the failure and ask before substituting another model.
 
 ## Artifacts
 
@@ -129,6 +114,11 @@ Output format — first line exactly:
 VERDICT: APPROVE | REVISE
 Then each finding on its own bullet:
 [blocker|major|minor|nit] <title> — <what & where in the plan> — <suggested fix>
+
+Verdict rubric:
+- APPROVE if and only if no blocker or major findings remain. Minor and nit
+  findings may accompany APPROVE.
+- REVISE if one or more blocker or major findings remain.
 ```
 
 Then you address the round:
@@ -139,9 +129,9 @@ Then you address the round:
 4. Append the round to the review log: verdict, findings, and per-finding disposition (`ACCEPTED — <edit made>` / `REJECTED — <why>`).
 5. Re-review with the updated plan and an updated history digest.
 
-**Stop when:** the reviewer says `VERDICT: APPROVE`, or a round yields no blocker/major findings (remaining nits at your discretion), or the cap is hit.
+**Stop when:** the reviewer says `VERDICT: APPROVE`, or the cap is hit. Under the verdict rubric, approval means no blocker or major findings remain; take any accompanying minor or nit findings at your judgment and record their dispositions.
 
-**Escalate to the user instead of looping** when the cap is hit with open blockers, or the reviewer re-raises a rejected finding a second time with a genuinely new argument — that's a real design disagreement, and the user should arbitrate. Present both positions neutrally.
+**Escalate to the user instead of looping** when the cap is hit without approval, or the reviewer re-raises a rejected finding a second time with a genuinely new argument. Present both positions, remaining findings, or persistent verdict inconsistency neutrally.
 
 ## Wrap-up
 
