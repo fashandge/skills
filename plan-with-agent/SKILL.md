@@ -1,6 +1,6 @@
 ---
 name: plan-with-agent
-description: Co-write and adversarially review a plan/design doc with a second agent (Codex or Claude, called via agents-cli), using a draft-review loop, independent dual drafts followed by synthesis, or an alternating review-and-fix loop where the reviewer edits the plan directly and the two agents fix issues in turns. Use when the user explicitly asks to plan with Codex or Claude, requests a second-model opinion or review of a plan, asks for independent co-drafting, asks the second agent to fix or edit the plan directly, or explicitly requests a two-agent audit that produces a remediation plan. Do not auto-trigger for ordinary planning, diagnosis, code review, or audits that do not request a second agent. For second-agent review of code changes instead of a plan doc, use review-with-agent.
+description: Co-write and adversarially review a plan/design doc with a second agent (Codex or Claude, called via agents-cli), using a draft-review loop, independent dual drafts followed by synthesis, or an alternating review-and-fix loop where the reviewer edits the plan directly and the two agents fix issues in turns. Use when the user explicitly asks to plan with Codex or Claude, requests a second-model opinion or review of a plan, asks for independent co-drafting, asks the second agent to fix or edit the plan directly, or explicitly requests a two-agent audit that produces a remediation plan. Do not auto-trigger for ordinary planning, diagnosis, code review, or audits that do not request a second agent. For second-agent review of code changes instead of a plan doc, use review-with-agent; for second-agent review of a skill, use skill-review-with-agent.
 ---
 
 # Plan with Agent
@@ -35,9 +35,9 @@ Apply these principles in order:
 
 1. **Never self-review.** Do not use the exact model running this session. If the session's exact model is unknown, choose the other vendor.
 2. **Honor an explicit user choice** of vendor, model, or effort unless it violates the self-review exclusion. If the user requests the current model, explain the conflict and use a different model only with their agreement.
-3. **Default to cross-vendor, at-least-peer review.** Use the other model family at the same tier or higher. A stronger same-vendor model is acceptable for unusually hard requirements when diversity matters less than raw capability.
+3. **Default first-pass reviews one tier up.** For review rounds in flows 1 and 2, use a cross-vendor reviewer one capability tier stronger when available. If the session is already top-tier or no stronger cross-vendor reviewer is available, use the strongest cross-vendor peer. A stronger same-vendor model is acceptable for unusually hard requirements when diversity matters less than raw capability.
 
-Read [references/model-selection.md](references/model-selection.md) before selecting a concrete model and effort. It owns the dated roster and effort mapping so volatile model names do not dominate this workflow. When the session model is below frontier tier, deliberately choose an above-peer reviewer, then verify its findings against the code before accepting them. For flow 3, apply the mutual-verifiability rule below rather than maximizing reviewer strength.
+Read [references/model-selection.md](references/model-selection.md) before selecting a concrete model and effort. It owns the dated roster and effort mapping so volatile model names do not dominate this workflow. For default selections, keep the same reviewer model for follow-up rounds but lower its effort; an explicit user effort still wins. Flow 2's independent draft and flow 3's direct-edit turns are deliberate peer-tier exceptions, described below.
 
 For flow 2's independent draft, choose a peer-tier cross-vendor counterpart. Drafting wants competitive alternatives; use extra intelligence in the subsequent review path rather than letting a stronger counterpart dominate synthesis.
 

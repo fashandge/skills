@@ -1,6 +1,6 @@
 ---
 name: review-with-agent
-description: Have a second agent (Codex or Claude, called via agents-cli) adversarially review code changes — a working tree, branch, or commit range — then address its findings and repeat the review-address cycle until approval or the round cap. Use when the user explicitly asks for a second agent or second model to review code, e.g. "have codex review this", "get claude to review my diff", "second-model review of these changes", "review this with codex and fix what it finds". Do not auto-trigger for ordinary code-review requests that don't ask for a second agent — the harness's own code-review skill covers those. For reviewing a plan/design doc instead of code, use plan-with-agent.
+description: Have a second agent (Codex or Claude, called via agents-cli) adversarially review code changes — a working tree, branch, or commit range — then address its findings and repeat the review-address cycle until approval or the round cap. Use when the user explicitly asks for a second agent or second model to review code, e.g. "have codex review this", "get claude to review my diff", "second-model review of these changes", "review this with codex and fix what it finds". Do not auto-trigger for ordinary code-review requests that don't ask for a second agent — the harness's own code-review skill covers those. For reviewing a plan/design doc instead of code, use plan-with-agent; for reviewing a skill, use skill-review-with-agent.
 ---
 
 # Review with Agent
@@ -32,7 +32,7 @@ Pin down exactly what is under review and why it exists. Do not require the requ
 
 ## Choose the reviewer
 
-Same principles as `plan-with-agent`, applied in order: never self-review; honor an explicit user choice of vendor/model/effort (unless it violates self-review); default to a cross-vendor, at-least-peer reviewer. Read `~/skills/plan-with-agent/references/model-selection.md` for the current roster, default session→reviewer mapping, and effort mapping — the first review round of a change set is a deep pass; follow-up rounds verify a shrinking delta.
+Same principles as `plan-with-agent`, applied in order: never self-review; honor an explicit user choice of vendor/model/effort (unless it violates self-review); default the first pass to a cross-vendor reviewer one capability tier stronger when available, or the strongest cross-vendor peer when the session is already top-tier or no stronger cross-vendor reviewer is available. Read `~/skills/plan-with-agent/references/model-selection.md` for the current roster, default session→reviewer mapping, and effort mapping. For default selections, keep the same reviewer model for follow-up rounds but lower its effort; an explicit user effort still wins.
 
 ## Invoking the reviewer
 

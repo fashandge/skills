@@ -1,8 +1,8 @@
 # Invoking a counterpart agent (agents-cli)
 
 Shared mechanics for calling a second agent via `agents-cli`. Consumed by the
-`plan-with-agent` and `review-with-agent` skills — edit here, not in the
-SKILL.mds, so they can't drift. Full flag list: `agents-cli -h`.
+`plan-with-agent`, `review-with-agent`, and `skill-review-with-agent` skills —
+edit here, not in the SKILL.mds, so they can't drift. Full flag list: `agents-cli -h`.
 
 Every call is fresh-context and one-shot (no session resume): the prompt must
 be fully self-contained — the brief, absolute paths, constraints, and
