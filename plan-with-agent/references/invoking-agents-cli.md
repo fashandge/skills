@@ -13,6 +13,18 @@ persistent prompt files); the answer arrives on stdout — capture it to a file,
 then read the file. Run long calls in the background and read the output file
 when the process exits; don't kill quiet runs.
 
+**Long calls from a cmux-hosted Claude Code session: add `--detach`.** An
+agent-process reaper in that environment can SIGKILL a background agents-cli
+call ~6 minutes after the session goes idle (plain shells survive; agent
+process trees don't). For calls expected to exceed ~6 minutes — any high/xhigh
+review or draft — add `--detach <output-base>`: the CLI returns immediately
+with a JSON line of file paths, the run continues in its own session, the
+final answer lands in `<output-base>.out`, and `<output-base>.exitcode`
+appears last (poll for it to detect completion; a plain background sleep-loop
+task works as a completion timer since shells survive the reaper). Short calls
+don't need `--detach`. When using it, the stdout-redirect in the templates
+above is unnecessary — results are file-based.
+
 ## Generic one-shot counterpart calls
 
 **Codex:**

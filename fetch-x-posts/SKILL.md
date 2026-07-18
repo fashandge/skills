@@ -1,6 +1,6 @@
 ---
 name: fetch-x-posts
-description: Fetch X/Twitter posts via the news project's xreach-based modules — search top or first N posts for a query (including from a specific account via from:handle), snapshot the logged-in home feed (For You / Following), or bulk-fetch a user's timeline. Use when user asks to "search X", "get top/first N tweets for <query>", "search tweets from @handle", "snapshot my X home feed", "get following feed", "fetch user @handle tweets", "pull N posts from X", or wants real-world usage opinions from X posts.
+description: Fetch X/Twitter posts via the news project's xreach-based modules — search top or first N posts for a query (including from a specific account via from:handle), snapshot the logged-in home feed (For You / Following), or bulk-fetch a user's timeline. Use when user asks to "search X", "get top/first N tweets for a query", "search tweets from @handle", "snapshot my X home feed", "get following feed", "fetch user @handle tweets", "pull N posts from X", or wants real-world usage opinions from X posts.
 ---
 
 # fetch-x-posts
@@ -71,18 +71,21 @@ Each run is a fresh timestamped snapshot — no resume, no merge (feed is person
 ### 3. User timeline — resumable bulk fetch
 
 ```bash
-# Fetch up to 500 tweets for handle (excludes pure @-replies by default, includes retweets/quotes)
+# DEFAULT (latest N): ensure the newest 500 are cached — front-fill new tweets, then
+# backfill older only if short. Re-run anytime to catch up; no flag needed.
 python -m news.src.user_tweets.fetch elonmusk --target 500
 
 # Patient settings for background run (rides throttles)
 python -m news.src.user_tweets.fetch elonmusk --target 500 --delay 5 --max-retries 20 --backoff-max 900
 
-# Re-run resumes from .resume.json
-python -m news.src.user_tweets.fetch elonmusk --target 1000
+# --backfill: deepen the back-catalog with OLDER history (backward only)
+python -m news.src.user_tweets.fetch elonmusk --backfill --target 3000
 
 # With linked X Articles enrichment (off by default for bulk)
 python -m news.src.user_tweets.fetch elonmusk --target 500 --fetch-articles
 ```
+
+**For "latest N tweets from @handle": just run the default, then read the newest N from `tweets.jsonl`.** The default front-fills from the top of the timeline to catch tweets posted since the last run, then backfills older only if the cache is short of `--target`. (There is no `--refresh` flag — the default already catches up. Use `--backfill` only when you want deeper *older* history without re-scanning the top.)
 
 Hard ceiling: Twitter only serves ~800-3200 most recent tweets per handle regardless of paging.
 
