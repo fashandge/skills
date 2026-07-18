@@ -1,13 +1,15 @@
 ---
 name: handoff-agent
-description: Hand a coding task to an autonomous Claude Code, Codex, or Kimi Code worker in local cmux/tmux or a remote SSH-hosted tmux session using the durable local-v1 handoff protocol, then inspect status, relay questions or steering, renew coordinator ownership, review results, and rescue the session or clear an authorized trust/permission prompt when needed. Also supports a manual Codex desktop-app handoff without protocol automation. Use when the user says "hand this off", "delegate this", "spawn a coding-agent session", "run this in a background coding-agent session", "run Claude on a remote box", "monitor the worker", "steer the other agent", or asks about an existing handoff run.
+description: Hand a coding task to an autonomous Claude Code, Codex, or Kimi Code worker in local cmux/tmux, a remote SSH-hosted tmux session, or a separate task in the same Codex desktop-app project. Use the durable local-v1 protocol for terminal workers or Codex task controls for app-native launch, monitoring, and steering. Use when the user says "hand this off", "delegate this", "spawn a coding-agent session", "start a background Codex task", "run Claude on a remote box", "monitor the worker", "steer the other agent", or asks about an existing handoff run.
 ---
 
 # Hand off to an autonomous coding agent
 
-Use the filesystem protocol on the worker's owning host as the semantic source of truth. Use cmux/tmux only
-to launch, probe, queue a doorbell, capture diagnostics, perform a narrowly
-authorized rescue/approval action, or stop a stuck process.
+For cmux/tmux and SSH workers, use the filesystem protocol on the worker's
+owning host as the semantic source of truth. Use cmux/tmux only to launch,
+probe, queue a doorbell, capture diagnostics, perform a narrowly authorized
+rescue/approval action, or stop a stuck process. For an app-native Codex task,
+use Codex task status and history instead of the local-v1 protocol.
 
 ## Prepare the kickoff
 
@@ -318,18 +320,65 @@ not obtained.
 6. Run read-only `doctor`. Use repair flags only for identified, explicit
    recovery; never repair implicitly.
 
-## Codex desktop-app mode
+## Launch a Codex desktop-app task
 
-When the user explicitly asks for a new Codex app task, write the same
-self-contained kickoff and give them this one-line prompt:
+Use this transport only when the coordinator is itself in the Codex app, the
+app task controls are available, and the user explicitly asks for a new or
+background Codex task. Do not create a task merely because the user asks how
+the mode works. The created task is user-owned and appears in the app.
+
+1. Prepare the same durable, self-contained kickoff described above.
+2. Call `list_projects`, then select the exact saved project that owns the
+   target repository on the intended host. Do not substitute a projectless
+   task or a similarly named project.
+3. Choose the task environment deliberately:
+   - Use `local` when the worker must share the current checkout, including a
+     newly written kickoff or authorized uncommitted state. Do not keep editing
+     that checkout concurrently with the worker.
+   - Use `worktree` for isolation only when the kickoff and required inputs are
+     reachable from the worktree's base. Specify `startingState` only when the
+     user explicitly requests a particular branch/ref or asks to include the
+     current working tree. Never launch a worktree that cannot read its
+     authoritative kickoff.
+4. Call `create_thread` with that `projectId`, environment, and this initial
+   prompt:
+
+   ```text
+   Implement per <kickoff-path> — read it fully first and treat it as authoritative.
+   ```
+
+   Omit model and reasoning overrides unless the user explicitly requests
+   them. Retain the returned `threadId` and `hostId`; a queued worktree may
+   initially return only `clientThreadId` and is not yet waitable.
+5. After successful creation, report the created task using the app's
+   `created-thread` directive. Do not use `fork_thread`: inherited conversation
+   history defeats the clean, self-contained kickoff boundary. Do not use
+   `handoff_thread`: it moves an existing task rather than creating a worker.
+
+For launch-only mode, return as soon as creation succeeds. Do not read or wait
+on the new task.
+
+For a managed run, use `wait_threads` with one target, its latest cursor, and
+bounded waits. Use `read_thread` only when the compact status lacks needed
+detail, and use `send_message_to_thread` for steering or answers already
+authorized by the user's instructions. Surface any request for new authority,
+credentials, approval, or a material user choice instead of deciding it for
+the worker. Do not narrate unchanged snapshots. Verify artifacts, diffs, and
+tests directly before accepting the result.
+
+This app-native transport does not create a local-v1 run directory, lease, or
+journal. Codex task status/history is authoritative for orchestration, while
+the kickoff remains authoritative for implementation scope.
+
+If the app task controls are unavailable, fall back to manual creation and give
+the user this one-line prompt:
 
 ```text
 Implement per docs/plans/<kickoff>.md — read it fully first.
 ```
 
-This manual mode does not use the cmux/tmux launcher or provide automated
-protocol monitoring/steering. Do not imply that it does. Prefer the scripted
-mode for an unattended or coordinator-managed handoff.
+State clearly that the manual fallback provides no automated monitoring or
+steering.
 
 ## Safety rules
 
