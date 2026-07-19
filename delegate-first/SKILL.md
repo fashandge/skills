@@ -1,6 +1,6 @@
 ---
 name: delegate-first
-description: "Delegate implementation work from expensive Opus/Fable Claude Code sessions to cheap headless one-shot workers — Codex CLI (default) or a weaker Claude model via claude -p. Claude specs, reviews, verifies. Steerable/durable/Kimi workers route to handoff-agent instead."
+description: "Delegate implementation work from expensive Opus/Fable Claude Code sessions to cheap headless one-shot workers — Codex CLI (default), a weaker Claude model via claude -p, or Kimi Code via kimi -p. Claude specs, reviews, verifies. Steerable/durable workers route to handoff-agent instead."
 ---
 
 # Delegate First
@@ -27,10 +27,12 @@ Rationale: orchestrator (Fable/Opus) tokens are metered + expensive; workers are
 | Worker | Invocation | When |
 |---|---|---|
 | **Codex** (default) | `codex exec --yolo … -o out.md` | Everything below unless a reason says otherwise — flat-rate, strong at code generation |
-| **Claude weak model** | `claude -p --model haiku\|sonnet --dangerously-skip-permissions` | Codex unavailable/rate-limited; task leans on Claude-family conventions (CLAUDE.md adherence, Claude-style tools); user asks for it. `haiku` for mechanical edits, `sonnet` for mid-complexity |
-| **Kimi Code** | *no headless mode* | Kimi is TUI-only — a Kimi worker can only run through `/handoff-agent` (which drives its TUI). Verify `kimi` is installed first; it currently is not on this Mac or the OCI box |
+| **Claude weak model** | `claude -p --model opus --dangerously-skip-permissions` | Codex unavailable/rate-limited; task leans on Claude-family conventions (CLAUDE.md adherence, Claude-style tools); user asks for it. `opus` by default; drop to `sonnet`/`haiku` for simple mechanical edits |
+| **Kimi Code** | `~/.kimi-code/bin/kimi -m kimi-code/k3 -p "…"` | User asks for Kimi, or as a third independent perspective. Local Mac only (not installed on the OCI box) |
 
-Both headless workers use the same contract: prompt via temp file, result to a file, review by Claude. `claude -p` prints its final answer to stdout — redirect to the out-file (`> out.md`); its stream is not incremental like Codex's, so the visible pane may show little until completion (acceptable; note it to the user for long runs).
+All three use the same contract: prompt via temp file, result to a file, review by Claude. `claude -p` and `kimi -p` print the final answer to stdout — redirect to the out-file (`> out.md`); their streams are not incremental like Codex's, so the visible pane may show little until completion (acceptable; note it to the user for long runs).
+
+Kimi gotchas (verified v0.27.0): the binary lives at `~/.kimi-code/bin/kimi` and is on the *interactive* zsh PATH only — use the absolute path from scripts/tool shells. Prompt mode auto-approves actions and **rejects** `--yolo`/`--auto` (`Cannot combine --prompt with --yolo`) — pass neither. The model alias is lowercase `kimi-code/k3`. Follow-ups: it prints `To resume this session: kimi -r <session-id>` — reuse that id with `-p` for the next instruction.
 
 ## Route
 
@@ -67,7 +69,6 @@ Both put a worker on the task; the axis is NOT complexity, it is what the run ne
 - **durability** across your own compaction/session (a long-lived worker you check on over many turns)
 - an **interactive remote worker** on a box, or a separate Codex app task
 - **fan-out** of several monitored workers
-- the worker must be **Kimi** (TUI-only)
 
 So simple-but-steerable → handoff-agent; complex-but-frozen-spec → headless here. Do not auto-escalate on size alone. Handoff-agent's doorbells and `coordinator pending` reads DO spend Claude tokens each round-trip; the headless route spends only spec + review.
 
@@ -85,9 +86,12 @@ command codex exec --yolo -C <repo> \
   -c model_reasoning_effort="xhigh" \
   -o /tmp/worker-last.md - <"$P" 2>/dev/null
 # Claude weak model (alternative):
-(cd <repo> && command claude -p --model haiku \
+(cd <repo> && command claude -p --model opus \
   --dangerously-skip-permissions \
   "$(cat "$P")" > /tmp/worker-last.md 2>/dev/null)
+# Kimi Code (alternative; no --yolo/--auto with -p — prompt mode auto-approves):
+(cd <repo> && ~/.kimi-code/bin/kimi -m kimi-code/k3 \
+  -p "$(cat "$P")" > /tmp/worker-last.md 2>/dev/null)
 ```
 
 The skill pins Codex to `gpt-5.6-terra` at `xhigh` effort as its default — deliberately, not relying on `~/.codex/config.toml`'s `model`, which the Codex desktop app mutates on its own. To use a different model for one task, swap the `--model` value (e.g. `--model gpt-5.6-luna`, `--model gpt-5.5`); to fall back to the config default, drop the flag.
