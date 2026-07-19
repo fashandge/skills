@@ -31,17 +31,49 @@ use Codex task status and history instead of the local-v1 protocol.
 
 ## Choose the launch mode
 
-Use launch-only mode unless the user asks to monitor, babysit, steer, review,
-or finish the worker. Do not run `--help` before a canonical launch; inspect it
-only for an uncommon override or troubleshooting.
+Continuous session-owned monitoring is the default for terminal workers. Lazily
+start or reuse one detached coordinator watcher on the first handoff in an
+orchestrator session, assign every later worker from that session to it, and let
+the launcher return promptly. Use unmonitored fire-and-forget mode only when the
+user explicitly asks not to monitor the worker.
 
-For launch-only mode, invoke the launcher directly. It returns as soon as the
-session is started (and, for Kimi, its run-specific kickoff pointer is delivered),
-then releases coordinator ownership itself. Do not locate credentials or wait
-for the worker-ready checkpoint. Use a lowercase `[a-z0-9-]` task slug.
+Before the first monitored launch, create one unique mode-`0700` coordinator
+directory, register the exact orchestrator target plus the PID of the long-lived
+orchestrator process, and start the singleton watcher. The caller/session adapter
+must supply the actual Claude/Codex process PID; never substitute a transient
+tool shell's `$$` or `$PPID`. Registration captures both PID and process-start
+identity so PID reuse cannot preserve an orphaned watcher. Keep the state path
+private and reuse it only for that orchestrator session.
 
 ```bash
-~/projects/agents/scripts/handoff_agent.sh <name> <kickoff.md> <repo> --agent codex
+mkdir -p "$HOME/.local/state/agents/handoff/coordinators"
+handoff_session_root=$(mktemp -d "$HOME/.local/state/agents/handoff/coordinators/session.XXXXXX")
+chmod 700 "$handoff_session_root"
+handoff_coordinator_state="$handoff_session_root/watcher.json"
+
+# cmux example; tmux uses --transport tmux --target <exact-orchestrator-handle>
+<helper> coordinator register --state "$handoff_coordinator_state" \
+  --transport cmux --owner-pid "$orchestrator_pid"
+<helper> coordinator start --state "$handoff_coordinator_state" --interval 5
+```
+
+Pass `--coordinator-state "$handoff_coordinator_state"` to every monitored
+launcher invocation. `coordinator start` returns `started: false` when the same
+session watcher is already running. The watcher is deterministic and
+credential-free, discovers newly assigned workers through the registry, sends
+opaque doorbells for pending outbox events, and exits when the exact registered
+orchestrator process exits. On a doorbell, use `coordinator pending` to load the
+unread durable events and handle them normally.
+
+For an explicitly unmonitored fire-and-forget launch, invoke the launcher
+without `--coordinator-state`. It returns as soon as the session is started
+(and, for Kimi, its run-specific kickoff pointer is delivered), then releases
+coordinator ownership itself. Do not locate credentials or wait for the
+worker-ready checkpoint. Use a lowercase `[a-z0-9-]` task slug.
+
+```bash
+~/projects/agents/scripts/handoff_agent.sh <name> <kickoff.md> <repo> \
+  --agent codex --coordinator-state "$handoff_coordinator_state"
 ```
 
 With no `--backend`, the launcher uses cmux only when the orchestrator process
@@ -51,8 +83,9 @@ launches the worker into that workspace. Otherwise it uses tmux. Pass
 an operational constraint requires it.
 
 Parse the launcher's JSON response and retain `run_dir`, `transport`, and
-`handle`. In launch-only mode verify `coordinator_released` is true; report the
-run and handle immediately without polling status. For Kimi, also require
+`handle`. When not actively babysitting the worker, verify `coordinator_released`
+is true; the detached watcher still owns notification delivery. Report the run
+and handle immediately without polling status. For Kimi, also require
 `kickoff_sent: true`; otherwise report the rescue command instead of claiming
 the worker started. Verify `registry_recorded` when present. A registry failure
 does not invalidate the live run, but later fast dispatch/context must fall back
@@ -75,16 +108,18 @@ HANDOFF_CREDENTIAL_DIR="$handoff_private_root" \
   --agent codex --retain-coordinator
 ```
 
-Canonical Claude launch:
+Canonical monitored Claude launch:
 
 ```bash
-~/projects/agents/scripts/handoff_agent.sh <name> <kickoff.md> <repo> --agent claude
+~/projects/agents/scripts/handoff_agent.sh <name> <kickoff.md> <repo> \
+  --agent claude --coordinator-state "$handoff_coordinator_state"
 ```
 
-Canonical Kimi Code launch:
+Canonical monitored Kimi Code launch:
 
 ```bash
-~/projects/agents/scripts/handoff_agent.sh <name> <kickoff.md> <repo> --agent kimi
+~/projects/agents/scripts/handoff_agent.sh <name> <kickoff.md> <repo> \
+  --agent kimi --coordinator-state "$handoff_coordinator_state"
 ```
 
 ## Launch on a remote SSH host
@@ -105,7 +140,8 @@ Canonical remote Claude launch on that box:
 ~/projects/agents/scripts/handoff_agent.sh <name> <local-kickoff.md> \
   --agent claude --remote-host oci-box \
   --remote-cwd /home/opc/projects/investment \
-  --remote-python /home/opc/miniforge3/envs/ml/bin/python
+  --remote-python /home/opc/miniforge3/envs/ml/bin/python \
+  --coordinator-state "$handoff_coordinator_state"
 ```
 
 The launcher sends the local kickoff and optional sibling `.goal` as JSON over
@@ -116,9 +152,11 @@ starts remote tmux, and returns `run_dir` as an `ssh://` URI plus
 the owning host through SSH. Never rsync, Git-sync, or mount an active remote run
 directory as a second writable copy.
 
-In launch-only mode, require `coordinator_released: true` and report the remote
-run URI and handle without polling. For a managed remote run, choose one exact,
-unique, mode-`0700` path on the remote host and supply it without discovery:
+When not actively babysitting the run, require `coordinator_released: true` and
+report the remote run URI and handle without polling; the local session watcher
+observes the credential-free remote registry proxy. For an actively managed
+remote run, choose one exact, unique, mode-`0700` path on the remote host and
+supply it without discovery:
 
 ```bash
 HANDOFF_REMOTE_CREDENTIAL_DIR=/home/opc/.local/state/agents/handoff/coordinators/<name>.<unique-id> \
@@ -126,7 +164,7 @@ HANDOFF_REMOTE_CREDENTIAL_DIR=/home/opc/.local/state/agents/handoff/coordinators
   --agent claude --remote-host oci-box \
   --remote-cwd /home/opc/projects/investment \
   --remote-python /home/opc/miniforge3/envs/ml/bin/python \
-  --retain-coordinator
+  --retain-coordinator --coordinator-state "$handoff_coordinator_state"
 ```
 
 Keep that path private and remember it exactly; the remote coordinator token is
@@ -332,7 +370,16 @@ resume/compaction, turn or stage boundaries, and before irreversible actions,
 commits, and results. A message sent during a long model turn may wait until the
 next checkpoint.
 
-For asynchronous coordinator observation, run:
+The default detached session watcher is started with `coordinator start`; do not
+replace it with a time-limited generic observer. When its opaque doorbell reaches
+the orchestrator, inspect the exact pending prefix:
+
+```bash
+<helper> coordinator pending --state "$handoff_coordinator_state"
+```
+
+For an ad-hoc foreground JSONL observation that is intentionally independent of
+session-owned delivery, run:
 
 ```bash
 <helper> watch [--run <selector> ...] --interval 5 --timeout <seconds>
@@ -340,11 +387,12 @@ For asynchronous coordinator observation, run:
 
 Omit `--run` to watch every registered run; add `--once` for one pass or
 `--notify-cmux` for metadata-only alerts. Keep the current orchestrator turn
-active and handle each emitted JSONL event. The watcher advances only its
-private observer cursor: it does not consume protocol outbox events, review a
-result, answer a question, or hold a coordinator lease. A persistent watcher
-can detect and notify while the model is idle, but autonomous replies still
-require an active coordinator agent with authority for the decision.
+active and handle each emitted JSONL event. This generic observer advances only
+its private observer cursor: it does not consume protocol outbox events, review
+a result, answer a question, or hold a coordinator lease. The detached session
+watcher likewise never performs semantic actions; it only maintains independent
+delivery cursors and sends opaque doorbells. Autonomous replies still require
+an active coordinator agent with authority for the decision.
 
 For urgent steering:
 
@@ -401,6 +449,13 @@ Never run a generic loop that repeatedly presses Enter, never infer permission
 from the currently highlighted default alone, and never treat disappearance of
 the dialog as semantic task success. Terminal approval is an operational rescue
 action; it does not advance journal cursors or replace an inbox/outbox event.
+
+To close a single viewer tab, use exactly
+`cmux close-surface --surface <exact-surface-handle>` — never a
+`tab-action` sweep (`close-others`, `close-left`, `close-right`): those
+close every *other* tab in the workspace, including the user's unrelated
+sessions and possibly the orchestrator's own surface. A cleanup action may
+only ever name the exact surface being removed.
 
 ## Close sessions quickly
 
