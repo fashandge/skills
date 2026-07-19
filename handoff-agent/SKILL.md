@@ -251,7 +251,12 @@ cmux reorder-workspace --workspace <mirror-workspace-uuid> \
   --after "$CMUX_WORKSPACE_ID"
 ```
 
-Two warts to respect. First, the vacated mirror window: after
+Three warts to respect. Zeroth, mirror lifetime: the mirror rides a tmux
+control-mode client, and the remote tmux *server* exits when its last
+session closes — so killing the final worker session (or the host
+stopping) silently kills the mirror, and sessions created afterward live
+on a new server the dead mirror cannot see. Re-run `ssh-tmux` to
+reconnect; the stale mirror workspace is just a dead view. First, the vacated mirror window: after
 `move-workspace-to-window` it must be closed by the **user** with ⌘W —
 closed via CLI it refills itself with a placeholder workspace, and
 `close-window` is forbidden during viewer placement/cleanup anyway (see the
@@ -461,6 +466,20 @@ inspect the exact pending prefix:
 ```bash
 <helper> coordinator pending --state "$handoff_coordinator_state"
 ```
+
+Calling `coordinator pending` **acknowledges** the events it surfaces: it
+records a per-run `acknowledged_through` cursor in the watcher state, and the
+watcher will not re-ring an event you have already loaded. A strictly newer
+worker event still rings, and each worker is tracked independently, so acking
+one worker never silences another. This means the cure for a doorbell that
+keeps repeating is to **call `coordinator pending`**, not to kill the watcher.
+Do not close the watcher's surface to stop a repeating doorbell: the watcher is
+session-scoped — other workers may still be running, and the orchestrator can
+still spawn new ones that need watching — so it must live until the orchestrator
+process exits, which it detects on its own. (A repeat doorbell can still occur
+legitimately when delivery to the composer failed, e.g. an unechoed
+`cmux_input`; `pending` also clears that, and if it truly cannot be delivered
+the worker state is still durable in the outbox.)
 
 For an ad-hoc foreground JSONL observation that is intentionally independent of
 session-owned delivery — debugging or rescue only, never a way to wait for
