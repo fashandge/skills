@@ -45,6 +45,8 @@ Mixed task: Claude designs first, freezes spec, delegates build-out.
 Heuristic: prompt reads as a work order → delegate; writing it forces decisions → design, Claude.
 Portfolio/multi-repo work: `$maintainer-orchestrator` instead.
 
+`codex exec` vs `/handoff-agent` — both put Codex to work; the axis is NOT complexity, it is what the run needs. Stay on `codex exec` whenever the task is spec-freezable up front (fire → read `-o` → review), even a large one — it is cheaper (no doorbell/lease/protocol tokens). Escalate to `/handoff-agent` only when the run needs a quality a headless one-shot cannot give: mid-run **steering** or answering the worker's blocking questions; **durability** across your own compaction/session (a long-lived worker you check on over many turns); a **remote box** (SSH) or a separate Codex app task; or **fan-out** of several monitored workers. So simple-but-remote → handoff-agent; complex-but-frozen-spec → codex exec. Do not auto-escalate on size alone.
+
 ## Invoke
 
 Prompt via temp file, never inline quoting:
@@ -76,6 +78,15 @@ Follow-up fixes — cheaper than fresh runs, keeps context. `resume` has no `-C`
   --dangerously-bypass-approvals-and-sandbox \
   -o /tmp/codex-last.md - <"$P2" 2>/dev/null)
 ```
+
+## Observe live (optional)
+
+Default is a detached background run (`run_in_background`, read `-o` on exit) — no window. When the user wants to *watch* progress, run the SAME `codex exec` command in a visible cmux/tmux pane instead of a detached job. It streams Codex's stdout to a terminal the user can watch, and still writes `-o` for the mandatory review.
+
+- cmux: `cmux new-surface --type terminal --workspace "$CMUX_WORKSPACE_ID" --focus false` → parse the surface UUID → `cmux send`/`send-key` the `command codex exec … -o <file> - <"$P"` line into it (send the text and Enter as two calls).
+- tmux: `tmux new-window -d -n codex 'command codex exec … -o <file> - <"$P"'`.
+- **Zero extra Claude tokens.** The pane shows Codex's own stdout, which never enters Claude's context — Claude still only reads the `-o` file at the end, exactly as in the background case. The only cost is a couple of pane-management CLI calls.
+- **Not `/handoff-agent`.** Reserve handoff-agent for long, autonomous, *steerable* work that needs durable protocol state; its doorbells and `coordinator pending` reads DO spend Claude tokens each round-trip. `codex exec` is a headless batch with an `-o` contract, not a protocol worker — for a spec-frozen build the visible pane gives the window essentially for free.
 
 ## Prompt contract
 

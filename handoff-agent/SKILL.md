@@ -228,39 +228,38 @@ screen is never durable state.
 
 ### cmux viewer default: ssh-tmux mirror under the current workspace
 
-`cmux ssh-tmux <host> --no-focus` mirrors the host's tmux over control mode
-(`tmux -CC`) — each remote session becomes a workspace with native
-scrolling, selection, and splits instead of tmux copy-mode, and it appears
-on the worker session as a `control-mode` client. It requires the "Remote
-tmux" beta enabled in cmux Settings (no CLI toggle) and mirrors **all**
-tmux sessions on the host. The mirror opens in a dedicated new window; the
-session→workspace mapping is fixed, so it can never be a tab inside an
-existing workspace — instead pull the mirrored workspace into the
-orchestrator's window and place it directly below the orchestrator's
-workspace:
+Use the quiet helper — it owns the whole placement flow (RPC attach with no
+window when the host connection is already up; otherwise `ssh-tmux
+--no-focus` with immediate minimize, workspace move under the current
+workspace, and best-effort close of the vacated window):
 
 ```bash
-cmux --id-format both ssh-tmux <host> --no-focus
-# Parse the mirror workspace UUID from the output; if absent, find it via
-# `cmux --id-format both list-windows` + `list-workspaces --window <new-window>`
-# (workspaces named after the remote tmux sessions).
-cmux --id-format both identify        # orchestrator window UUID
-cmux move-workspace-to-window --workspace <mirror-workspace-uuid> \
-  --window <orchestrator-window-uuid>
-cmux reorder-workspace --workspace <mirror-workspace-uuid> \
-  --after "$CMUX_WORKSPACE_ID"
+~/projects/agents/scripts/cmux_ssh_tmux_quiet.sh <host> <worker-session>
 ```
+
+Always pass the worker session name(s): the mirror protocol is host-wide,
+and an unfiltered run would also grab and re-place mirrors belonging to
+other orchestrator sessions. Read the script header for details; do not
+re-implement its steps inline. The mirror gives native scrolling,
+selection, and splits instead of tmux copy-mode, appears on the worker
+session as a `control-mode` client, and requires the "Remote tmux" beta
+enabled in cmux Settings (no CLI toggle). The minimize step needs cmux to
+have macOS Accessibility access; without it the mirror window simply stays
+visible and the user closes it with ⌘W.
 
 Three warts to respect. Zeroth, mirror lifetime: the mirror rides a tmux
 control-mode client, and the remote tmux *server* exits when its last
 session closes — so killing the final worker session (or the host
 stopping) silently kills the mirror, and sessions created afterward live
-on a new server the dead mirror cannot see. Re-run `ssh-tmux` to
-reconnect; the stale mirror workspace is just a dead view. First, the vacated mirror window: after
-`move-workspace-to-window` it must be closed by the **user** with ⌘W —
-closed via CLI it refills itself with a placeholder workspace, and
-`close-window` is forbidden during viewer placement/cleanup anyway (see the
-layout-safety invariants below). Second, the control-mode mapping is
+on a new server the dead mirror cannot see. Re-run the quiet helper to
+reconnect; the stale mirror workspace is just a dead view, and
+`cmux rpc remote.tmux.attach '{"host":...,"session":...}'` revives it in
+place with no window. First, leftover mirror-window husks: cmux may refill
+a CLI-closed mirror window with a placeholder workspace instead of dying;
+the helper minimizes such husks to the Dock, and AppleScript cannot reach
+windows parked on other macOS Spaces — those need a manual ⌘W. Outside the
+helper, `close-window` remains forbidden (see the layout-safety invariants
+below). Second, the control-mode mapping is
 **bidirectional**: renaming the mirrored workspace renames the *remote tmux
 session itself*, silently breaking the registered handle that doorbells and
 rescue commands target. Leave the mirrored workspace's name untouched while
@@ -270,7 +269,7 @@ the run is active; apply the grouping rename
 finishes, or accept that the handle diverges and re-resolve it with
 `ssh <host> tmux ls` before every send.
 
-Fallback — plain attach tab: if `ssh-tmux` fails (Remote tmux beta
+Fallback — plain attach tab: if the quiet helper fails (Remote tmux beta
 disabled, connection error), fall back to an unfocused terminal tab beside
 the current one in the current workspace, and tell the user the mirror is
 available once they enable the beta (`cmux settings open`). Use a plain
@@ -289,7 +288,25 @@ cmux send-key --workspace "$CMUX_WORKSPACE_ID" --surface <uuid> enter
 A tmux-hosted orchestrator has no mirror equivalent — plain attach in a
 tmux window is already native there.
 
-### Layout-safety invariants (never close the user's sessions)
+### Keep viewed sessions showing progress
+
+A viewer is only useful if the pane has something to show. Agent workers
+(Claude/Codex/Kimi) render their own TUI, so they need nothing extra. But
+an ad-hoc tmux session running a batch command (a rebuild, a sweep, a bulk
+download) with output redirected to a log file displays a blank pane that
+reads as "dead" — the user cannot tell progress from failure. When
+creating any tmux session the user may view, keep the pane live while
+still capturing the log:
+
+```bash
+tmux new-session -d -s <name> \
+  "<command> 2>&1 | tee <logfile>; echo EXIT:\${PIPESTATUS[0]} | tee -a <logfile>"
+```
+
+Capture the command's own exit status via `PIPESTATUS` (plain `$?` after a
+pipe reports tee's status, not the command's). If a tool is genuinely
+silent for long stretches, prefer a variant that emits periodic progress
+(verbose/progress flags) so the pane visibly advances.
 
 Every viewer placement or cleanup action must name the exact UUID of the
 one thing it creates or removes — nothing positional, nothing by name
@@ -468,11 +485,16 @@ inspect the exact pending prefix:
 ```
 
 Calling `coordinator pending` **acknowledges** the events it surfaces: it
-records a per-run `acknowledged_through` cursor in the watcher state, and the
-watcher will not re-ring an event you have already loaded. A strictly newer
-worker event still rings, and each worker is tracked independently, so acking
-one worker never silences another. This means the cure for a doorbell that
-keeps repeating is to **call `coordinator pending`**, not to kill the watcher.
+records a per-run `acknowledged_through` cursor in the watcher state, and for a
+**result** or review the watcher will not re-ring an event you have already
+loaded. A strictly newer worker event still rings, and each worker is tracked
+independently, so acking one worker never silences another. Ringing is
+**state-aware**: a worker **blocked** on a question keeps re-ringing until it is
+answered (a bare ack does not silence a stuck worker — it needs the answer, not
+just to be seen), while pure progress checkpoints and terminal
+(`succeeded`/`stopped`) states do not ring at all. This means the cure for a
+repeating doorbell on a *result* is to **call `coordinator pending`**, not to
+kill the watcher.
 Do not close the watcher's surface to stop a repeating doorbell: the watcher is
 session-scoped — other workers may still be running, and the orchestrator can
 still spawn new ones that need watching — so it must live until the orchestrator
@@ -480,6 +502,17 @@ process exits, which it detects on its own. (A repeat doorbell can still occur
 legitimately when delivery to the composer failed, e.g. an unechoed
 `cmux_input`; `pending` also clears that, and if it truly cannot be delivered
 the worker state is still durable in the outbox.)
+
+To silence a run's current doorbell **without** consuming it or holding a lease
+— a completed run you have parked in `awaiting_review` for viewing, or a
+`blocked` run you are done with — use the credential-free:
+
+```bash
+<helper> coordinator dismiss --state "$handoff_coordinator_state" --run <selector>
+```
+
+`dismiss` records a per-run `dismissed_through` cursor; it stops ringing even a
+persistent `blocked` nag, and a strictly newer worker event still re-rings.
 
 For an ad-hoc foreground JSONL observation that is intentionally independent of
 session-owned delivery — debugging or rescue only, never a way to wait for
