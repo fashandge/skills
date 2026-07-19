@@ -32,10 +32,21 @@ use Codex task status and history instead of the local-v1 protocol.
 ## Choose the launch mode
 
 Continuous session-owned monitoring is the default for terminal workers. Lazily
-start or reuse one detached coordinator watcher on the first handoff in an
-orchestrator session, assign every later worker from that session to it, and let
-the launcher return promptly. Use unmonitored fire-and-forget mode only when the
+start or reuse one coordinator watcher on the first handoff in an orchestrator
+session, assign every later worker from that session to it, and let the
+launcher return promptly. Use unmonitored fire-and-forget mode only when the
 user explicitly asks not to monitor the worker.
+
+`coordinator start` picks the watcher's hosting by transport (`--mode auto`):
+cmux coordinators get a **surface-hosted** watcher — a terminal tab named
+`watcher: <coordinator workspace>` parked in the bottom `handoff-watchers`
+workspace, kept inside the cmux process tree so typed doorbells and native
+alerts work — while tmux and native-app coordinators keep the fully detached
+daemon. Closing the watcher tab (or the `handoff-watchers` workspace) kills
+the watcher; rerun `coordinator start` to relaunch it. Do not force
+`--mode detached` for a cmux coordinator unless degraded transient
+macOS-banner doorbells are acceptable (the cmux socket rejects out-of-tree
+clients).
 
 Before the first monitored launch, create one unique mode-`0700` coordinator
 directory, register the exact orchestrator target plus the PID of the long-lived
@@ -421,9 +432,15 @@ resume/compaction, turn or stage boundaries, and before irreversible actions,
 commits, and results. A message sent during a long model turn may wait until the
 next checkpoint.
 
-The default detached session watcher is started with `coordinator start`; do not
-replace it with a time-limited generic observer. When its opaque doorbell reaches
-the orchestrator, inspect the exact pending prefix:
+The default session watcher is started with `coordinator start`; do not
+replace it with a time-limited generic observer. For a cmux coordinator its
+doorbell attempts two complementary channels and records the accepted set in
+the run's `last_doorbell_method` (e.g. `cmux_input+cmux_notify`): typed input
+into the coordinator surface — counted only when the text visibly echoes, and
+the only channel that pushes an idle orchestrator agent to act — plus the
+visible `cmux notify` alert for the human. So the doorbell may arrive *as a
+typed prompt in the orchestrator's own composer*; treat it as the trigger to
+inspect the exact pending prefix:
 
 ```bash
 <helper> coordinator pending --state "$handoff_coordinator_state"
