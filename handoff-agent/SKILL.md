@@ -11,6 +11,11 @@ probe, queue a doorbell, capture diagnostics, perform a narrowly authorized
 rescue/approval action, or stop a stuck process. For an app-native Codex task,
 use Codex task status and history instead of the local-v1 protocol.
 
+Not every delegation needs this machinery: a spec-freezable one-shot that
+needs no mid-run steering, cross-session durability, or fan-out is cheaper as
+a headless worker via the `delegate-first` skill (its "vs /handoff-agent"
+section owns the boundary — defer to it rather than restating it here).
+
 ## Prepare the kickoff
 
 1. If the user names a plan/spec, write a thin kickoff that points to it by
