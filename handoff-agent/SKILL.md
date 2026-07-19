@@ -183,73 +183,113 @@ means the state is unknown, not dead: do not rotate or launch a replacement
 worker until the old one is fenced or confirmed stopped.
 
 After a successful remote launch, also open a local viewer attached to the
-worker's remote tmux session so the user can watch it live — placed exactly
-like a local worker: a new unfocused tab beside the current one, not a new
-workspace or window. Pick the transport from the orchestrator's own context:
-inside cmux (an inherited `CMUX_SURFACE_ID` and a reachable cmux connection)
-create a terminal surface in the current workspace; otherwise, inside tmux
-(`$TMUX` set) create a window in the current session; with neither, skip and
-report the manual attach command instead.
+worker's remote tmux session so the user can watch it live. Pick the
+transport from the orchestrator's own context: inside cmux (an inherited
+`CMUX_SURFACE_ID` and a reachable cmux connection), the **default viewer is
+a remote-tmux mirror workspace grouped directly below the orchestrator's
+workspace** (next section); inside tmux (`$TMUX` set), create a window in
+the current session; with neither, skip and report the manual attach
+command instead.
 
 ```bash
-# cmux-hosted orchestrator: unfocused tab in the current workspace,
-# then type the attach command into it (same pattern as the local launcher)
+# tmux-hosted orchestrator
+tmux new-window -d -n <name>-worker "ssh -t <host> tmux attach -t <remote-handle>"
+```
+
+The viewer is deliberately read-write: it is the **user's** window onto the
+worker, and they may interact with it directly. The orchestrator itself never
+types into the viewer — coordinator steering stays in the durable protocol,
+and rescue/approval actions go through the exact `ssh <host> tmux ...`
+commands above so they are tied to a verified probe. The viewer is cosmetic
+transport: if it disconnects or is closed, the run is unaffected, and its
+screen is never durable state.
+
+### cmux viewer default: ssh-tmux mirror under the current workspace
+
+`cmux ssh-tmux <host> --no-focus` mirrors the host's tmux over control mode
+(`tmux -CC`) — each remote session becomes a workspace with native
+scrolling, selection, and splits instead of tmux copy-mode, and it appears
+on the worker session as a `control-mode` client. It requires the "Remote
+tmux" beta enabled in cmux Settings (no CLI toggle) and mirrors **all**
+tmux sessions on the host. The mirror opens in a dedicated new window; the
+session→workspace mapping is fixed, so it can never be a tab inside an
+existing workspace — instead pull the mirrored workspace into the
+orchestrator's window and place it directly below the orchestrator's
+workspace:
+
+```bash
+cmux --id-format both ssh-tmux <host> --no-focus
+# Parse the mirror workspace UUID from the output; if absent, find it via
+# `cmux --id-format both list-windows` + `list-workspaces --window <new-window>`
+# (workspaces named after the remote tmux sessions).
+cmux --id-format both identify        # orchestrator window UUID
+cmux move-workspace-to-window --workspace <mirror-workspace-uuid> \
+  --window <orchestrator-window-uuid>
+cmux reorder-workspace --workspace <mirror-workspace-uuid> \
+  --after "$CMUX_WORKSPACE_ID"
+```
+
+Two warts to respect. First, the vacated mirror window: after
+`move-workspace-to-window` it must be closed by the **user** with ⌘W —
+closed via CLI it refills itself with a placeholder workspace, and
+`close-window` is forbidden during viewer placement/cleanup anyway (see the
+layout-safety invariants below). Second, the control-mode mapping is
+**bidirectional**: renaming the mirrored workspace renames the *remote tmux
+session itself*, silently breaking the registered handle that doorbells and
+rescue commands target. Leave the mirrored workspace's name untouched while
+the run is active; apply the grouping rename
+(`workspace-action --action rename --title
+"<orchestrator-workspace-name>-<worker-session>"`) only after the worker
+finishes, or accept that the handle diverges and re-resolve it with
+`ssh <host> tmux ls` before every send.
+
+Fallback — plain attach tab: if `ssh-tmux` fails (Remote tmux beta
+disabled, connection error), fall back to an unfocused terminal tab beside
+the current one in the current workspace, and tell the user the mirror is
+available once they enable the beta (`cmux settings open`). Use a plain
+terminal running `ssh -t`, not `cmux ssh` (its managed remote-workspace
+daemon flow is unrelated and can sit disconnected):
+
+```bash
 cmux --id-format both new-surface --type terminal \
   --workspace "$CMUX_WORKSPACE_ID" --focus false      # parse the surface UUID
 cmux rename-tab --workspace "$CMUX_WORKSPACE_ID" --surface <uuid> <name>-worker
 cmux send --workspace "$CMUX_WORKSPACE_ID" --surface <uuid> \
   "ssh -t <host> tmux attach -t <remote-handle>"
 cmux send-key --workspace "$CMUX_WORKSPACE_ID" --surface <uuid> enter
-# tmux-hosted orchestrator
-tmux new-window -d -n <name>-worker "ssh -t <host> tmux attach -t <remote-handle>"
 ```
 
-The attach is deliberately read-write: it is the **user's** window onto the
-worker, and they may interact with it directly. The orchestrator itself never
-types into the viewer — coordinator steering stays in the durable protocol,
-and rescue/approval actions go through the exact `ssh <host> tmux ...`
-commands above so they are tied to a verified probe. Use a plain terminal
-running `ssh -t`, not `cmux ssh` (its managed remote-workspace daemon flow is
-unrelated and can sit disconnected) and not a new workspace (wrong placement).
-The viewer is cosmetic transport: if it disconnects or is closed, the run is
-unaffected, and its screen is never durable state.
+A tmux-hosted orchestrator has no mirror equivalent — plain attach in a
+tmux window is already native there.
 
-Optional cmux-only upgrade when the user wants heavy scrollback or richer
-interaction: `cmux ssh-tmux <host> --no-focus` mirrors the host's tmux over
-control mode (`tmux -CC`) — each remote session becomes a workspace, with
-native scrolling, selection, and splits instead of tmux copy-mode. It
-requires the "Remote tmux" beta enabled in cmux Settings (there is no CLI
-toggle; `cmux settings open` and ask the user), mirrors **all** tmux sessions
-on the host, and appears on the worker session as a `control-mode` client.
-The mirror opens in a dedicated new window; since the session→workspace
-mapping is fixed, it can never be a tab inside an existing workspace, but the
-mirrored workspace can be pulled into the orchestrator's window so no extra
-app window remains in use, and renamed so it groups with its owner in the
-sidebar — `<orchestrator-workspace-name>-<worker-session>`:
+### Layout-safety invariants (never close the user's sessions)
 
-```bash
-cmux move-workspace-to-window --workspace <mirror-workspace-uuid> \
-  --window <orchestrator-window-uuid>
-cmux reorder-workspace --workspace <mirror-workspace-uuid> \
-  --after "$CMUX_WORKSPACE_ID"
-cmux workspace-action --action rename --workspace <mirror-workspace-uuid> \
-  --title "<orchestrator-workspace-name>-<worker-session>"
-```
+Every viewer placement or cleanup action must name the exact UUID of the
+one thing it creates or removes — nothing positional, nothing by name
+pattern, and never a sweep:
 
-Two warts to respect. First, the vacated mirror window refills itself with a
-placeholder workspace when closed via CLI — tell the user to close it with
-⌘W rather than looping on `close-window`. Second, and operationally
-important: the control-mode mapping is **bidirectional**, so renaming the
-mirrored workspace renames the *remote tmux session itself*, silently
-breaking the registered handle that doorbells and rescue commands target.
-After any such rename, resolve the session's current name with
-`ssh <host> tmux ls` before sending keys — or rename the workspace back.
-Prefer leaving the mirrored workspace's name untouched when the run is still
-active; apply the grouping rename only after the worker finishes, or accept
-that the handle diverges and must be re-resolved each time. Offer ssh-tmux as an alternative
-when the user asks for better scrolling; keep the plain attach tab as the
-default placement. A tmux-hosted orchestrator has no equivalent — plain
-attach is already native there.
+- **Snapshot before mutating layout.** Run `cmux --id-format both
+  list-pane-surfaces --workspace "$CMUX_WORKSPACE_ID"` and
+  `cmux --id-format both list-workspaces` first. After the mutation, list
+  again and verify every pre-existing surface and workspace is still
+  present. If anything is missing, stop all further layout actions
+  immediately and report it to the user.
+- **Close a viewer tab only with
+  `cmux close-surface --surface <exact-uuid>`.** Never a `tab-action` sweep
+  (`close-others`, `close-left`, `close-right`) — those close every *other*
+  tab in the workspace, including the user's unrelated sessions and
+  possibly the orchestrator's own surface.
+- **Never run `cmux close-window`**, even on the vacated mirror window —
+  targeting the wrong window destroys every workspace and session inside
+  it. The user closes the vacated window with ⌘W.
+- **Never run `cmux close-workspace`** except on the exact mirror-workspace
+  UUID parsed from this run's own `ssh-tmux` output, and only when the user
+  asked to remove the mirror. The mapping is bidirectional, so verify the
+  remote worker session survived afterward (`ssh <host> tmux ls`).
+- **Replace, then remove — by exact UUID.** When upgrading a viewer (e.g. a
+  plain attach tab → mirror workspace), create and verify the new viewer
+  first, then close only the old viewer's exact surface UUID. Never "clean
+  up" the workspace by closing whatever else is there.
 
 The launcher owns agent model/effort defaults. Use `--effort low` for a trivial
 read-only lookup and the normal default for substantial coding. Kimi is launched
@@ -452,10 +492,10 @@ action; it does not advance journal cursors or replace an inbox/outbox event.
 
 To close a single viewer tab, use exactly
 `cmux close-surface --surface <exact-surface-handle>` — never a
-`tab-action` sweep (`close-others`, `close-left`, `close-right`): those
-close every *other* tab in the workspace, including the user's unrelated
-sessions and possibly the orchestrator's own surface. A cleanup action may
-only ever name the exact surface being removed.
+`tab-action` sweep (`close-others`, `close-left`, `close-right`) and never
+`close-window`/`close-workspace`: the layout-safety invariants in the
+remote-launch section apply to every cleanup, local or remote. A cleanup
+action may only ever name the exact surface being removed.
 
 ## Close sessions quickly
 
@@ -471,7 +511,10 @@ tmux kill-session -t <exact-session-handle>
 ```
 
 For multiple workers, issue independent closes without serial protocol loops.
-Never close the orchestrator's own surface unless the user explicitly names it.
+Never close the orchestrator's own surface unless the user explicitly names it,
+and never widen a close beyond the named handles — no `tab-action` sweeps,
+`close-window`, or `close-workspace` (except an exact mirror-workspace UUID
+per the layout-safety invariants).
 Afterward, report whether each handle closed; the durable run may truthfully
 remain nonterminal or show an unconsumed stop, and that stale semantic state
 must not delay terminal closure.
