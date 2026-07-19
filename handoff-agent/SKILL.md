@@ -81,8 +81,9 @@ Pass `--coordinator-state "$handoff_coordinator_state"` to every monitored
 launcher invocation. `coordinator start` returns `started: false` when the same
 session watcher is already running. The watcher is deterministic and
 credential-free, discovers newly assigned workers through the registry, sends
-opaque doorbells for pending outbox events, and exits when the exact registered
-orchestrator process exits. On a doorbell, use `coordinator pending` to load the
+opaque doorbells for *actionable* outbox events (a result, or a worker blocked
+on a question — pure progress checkpoints and terminal states do not ring), and
+exits when the exact registered orchestrator process exits. On a doorbell, use `coordinator pending` to load the
 unread durable events and handle them normally.
 
 For an explicitly unmonitored fire-and-forget launch, invoke the launcher

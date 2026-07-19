@@ -67,7 +67,7 @@ The skill pins `gpt-5.6-terra` at `xhigh` effort as its default — deliberately
 - `command codex` bypasses the interactive zsh wrapper; if not on PATH: `fnm exec --using default -- codex`
 - stderr suppressed (thinking noise bloats context); drop `2>/dev/null` only to debug a failing run
 - read `-o` file for the result; don't parse the JSONL stream
-- long runs: Bash run_in_background, read `-o` file on exit; don't kill quiet runs <30 min
+- run via `run_in_background` (the harness pings you on exit — never poll for it) and read `-o` on completion; **make the run visible by default** (see *Run visibly*); don't kill quiet runs <30 min
 - parallel independent tasks OK: separate repos/dirs, separate `-o` files
 - outside a git repo add `--skip-git-repo-check`
 
@@ -79,13 +79,24 @@ Follow-up fixes — cheaper than fresh runs, keeps context. `resume` has no `-C`
   -o /tmp/codex-last.md - <"$P2" 2>/dev/null)
 ```
 
-## Observe live (optional)
+## Run visibly (default)
 
-Default is a detached background run (`run_in_background`, read `-o` on exit) — no window. When the user wants to *watch* progress, run the SAME `codex exec` command in a visible cmux/tmux pane instead of a detached job. It streams Codex's stdout to a terminal the user can watch, and still writes `-o` for the mandatory review.
+Run every delegation in a visible cmux/tmux pane so the user can watch Codex work live — while keeping the harness-tracked `run_in_background` job that pings you on completion (do NOT poll, and do NOT type `codex` into the pane, which would sever completion tracking). The trick: the background job tees its stream to a file, and the pane just `tail -F`s that file. So the background job still owns execution and completion; the pane is a passive live view.
 
-- cmux: `cmux new-surface --type terminal --workspace "$CMUX_WORKSPACE_ID" --focus false` → parse the surface UUID → `cmux send`/`send-key` the `command codex exec … -o <file> - <"$P"` line into it (send the text and Enter as two calls).
-- tmux: `tmux new-window -d -n codex 'command codex exec … -o <file> - <"$P"'`.
-- **Zero extra Claude tokens.** The pane shows Codex's own stdout, which never enters Claude's context — Claude still only reads the `-o` file at the end, exactly as in the background case. The only cost is a couple of pane-management CLI calls.
+```bash
+OUT=/tmp/codex-last.md; STREAM=/tmp/codex-last.stream; : >"$STREAM"
+# 1. Open a visible pane tailing the live stream (unfocused):
+#    cmux: cmux new-surface --type terminal --workspace "$CMUX_WORKSPACE_ID" --focus false
+#          → parse the surface UUID → cmux send/send-key `tail -F "$STREAM"`
+#    tmux: tmux new-window -d -n codex "tail -F '$STREAM'"
+# 2. Launch the real run as a run_in_background Bash job (completion ping as usual):
+command codex exec --yolo -C <repo> --model gpt-5.6-terra \
+  -c model_reasoning_effort="xhigh" -o "$OUT" - <"$P" >"$STREAM" 2>&1
+```
+
+- **Zero extra Claude tokens.** The pane shows Codex's own stdout via `tail`; it never enters Claude's context — on the completion ping Claude reads `$OUT` only, exactly as in the headless case. Cost is a couple of pane-management CLI calls.
+- The pane is cosmetic: closing it (or `tail` exiting) never affects the run. Close the surface after review, or leave it.
+- **Fallback to a plain detached background run (no pane)** only when there is no cmux/tmux surface — headless/cron, or `CMUX_*` and `$TMUX` both unset. Then run the base `Invoke` command directly under `run_in_background`.
 - **Not `/handoff-agent`.** Reserve handoff-agent for long, autonomous, *steerable* work that needs durable protocol state; its doorbells and `coordinator pending` reads DO spend Claude tokens each round-trip. `codex exec` is a headless batch with an `-o` contract, not a protocol worker — for a spec-frozen build the visible pane gives the window essentially for free.
 
 ## Prompt contract
