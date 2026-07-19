@@ -1,15 +1,16 @@
 ---
 name: delegate-first
-description: "Delegate implementation work from expensive Opus/Fable Claude Code sessions to cheap headless one-shot workers — Codex CLI (default), a weaker Claude model via claude -p, or Kimi Code via kimi -p. Claude specs, reviews, verifies. Steerable/durable workers route to handoff-agent instead."
+description: "Delegate implementation work to cheap headless one-shot workers — Codex CLI (default), a weaker Claude model via claude -p, or Kimi Code via kimi -p. Orchestrator specs, reviews, verifies. Auto-triggers only in Opus/Fable Claude Code sessions; from Codex/Kimi/other sessions use only on explicit request. Steerable/durable workers route to handoff-agent instead."
 ---
 
 # Delegate First
 
-Claude Code sessions only. Codex/other harnesses: skip; never self-delegate.
+Two invocation modes — the gate below decides *automatic* use only:
 
-Opus/Fable models only. If the session runs Sonnet, Haiku, an unknown Claude model, or a non-Anthropic model (e.g. GLM 5.2, Meta muse-spark): skip this skill entirely and implement directly. The economics below don't apply, and the routing assumptions (Claude ergonomics vs worker generation) are calibrated to Opus/Fable models.
+- **Auto-trigger** (apply this skill proactively for routable work): ONLY in Anthropic Claude Code sessions running Opus or Fable. If the session runs Sonnet, Haiku, an unknown Claude model, a non-Anthropic model (e.g. GLM 5.2, Meta muse-spark), or another harness entirely (Codex, Kimi): never auto-invoke — the economics below don't apply, and the routing assumptions (Claude ergonomics vs worker generation) are calibrated to Opus/Fable orchestrators.
+- **Explicit request** (the user invokes `/delegate-first` or says "delegate this to codex/claude/kimi"): usable from ANY harness or model — Codex and Kimi sessions included. Skip the eligibility gate, keep everything else (worker matrix, spec contract, visible pane, verify-always). Never self-delegate: don't hand work to the same agent CLI the session itself runs on — pick a different worker, or the one the user names.
 
-Detecting an eligible session (check before first delegation, once per session):
+Detecting an auto-trigger-eligible session (check before first automatic delegation, once per session):
 
 1. Model name — read "You are powered by the model named ..." in the system prompt. Only a model whose normalized name contains `claude-opus` or `claude-fable` is eligible. `claude-sonnet-*`, `claude-haiku-*`, unknown Claude models, and non-`claude-*` names → skip. This is a hard gate; `CODEX_FIRST=1` does not override it. Not sufficient alone: wrappers can spoof Claude model ids.
 2. Env check for an eligible model (authoritative; run in Bash):
@@ -27,16 +28,16 @@ Rationale: orchestrator (Fable/Opus) tokens are metered + expensive; workers are
 | Worker | Invocation | When |
 |---|---|---|
 | **Codex** (default) | `codex exec --yolo … -o out.md` | Everything below unless a reason says otherwise — flat-rate, strong at code generation |
-| **Claude weak model** | `claude -p --model opus --dangerously-skip-permissions` | Codex unavailable/rate-limited; task leans on Claude-family conventions (CLAUDE.md adherence, Claude-style tools); user asks for it. `opus` by default; drop to `sonnet`/`haiku` for simple mechanical edits |
-| **Kimi Code** | `~/.kimi-code/bin/kimi -m kimi-code/k3 -p "…"` | User asks for Kimi, or as a third independent perspective. Local Mac only (not installed on the OCI box) |
+| **Claude weak model** | `claude -p --model opus --effort high --dangerously-skip-permissions` | Codex unavailable/rate-limited; task leans on Claude-family conventions (CLAUDE.md adherence, Claude-style tools); user asks for it. `opus` at `high` effort by default; drop to `sonnet`/`haiku` for simple mechanical edits |
+| **Kimi Code** | `KIMI_MODEL_THINKING_EFFORT=max ~/.kimi-code/bin/kimi -m kimi-code/k3 -p "…"` | User asks for Kimi, or as a third independent perspective. `kimi-code/k3` at `max` thinking effort by default (effort is env-var-only — no CLI flag) |
 
 All three use the same contract: prompt via temp file, result to a file, review by Claude. `claude -p` and `kimi -p` print the final answer to stdout — redirect to the out-file (`> out.md`); their streams are not incremental like Codex's, so the visible pane may show little until completion (acceptable; note it to the user for long runs).
 
-Kimi gotchas (verified v0.27.0): the binary lives at `~/.kimi-code/bin/kimi` and is on the *interactive* zsh PATH only — use the absolute path from scripts/tool shells. Prompt mode auto-approves actions and **rejects** `--yolo`/`--auto` (`Cannot combine --prompt with --yolo`) — pass neither. The model alias is lowercase `kimi-code/k3`. Follow-ups: it prints `To resume this session: kimi -r <session-id>` — reuse that id with `-p` for the next instruction.
+Kimi gotchas (verified v0.27.0): the binary lives at `~/.kimi-code/bin/kimi` and is on the *interactive* zsh PATH only — use the absolute path from scripts/tool shells. Prompt mode auto-approves actions and **rejects** `--yolo`/`--auto` (`Cannot combine --prompt with --yolo`) — pass neither. The model alias is lowercase `kimi-code/k3`; thinking effort only via `KIMI_MODEL_THINKING_EFFORT=max`. Follow-ups: it prints `To resume this session: kimi -r <session-id>` — reuse that id with `-p` for the next instruction. On the OCI box, `~/.kimi-code/bin/kimi` is a wrapper that execs `kimi-real` via `/lib/ld-linux-aarch64.so.1` (the UEK kernel rejects the binary's ELF property notes at direct execve); `kimi upgrade` overwrites the wrapper — re-create it after upgrading.
 
 ## Route
 
-When the Opus/Fable model gate above passes, delegate proper hands-on implementation work to a worker:
+When the auto-trigger gate above passes (or the user explicitly asks), delegate proper hands-on implementation work to a worker:
 
 - implementation from a frozen spec; refactors; mechanical migrations
 - bug fixes with known repro; test writing; coverage fills
@@ -45,7 +46,7 @@ When the Opus/Fable model gate above passes, delegate proper hands-on implementa
 
 Keep in Claude:
 
-- all work when running Sonnet, Haiku, an unknown Claude model, or a non-Anthropic model
+- all work when running an auto-trigger-ineligible session (Sonnet, Haiku, unknown/non-Anthropic models) — unless the user explicitly asked to delegate
 - design, API design, architecture, naming, UX judgment
 - tasks where writing the spec IS the work (ambiguity = design)
 - tiny edits (~<20 lines, single obvious change) — delegation overhead loses
@@ -86,11 +87,12 @@ command codex exec --yolo -C <repo> \
   -c model_reasoning_effort="xhigh" \
   -o /tmp/worker-last.md - <"$P" 2>/dev/null
 # Claude weak model (alternative):
-(cd <repo> && command claude -p --model opus \
+(cd <repo> && command claude -p --model opus --effort high \
   --dangerously-skip-permissions \
   "$(cat "$P")" > /tmp/worker-last.md 2>/dev/null)
-# Kimi Code (alternative; no --yolo/--auto with -p — prompt mode auto-approves):
-(cd <repo> && ~/.kimi-code/bin/kimi -m kimi-code/k3 \
+# Kimi Code (alternative; no --yolo/--auto with -p — prompt mode auto-approves;
+# thinking effort is env-var-only):
+(cd <repo> && KIMI_MODEL_THINKING_EFFORT=max ~/.kimi-code/bin/kimi -m kimi-code/k3 \
   -p "$(cat "$P")" > /tmp/worker-last.md 2>/dev/null)
 ```
 
