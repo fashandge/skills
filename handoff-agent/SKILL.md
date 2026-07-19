@@ -192,6 +192,8 @@ sidebar — `<orchestrator-workspace-name>-<worker-session>`:
 ```bash
 cmux move-workspace-to-window --workspace <mirror-workspace-uuid> \
   --window <orchestrator-window-uuid>
+cmux reorder-workspace --workspace <mirror-workspace-uuid> \
+  --after "$CMUX_WORKSPACE_ID"
 cmux workspace-action --action rename --workspace <mirror-workspace-uuid> \
   --title "<orchestrator-workspace-name>-<worker-session>"
 ```
