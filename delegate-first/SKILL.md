@@ -12,18 +12,20 @@ Two invocation modes — the gate below decides *automatic* use only:
 
 Detecting an auto-trigger-eligible session (check before first automatic delegation, once per session):
 
-1. Model name — read "You are powered by the model named ..." in the system prompt. Only a model whose normalized name contains `claude-opus` or `claude-fable` is eligible. `claude-sonnet-*`, `claude-haiku-*`, unknown Claude models, and non-`claude-*` names → skip. This is a hard gate; `CODEX_FIRST=1` does not override it. Not sufficient alone: wrappers can spoof Claude model ids.
-2. Env check for an eligible model (authoritative; run in Bash):
+1. Model name — read "You are powered by the model named ..." in the system prompt. Only a model whose normalized name contains `claude-opus` or `claude-fable` is eligible. `claude-sonnet-*`, `claude-haiku-*`, unknown Claude models, and non-`claude-*` names → skip. This is a hard gate; `DELEGATE_FIRST=1` does not override it. Not sufficient alone: wrappers can spoof Claude model ids.
+2. Env check for an eligible model (authoritative; run in Bash — `CODEX_FIRST` is the honored legacy name for the same signal):
    ```bash
-   echo "CODEX_FIRST=${CODEX_FIRST:-unset} ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-unset}"
+   echo "DELEGATE_FIRST=${DELEGATE_FIRST:-${CODEX_FIRST:-unset}} ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-unset}"
    ```
-   - `CODEX_FIRST=0` → skip (explicit off — set by claude-go / claude-meta / ccr wrappers).
-   - `CODEX_FIRST=1` → use the skill, provided the model gate passed (explicit on, overrides base-URL inference — e.g. an Anthropic-compatible gateway serving Opus/Fable).
-   - unset → infer from `ANTHROPIC_BASE_URL`: unset or `*.anthropic.com` → use the skill; anything else (localhost proxy, api.meta.ai, ccr router) → skip.
+   - `DELEGATE_FIRST=0` → skip (explicit off — set by claude-go / claude-muse-spark / ccr wrappers).
+   - `DELEGATE_FIRST=1` → use the skill, provided the model gate passed (explicit on, overrides base-URL inference — e.g. an Anthropic-compatible gateway serving Opus/Fable).
+   - unset (both names) → infer from `ANTHROPIC_BASE_URL`: unset or `*.anthropic.com` → use the skill; anything else (localhost proxy, api.meta.ai, ccr router) → skip.
 
 Rationale: orchestrator (Fable/Opus) tokens are metered + expensive; workers are cheap — Codex is flat-rate, and Haiku/Sonnet via `claude -p` are metered but a fraction of the orchestrator's price. Claude wins at ergonomics — judgment, design, spec-writing, review, orchestration. So workers type, Claude thinks and verifies.
 
 ## Choose a worker
+
+**User override always wins.** When the user names a worker and/or model ("delegate to kimi", "have sonnet do it", "use codex with gpt-5.5"), use exactly that — the matrix defaults below apply only when the user left the choice open. Model overrides map per CLI: Codex `--model <id>` (+ `-c model_reasoning_effort=…`), Claude `--model <id> --effort <level>`, Kimi `-m <alias>` (+ `KIMI_MODEL_THINKING_EFFORT=…`).
 
 | Worker | Invocation | When |
 |---|---|---|
