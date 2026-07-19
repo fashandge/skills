@@ -23,7 +23,8 @@ use Codex task status and history instead of the local-v1 protocol.
    throwaway task, create a mode-`0700` temporary directory outside the
    repository with `mktemp -d`, write the kickoff there, and remove that source
    after a successful launch. The launcher has already copied it into the
-   durable run directory by then.
+   durable run directory by then; later `handoffctl context` reads that durable
+   copy, so retaining the temporary source adds no recovery value.
 4. Add `<kickoff>.goal` only when autonomous continuation is wanted. Put one
    complete `/goal ...` command on its first line.
 5. Ask only when the repository, agent, or machine is genuinely ambiguous.
@@ -53,7 +54,9 @@ Parse the launcher's JSON response and retain `run_dir`, `transport`, and
 `handle`. In launch-only mode verify `coordinator_released` is true; report the
 run and handle immediately without polling status. For Kimi, also require
 `kickoff_sent: true`; otherwise report the rescue command instead of claiming
-the worker started.
+the worker started. Verify `registry_recorded` when present. A registry failure
+does not invalidate the live run, but later fast dispatch/context must fall back
+to the retained run and handle fields.
 
 For a managed run, create one dedicated mode-`0700` private directory and add
 `--retain-coordinator`. When `HANDOFF_CREDENTIAL_DIR` is supplied, the launcher
@@ -141,6 +144,65 @@ with `ssh <host> tmux kill-session -t <remote-handle>`. A lost SSH connection
 means the state is unknown, not dead: do not rotate or launch a replacement
 worker until the old one is fenced or confirmed stopped.
 
+After a successful remote launch, also open a local viewer attached to the
+worker's remote tmux session so the user can watch it live — placed exactly
+like a local worker: a new unfocused tab beside the current one, not a new
+workspace or window. Pick the transport from the orchestrator's own context:
+inside cmux (an inherited `CMUX_SURFACE_ID` and a reachable cmux connection)
+create a terminal surface in the current workspace; otherwise, inside tmux
+(`$TMUX` set) create a window in the current session; with neither, skip and
+report the manual attach command instead.
+
+```bash
+# cmux-hosted orchestrator: unfocused tab in the current workspace,
+# then type the attach command into it (same pattern as the local launcher)
+cmux --id-format both new-surface --type terminal \
+  --workspace "$CMUX_WORKSPACE_ID" --focus false      # parse the surface UUID
+cmux rename-tab --workspace "$CMUX_WORKSPACE_ID" --surface <uuid> <name>-worker
+cmux send --workspace "$CMUX_WORKSPACE_ID" --surface <uuid> \
+  "ssh -t <host> tmux attach -t <remote-handle>"
+cmux send-key --workspace "$CMUX_WORKSPACE_ID" --surface <uuid> enter
+# tmux-hosted orchestrator
+tmux new-window -d -n <name>-worker "ssh -t <host> tmux attach -t <remote-handle>"
+```
+
+The attach is deliberately read-write: it is the **user's** window onto the
+worker, and they may interact with it directly. The orchestrator itself never
+types into the viewer — coordinator steering stays in the durable protocol,
+and rescue/approval actions go through the exact `ssh <host> tmux ...`
+commands above so they are tied to a verified probe. Use a plain terminal
+running `ssh -t`, not `cmux ssh` (its managed remote-workspace daemon flow is
+unrelated and can sit disconnected) and not a new workspace (wrong placement).
+The viewer is cosmetic transport: if it disconnects or is closed, the run is
+unaffected, and its screen is never durable state.
+
+Optional cmux-only upgrade when the user wants heavy scrollback or richer
+interaction: `cmux ssh-tmux <host> --no-focus` mirrors the host's tmux over
+control mode (`tmux -CC`) — each remote session becomes a workspace, with
+native scrolling, selection, and splits instead of tmux copy-mode. It
+requires the "Remote tmux" beta enabled in cmux Settings (there is no CLI
+toggle; `cmux settings open` and ask the user), mirrors **all** tmux sessions
+on the host, and appears on the worker session as a `control-mode` client.
+The mirror opens in a dedicated new window; since the session→workspace
+mapping is fixed, it can never be a tab inside an existing workspace, but the
+mirrored workspace can be pulled into the orchestrator's window so no extra
+app window remains in use, and renamed so it groups with its owner in the
+sidebar — `<orchestrator-workspace-name>-<worker-session>`:
+
+```bash
+cmux move-workspace-to-window --workspace <mirror-workspace-uuid> \
+  --window <orchestrator-window-uuid>
+cmux workspace-action --action rename --workspace <mirror-workspace-uuid> \
+  --title "<orchestrator-workspace-name>-<worker-session>"
+```
+
+Known cosmetic wart: the vacated mirror window refills itself with a
+placeholder workspace when closed via CLI — tell the user to close it with
+⌘W rather than looping on `close-window`. Offer ssh-tmux as an alternative
+when the user asks for better scrolling; keep the plain attach tab as the
+default placement. A tmux-hosted orchestrator has no equivalent — plain
+attach is already native there.
+
 The launcher owns agent model/effort defaults. Use `--effort low` for a trivial
 read-only lookup and the normal default for substantial coding. Kimi is launched
 explicitly with the configured alias `--model kimi-code/k3` and thinking effort
@@ -170,11 +232,20 @@ Use the fixed helper:
 Read operations need no token:
 
 ```bash
+<helper> runs list
+<helper> runs show --run <selector>
+<helper> context --run <selector>
 <helper> status --run-dir <absolute-run-dir>
 <helper> control show --run-dir <absolute-run-dir>
 <helper> read --run-dir <absolute-run-dir> --journal outbox --after <cursor>
 <helper> doctor --run-dir <absolute-run-dir>
 ```
+
+Every successful terminal launch privately registers the run on its owning host;
+a remote launch also registers a credential-free proxy on the coordinator host.
+Selectors may be a run ID, unique prefix, task name, handle, or run URI. Public
+registry output redacts credential directories. Prefer `context` after context
+compaction or after removing a temporary kickoff source.
 
 Treat `status.json`, `control.json`, and the journals as evidence. Do not infer
 progress, acknowledgment, or success from terminal echoes.
@@ -199,9 +270,10 @@ HANDOFF_COORDINATOR_TOKEN_FILE=<coordinator-token-file> \
 If the user asks to monitor, babysit, or finish the handoff, keep the current
 turn active and continue the renew/read/consume loop until the requested
 terminal condition. Launch-only mode has already released the coordinator
-lease and intentionally does not wait for worker readiness. A later coordinator
-must perform an explicit recovery-token takeover; it must not reuse the released
-or expired coordinator token.
+lease and intentionally does not wait for worker readiness. For a later one-shot
+instruction, use registry-backed `dispatch`; it performs the required takeover
+without exposing or rediscovering credential paths. Use explicit low-level
+recovery only when the registry is unavailable or repair is required.
 
 Read outbox events after `control.outbox_cursor`. Handle every event through a
 contiguous sequence, then call `control consume --through N`. Re-reading an
@@ -209,9 +281,22 @@ event is safe; use its stable `message_id` for idempotent handling.
 
 For steering, answers, and reviews:
 
+- Prefer one-shot registry dispatch for a new instruction after launch-only:
+
+  ```bash
+  <helper> dispatch --run <selector> --body-file <private-file-or-dash>
+  ```
+
+  Pass dynamic content through stdin (`--body-file -`) or a private file.
+  `dispatch` takes over the released lease, appends `steer`, rings the exact
+  doorbell, releases ownership, and removes its ephemeral coordinator token. If
+  the worker is `awaiting_review`, it appends `supersede` tied to the exact
+  pending result so the worker can resume without accepting or mislabeling it.
+  Remote dispatch performs the full owner-side transaction and tmux doorbell in
+  one SSH invocation.
 - Write body and data to private files or structured stdin. Never interpolate
   user/model content into a shell program.
-- Use `send --type steer` for new instructions.
+- Use low-level `send --type steer` only while already holding a managed lease.
 - Use `send --type answer --reply-to <question-id>` for a worker question.
 - Use `send --type review --reply-to <result-id>` with disposition
   `accepted` or `changes_requested`.
@@ -228,16 +313,32 @@ resume/compaction, turn or stage boundaries, and before irreversible actions,
 commits, and results. A message sent during a long model turn may wait until the
 next checkpoint.
 
+For asynchronous coordinator observation, run:
+
+```bash
+<helper> watch [--run <selector> ...] --interval 5 --timeout <seconds>
+```
+
+Omit `--run` to watch every registered run; add `--once` for one pass or
+`--notify-cmux` for metadata-only alerts. Keep the current orchestrator turn
+active and handle each emitted JSONL event. The watcher advances only its
+private observer cursor: it does not consume protocol outbox events, review a
+result, answer a question, or hold a coordinator lease. A persistent watcher
+can detect and notify while the model is idle, but autonomous replies still
+require an active coordinator agent with authority for the decision.
+
 For urgent steering:
 
-1. Durably append the real instruction with `handoffctl send`.
-2. Queue only an opaque terminal doorbell such as
-   `Check handoff run <run-id>; inbox now through seq <N>.`
-3. Never type the steering body or credentials into cmux/tmux.
+1. Use `handoffctl dispatch` so the instruction is durably appended before the
+   exact registered handle is touched.
+2. Confirm `doorbell_sent: true`; otherwise use the returned durable message
+   sequence and stored handle for a narrow manual doorbell.
+3. Never type the steering body or credentials into cmux/tmux. A doorbell
+   contains only `Check handoff run <run-id>; inbox now through seq <N>.`
 
 A doorbell queues behind a running turn; it cannot interrupt the model. Hooks
-and periodic watchers are follow-up optimizations, not current correctness
-mechanisms.
+remain an optimization; the durable journal is authoritative even when a
+watcher or doorbell fails.
 
 Probe/capture patterns for rescue only:
 
