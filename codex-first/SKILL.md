@@ -99,6 +99,22 @@ command codex exec --yolo -C <repo> --model gpt-5.6-terra \
 - **Fallback to a plain detached background run (no pane)** only when there is no cmux/tmux surface — headless/cron, or `CMUX_*` and `$TMUX` both unset. Then run the base `Invoke` command directly under `run_in_background`.
 - **Not `/handoff-agent`.** Reserve handoff-agent for long, autonomous, *steerable* work that needs durable protocol state; its doorbells and `coordinator pending` reads DO spend Claude tokens each round-trip. `codex exec` is a headless batch with an `-o` contract, not a protocol worker — for a spec-frozen build the visible pane gives the window essentially for free.
 
+## Remote box (only when explicitly asked)
+
+Default is local. Run `codex exec` on a remote box **only when the user explicitly asks for the box**, or the task's code/data lives there — never as an inference. Same headless + visible-pane + `-o`-review contract, wrapped in SSH; the task's `-C` is a **box** repo. Codex must already be authenticated on the box. No extra Claude tokens: the remote stdout is redirected to a box-side stream + `-o` and never returns over SSH; the pane tails it via `ssh tail -F`; you read `-o` once via `ssh box cat` on completion.
+
+```bash
+ssh <box> 'mkdir -p <remote-work> && : > <remote-stream>'      # prep; prompt goes over SSH stdin
+# visible pane (default): a terminal running  ssh <box> "tail -F <remote-stream>"
+# the run as a local run_in_background job — the SSH command exiting IS the completion ping:
+ssh <box> 'command codex exec --yolo -C <remote-repo> --model gpt-5.6-terra \
+  -c model_reasoning_effort="xhigh" -o <remote-out> - > <remote-stream> 2>&1' < "$P"
+# on the ping: ssh <box> cat <remote-out>  → review; verify with  ssh <box> <test cmd>
+```
+
+- For a stopped box with a documented lifecycle helper, bring it up only if the request authorizes using the box (e.g. investment OCI box: `~/projects/investment/src/scripts/oci_box_ctl.sh up`).
+- This is still `codex exec`, not `/handoff-agent`. Use handoff-agent's remote SSH adapter instead when the box run needs steering, durability across your session, or fan-out — not for a spec-frozen one-shot.
+
 ## Prompt contract
 
 Codex starts with zero session context. Every prompt: goal, exact repo/paths, constraints, non-goals, proof expected (exact test command), output shape ("report files changed + test output"). Spec quality decides success.
