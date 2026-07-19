@@ -176,7 +176,9 @@ remote commands as shell-quoted argv and use `handoffctl --help` for exact
 payload flags.
 
 For a remote doorbell, append the durable message first, then send only the
-opaque run ID and inbox sequence to the exact remote tmux handle. Probe and
+opaque run ID and inbox sequence to the exact remote tmux handle, following
+the manual-doorbell submit discipline (see "Monitoring behavior and
+doorbells"). Probe and
 rescue with `ssh <host> tmux capture-pane -p -t <remote-handle> -S -2000`; close
 with `ssh <host> tmux kill-session -t <remote-handle>`. A lost SSH connection
 means the state is unknown, not dead: do not rotate or launch a replacement
@@ -385,12 +387,21 @@ For steering, answers, and reviews:
   ```
 
   Pass dynamic content through stdin (`--body-file -`) or a private file.
-  `dispatch` takes over the released lease, appends `steer`, rings the exact
-  doorbell, releases ownership, and removes its ephemeral coordinator token. If
-  the worker is `awaiting_review`, it appends `supersede` tied to the exact
-  pending result so the worker can resume without accepting or mislabeling it.
-  Remote dispatch performs the full owner-side transaction and tmux doorbell in
-  one SSH invocation.
+  `dispatch` takes over the released lease, appends the right message type for
+  the worker's state, rings the exact doorbell, releases ownership, and removes
+  its ephemeral coordinator token. State-aware linking: a worker `blocked` on a
+  question gets `answer` tied to that exact question (a bare `steer` can never
+  unblock it — the worker cannot advance across an unanswered blocking
+  question); a worker `awaiting_review` gets `supersede` tied to the exact
+  pending result so it can resume without accepting or mislabeling it; otherwise
+  the body goes as `steer`. Verify which happened from the response's
+  `answered_question` / `superseded_result` / `message.type` fields — when
+  answering a blocking question, confirm `answered_question` matches the
+  question you meant to answer. Remote dispatch performs the full owner-side
+  transaction and tmux doorbell in one SSH invocation, so the fix requires an
+  up-to-date `agents` package on the owning host; if a dispatched authorization
+  ever still leaves the worker `blocked` with `message.type: steer`, the owning
+  host runs a stale package — update it rather than hand-rolling a takeover.
 - Write body and data to private files or structured stdin. Never interpolate
   user/model content into a shell program.
 - Use low-level `send --type steer` only while already holding a managed lease.
@@ -446,6 +457,17 @@ For urgent steering:
 A doorbell queues behind a running turn; it cannot interrupt the model. Hooks
 remain an optimization; the durable journal is authoritative even when a
 watcher or doorbell fails.
+
+Manual-doorbell submit discipline: agent TUIs (Claude/Codex/Kimi) coalesce a
+same-burst text+Enter into a bracketed paste, so the Enter becomes an input
+newline and the doorbell sits unsent in the composer while looking delivered.
+Launcher/`handoffctl` doorbells handle this automatically (settle + verify +
+retry). When sending a doorbell manually, send the literal text and the Enter
+as two separate commands with ~1s between them, then capture the pane and
+check the bottom lines: if the doorbell text still sits in the composer, send
+one more bare Enter (harmless if it already submitted). Never assume delivery
+from a zero exit code; on the worker side, only an advanced `inbox_cursor`
+proves receipt.
 
 Probe/capture patterns for rescue only:
 
