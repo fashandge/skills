@@ -196,9 +196,17 @@ cmux workspace-action --action rename --workspace <mirror-workspace-uuid> \
   --title "<orchestrator-workspace-name>-<worker-session>"
 ```
 
-Known cosmetic wart: the vacated mirror window refills itself with a
+Two warts to respect. First, the vacated mirror window refills itself with a
 placeholder workspace when closed via CLI — tell the user to close it with
-⌘W rather than looping on `close-window`. Offer ssh-tmux as an alternative
+⌘W rather than looping on `close-window`. Second, and operationally
+important: the control-mode mapping is **bidirectional**, so renaming the
+mirrored workspace renames the *remote tmux session itself*, silently
+breaking the registered handle that doorbells and rescue commands target.
+After any such rename, resolve the session's current name with
+`ssh <host> tmux ls` before sending keys — or rename the workspace back.
+Prefer leaving the mirrored workspace's name untouched when the run is still
+active; apply the grouping rename only after the worker finishes, or accept
+that the handle diverges and must be re-resolved each time. Offer ssh-tmux as an alternative
 when the user asks for better scrolling; keep the plain attach tab as the
 default placement. A tmux-hosted orchestrator has no equivalent — plain
 attach is already native there.
