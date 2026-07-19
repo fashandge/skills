@@ -37,6 +37,15 @@ session, assign every later worker from that session to it, and let the
 launcher return promptly. Use unmonitored fire-and-forget mode only when the
 user explicitly asks not to monitor the worker.
 
+Starting the watcher is part of launching a monitored handoff, not an optional
+extra. Never wait on workers by polling from your own turn — no `watch` (with
+or without `--timeout`), no repeated `status`, no sleep-and-check loops. The
+watcher pushes a typed doorbell into your surface when a worker needs
+attention, and `coordinator pending` then loads the unread events. A
+self-run `watch --timeout` is a debugging tool only. If you find yourself
+polling, the watcher is missing or dead: start or relaunch it with
+`coordinator start` instead of working around it.
+
 `coordinator start` picks the watcher's hosting by transport (`--mode auto`):
 cmux coordinators get a **surface-hosted** watcher — a terminal tab named
 `watcher: <coordinator workspace>` parked in the bottom `handoff-watchers`
@@ -419,6 +428,11 @@ For steering, answers, and reviews:
 - Use `send --type answer --reply-to <question-id>` for a worker question.
 - Use `send --type review --reply-to <result-id>` with disposition
   `accepted` or `changes_requested`.
+- `send` rings the worker's terminal doorbell automatically for a registered
+  run and reports `doorbell_sent` in its response (`--no-doorbell` opts out).
+  Confirm `doorbell_sent: true` after every send — including the final stop —
+  and fall back to the manual doorbell procedure with the returned
+  `message.seq` only when it is `false`.
 - Supply the coordinator credential through
   `HANDOFF_COORDINATOR_TOKEN_FILE` or `--token-file`, never argv token bytes.
 
@@ -433,7 +447,9 @@ commits, and results. A message sent during a long model turn may wait until the
 next checkpoint.
 
 The default session watcher is started with `coordinator start`; do not
-replace it with a time-limited generic observer. For a cmux coordinator its
+replace it with a time-limited generic observer — `watch --timeout` from your
+own shell is for debugging only, never for waiting on worker events. For a
+cmux coordinator its
 doorbell attempts two complementary channels and records the accepted set in
 the run's `last_doorbell_method` (e.g. `cmux_input+cmux_notify`): typed input
 into the coordinator surface — counted only when the text visibly echoes, and
@@ -447,22 +463,25 @@ inspect the exact pending prefix:
 ```
 
 For an ad-hoc foreground JSONL observation that is intentionally independent of
-session-owned delivery, run:
+session-owned delivery — debugging or rescue only, never a way to wait for
+worker events in a normal flow — run:
 
 ```bash
 <helper> watch [--run <selector> ...] --interval 5 --timeout <seconds>
 ```
 
 Omit `--run` to watch every registered run; add `--once` for one pass or
-`--notify-cmux` for metadata-only alerts. Keep the current orchestrator turn
-active and handle each emitted JSONL event. This generic observer advances only
+`--notify-cmux` for metadata-only alerts. This generic observer advances only
 its private observer cursor: it does not consume protocol outbox events, review
 a result, answer a question, or hold a coordinator lease. The detached session
 watcher likewise never performs semantic actions; it only maintains independent
 delivery cursors and sends opaque doorbells. Autonomous replies still require
 an active coordinator agent with authority for the decision.
 
-For urgent steering:
+For urgent steering while you hold no active coordinator lease (external
+intervention or an expired lease — `dispatch` refuses to run while a managed
+lease is held; a managed coordinator driving the normal answer/review/stop
+lifecycle uses `send`, which rings the doorbell itself):
 
 1. Use `handoffctl dispatch` so the instruction is durably appended before the
    exact registered handle is touched.
@@ -572,8 +591,11 @@ not obtained.
    never require the worker to stash, discard, or commit unrelated user work.
 3. Send an accepted or changes-requested review tied to that exact result ID.
 4. Wait for the worker to consume acceptance and emit `succeeded`; do not
-   confuse worker success with coordinator acceptance or integration.
-5. Record `control integrate` or `control abandon`, then send a graceful stop.
+   confuse worker success with coordinator acceptance or integration. Waiting
+   means watching for the watcher's next doorbell, not polling yourself.
+5. Record `control integrate` or `control abandon`, then send a graceful stop
+   and confirm its `doorbell_sent` — without the doorbell the idle worker
+   never learns the run is over.
 6. Run read-only `doctor`. Use repair flags only for identified, explicit
    recovery; never repair implicitly.
 
