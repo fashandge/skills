@@ -289,6 +289,15 @@ Read outbox events after `control.outbox_cursor`. Handle every event through a
 contiguous sequence, then call `control consume --through N`. Re-reading an
 event is safe; use its stable `message_id` for idempotent handling.
 
+Treat a blocking worker question as self-contained only when it states the
+current stage and completed work, concrete evidence, the exact conflict, the
+decision or authority needed, a recommended resolution, the consequences of
+the available options, and actions intentionally deferred. Assume the worker
+knows the kickoff while the coordinator does not know the worker's live
+progress. Do not reconstruct missing context or guess. Send a `steer` requesting
+the missing context, ring the normal opaque doorbell, and answer the substantive
+question only after the worker supplements the durable outbox record.
+
 For steering, answers, and reviews:
 
 - Prefer one-shot registry dispatch for a new instruction after launch-only:
