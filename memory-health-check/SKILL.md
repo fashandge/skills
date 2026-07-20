@@ -65,6 +65,42 @@ signals answer three different questions:
 `vm_stat` reports counts in **pages**; multiply by the page size in its header (16384 bytes on
 Apple Silicon, 4096 on Intel) to get bytes. The script does this for you.
 
+## When wired memory is the problem
+
+The three signals above cover userland demand. They do **not** explain a machine whose RAM is
+eaten by the kernel. Check for this whenever `top -l 1 -n 0` shows a wired figure that is a large
+fraction of physical RAM (normal is roughly 3–4 GB on a 24 GB Mac; double digits is pathological):
+
+```bash
+top -l 1 -n 0 | grep PhysMem     # "23G used (19G wired, 1.9G compressor), 100M unused"
+```
+
+Wired memory is kernel-locked: it cannot be compressed, paged out, or reclaimed, and it is not
+released when processes exit — only a reboot frees it. So a wired leak starves userland no matter
+how few apps are open, and per-process rankings will look innocent. Rule out third-party drivers
+first (`systemextensionsctl list`, `kmutil showloaded --collection-type auxiliary`); if both come
+back empty, it is Apple's own kernel.
+
+To attribute it, use the companion sampler — `zprint` reports every size as `0K` to unprivileged
+callers, so this one genuinely needs `sudo`:
+
+```bash
+sudo ~/skills/memory-health-check/scripts/sample_wired_zones.sh --top       # rank wired allocations now
+sudo ~/skills/memory-health-check/scripts/sample_wired_zones.sh -n 48 -i 900 # 12 h @ 15 min, logs MB/hour
+```
+
+It appends a CSV row per sample (zone size, total wired, swap, process counts) to
+`~/.local/state/wired-zone-samples.csv` and prints the growth rate across the whole log, which is
+what turns "my Mac is slow" into a filable bug report and lets you A/B which workload drives the
+leak. `-z ZONE` watches a different label; the default is `data.kalloc.1024[vfs.namei]`.
+
+Observed on this machine (macOS 26.5.1, build 25F80, 2 days uptime): **16.2 GB** stuck in
+`data.kalloc.1024[vfs.namei]` — the kernel's pathname-lookup buffers, ~1 KB leaked per path
+resolution, so it scales with `open`/`stat`/`access` volume (node module resolution, file
+watchers, repo scans). Kernel *zones* are normally well under 1 GB in total; when the sampler
+shows one zone holding tens of percent of all wired memory, that is the leak, and rebooting is the
+only way to reclaim it.
+
 ## Verdict rubric
 
 The script applies these thresholds; apply the same judgment if reading raw:
