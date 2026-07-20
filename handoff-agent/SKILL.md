@@ -100,12 +100,10 @@ Canonical monitored launches:
 ```
 
 With no `--backend`, the launcher uses cmux only when the orchestrator process
-inherits a cmux workspace context and the cmux connection is reachable (the
-worker launches into that workspace); otherwise it uses tmux. Pass `--backend
-cmux` or `--backend tmux` only when the user asks for an override or an
-operational constraint requires it. Launcher internals — model/effort defaults,
-Kimi delivery mechanics, watcher hosting modes, readiness waits — live in
-`references/launch-details.md`.
+inherits a reachable cmux workspace (the worker launches into it); otherwise
+tmux. Override with `--backend cmux|tmux` only on request or operational need.
+Launcher internals — model/effort defaults, Kimi delivery, watcher hosting
+modes, readiness waits — live in `references/launch-details.md`.
 
 Parse the launcher's JSON response and retain `run_dir`, `transport`, and
 `handle`. When not actively babysitting the worker, verify
@@ -116,16 +114,9 @@ rescue command instead of claiming the worker started. Verify
 live run, but later fast dispatch/context must fall back to the retained run
 and handle fields. Report the run and handle immediately without polling status.
 
-### Remote Codex folder-trust gate
-
-Remote Codex launches automatically use a 30-second ready gate, then make at
-most one exact-handle tmux capture. The launcher sends `C-m` only when it sees
-Codex's exact folder-trust dialog for the supplied `--remote-cwd`; otherwise it
-returns `startup_unconfirmed`. Treat `folder_trust_rescued` as a successful
-transport rescue and resume normal event-driven behavior. Do not inspect the
+Remote Codex launches rescue their own folder-trust dialog. Do not inspect the
 screen yourself unless the launcher reports `startup_unconfirmed`; then read
-`references/rescue-and-close.md`. Pass `--readiness-timeout` only to override
-the bounded startup wait.
+`references/rescue-and-close.md`.
 
 For a managed run, create one dedicated mode-`0700` private directory and add
 `--retain-orchestrator`. When `HANDOFF_CREDENTIAL_DIR` is supplied, the launcher
@@ -173,18 +164,14 @@ absolute `--run-dir`:
 <helper> runs prune [--older-than DAYS] [--host NAME] [--no-terminal-only] (--dry-run | --yes)
 ```
 
-`runs forget`/`runs prune` refuse a run that is not known to be terminal
-(a missing run directory counts as terminal — a dangling pointer) unless
-explicitly overridden; `prune` previews with `--dry-run` and requires `--yes`
-for a real run, reporting skipped records with reasons. `runs doctor` names
-invalid records individually when one corrupt entry breaks registry reads;
-`runs forget` is the remedy it points to.
-
-One exception: a record that is invalid only because it predates the
-orchestrator rename is *not* removable. Both commands refuse it and point at
-`scripts/migrate_handoff_state_orchestrator.py`, because the migration
-restores such a record intact while removing it would destroy state. Migrate
-rather than forget when a whole host has drifted.
+Both refuse a run not known to be terminal (a missing run directory counts as
+terminal — a dangling pointer) unless overridden; `prune` previews with
+`--dry-run` and requires `--yes`. `runs doctor` names invalid records
+individually when one corrupt entry breaks every registry read, and `forget` is
+the remedy it points to. **Exception:** a record invalid only because it
+predates the orchestrator rename is refused outright and pointed at
+`scripts/migrate_handoff_state_orchestrator.py` — migration restores it intact,
+removal destroys it. When a whole host has drifted, migrate rather than forget.
 
 Every successful terminal launch privately registers the run on its owning
 host; a remote launch also registers a credential-free proxy on the orchestrator
@@ -194,13 +181,9 @@ context compaction or after removing a temporary kickoff source. Treat
 `status.json`, `control.json`, and the journals as evidence — never infer
 progress, acknowledgment, or success from terminal echoes.
 
-When a cmux-launched worker publishes a `result`, `handoffctl` first makes the
-result and `awaiting_review` state durable, then sends a best-effort native
-cmux notification titled `Handoff result ready` with body `Awaiting orchestrator
-review`, targeting the inherited `CMUX_SURFACE_ID`. Missing cmux context,
-command failure, or timeout never invalidates the result and must not make the
-worker retry publication or leave `awaiting_review`; the durable outbox event
-is always authoritative. Pure tmux runs do not receive this cmux-native alert.
+A cmux result also fires a best-effort native notification, but the durable
+outbox event is always authoritative: a failed or missing alert never
+invalidates the result (mechanics in `references/launch-details.md`).
 
 While actively coordinating, renew the orchestrator lease at least every 60
 seconds and before other orchestrator mutations:
@@ -223,15 +206,14 @@ handle every event through a contiguous sequence, then call
 `control consume --through N`. Re-reading an event is safe; use its stable
 `message_id` for idempotent handling.
 
-Blocking-question completeness contract: treat a worker question as
-self-contained only when it states the current stage and completed work,
-concrete evidence, the exact conflict, the decision or authority needed, a
-recommended resolution, the consequences of the available options, and actions
-intentionally deferred. Assume the worker knows the kickoff while you do not
-know the worker's live progress; do not reconstruct missing context or guess.
-Send a `steer` requesting the missing context, ring the normal opaque doorbell,
-and answer the substantive question only after the worker supplements the
-durable outbox record.
+Blocking-question completeness contract: a worker question is self-contained
+only when it states the current stage and completed work, concrete evidence,
+the exact conflict, the decision or authority needed, a recommended resolution,
+the consequences of each option, and what was intentionally deferred. The
+worker knows the kickoff; you do not know its live progress — so never
+reconstruct missing context or guess. Send a `steer` asking for what is
+missing, ring the normal doorbell, and answer the substantive question only
+once the worker has supplemented the durable record.
 
 For steering, answers, and reviews:
 
@@ -252,11 +234,9 @@ For steering, answers, and reviews:
   the body goes as `steer`. Verify which happened from the response's
   `answered_question` / `superseded_result` / `message.type` fields — when
   answering a blocking question, confirm `answered_question` matches the question
-  you meant to answer. Remote dispatch performs the full owner-side transaction
-  and tmux doorbell in one SSH invocation, so it needs an up-to-date `agents`
-  package on the owning host; if a dispatched authorization ever still leaves
-  the worker `blocked` with `message.type: steer`, the owning host runs a stale
-  package — update it rather than hand-rolling a takeover.
+  you meant to answer. A dispatched authorization that still leaves the worker
+  `blocked` with `message.type: steer` means the owning host runs a stale
+  package (see `references/launch-details.md`), not that you need a takeover.
 - Write body and data to private files or structured stdin. Never interpolate
   user/model content into a shell program.
 - Use low-level `send --type steer` only while already holding a managed lease.
@@ -282,14 +262,13 @@ commits, and results. A message sent during a long model turn may wait until
 the next checkpoint.
 
 - The session watcher is started with `orchestrator start`; never replace it with a time-limited generic observer — a self-run `watch --timeout` is for debugging only, never for waiting on worker events.
-- A cmux orchestrator's doorbell uses two channels, recorded in the run's `last_doorbell_method` (e.g. `cmux_input+cmux_notify`): typed input into the orchestrator surface — counted only when the text visibly echoes, and the only channel that pushes an idle orchestrator agent to act — plus the visible `cmux notify` alert for the human. The doorbell may arrive as a typed prompt in your own composer; treat it as the trigger to inspect the exact pending prefix with `<helper> orchestrator pending --state "$handoff_orchestrator_state"`.
-- `orchestrator pending` **acknowledges** the events it surfaces: it records a per-run `acknowledged_through` cursor in the watcher state, and for a **result** or review the watcher will not re-ring an event you have already loaded. A strictly newer worker event still rings, and each worker is tracked independently, so acking one worker never silences another.
+- A doorbell may arrive as a typed prompt in your own composer. Treat it as the trigger to inspect the exact pending prefix with `<helper> orchestrator pending --state "$handoff_orchestrator_state"`, which also **acknowledges** what it surfaces.
 - Ringing is **state-aware**: a worker **blocked** on a question keeps re-ringing until it is answered (a bare ack does not silence a stuck worker — it needs the answer, not just to be seen); a result rings until loaded; pure progress checkpoints and terminal (`succeeded`/`stopped`) states do not ring at all. The cure for a repeating doorbell on a *result* is `orchestrator pending`, never killing or closing the watcher.
-- Never close the watcher's surface to stop a repeating doorbell: the watcher is session-scoped — other workers may still be running, and the orchestrator can still spawn new ones that need watching — so it must live until the orchestrator process exits, which it detects on its own. A repeat doorbell can still occur legitimately when delivery to the composer failed (e.g. an unechoed `cmux_input`); `pending` clears that too, and if it truly cannot be delivered the worker state is still durable in the outbox.
-- To silence a run's current doorbell **without** consuming it or holding a lease — a completed run parked in `awaiting_review` for viewing, or a `blocked` run you are done with — use the credential-free `<helper> orchestrator dismiss --state "$handoff_orchestrator_state" --run <selector>`. `dismiss` records a per-run `dismissed_through` cursor; it stops ringing even a persistent `blocked` nag, and a strictly newer worker event still re-rings.
-- `<helper> watch [--run <selector> ...] --interval 5 --timeout <seconds>` (omit `--run` to watch every registered run; `--once` for one pass; `--notify-cmux` for metadata-only alerts) is an ad-hoc foreground JSONL observer for debugging or rescue only, never a way to wait for worker events in a normal flow. It advances only its private observer cursor: it does not consume protocol outbox events, review a result, answer a question, or hold an orchestrator lease. The detached session watcher likewise never performs semantic actions; it only maintains independent delivery cursors and sends opaque doorbells. Autonomous replies still require an active orchestrator agent with authority for the decision.
-- For urgent steering while you hold no active orchestrator lease (external intervention or an expired lease — `dispatch` refuses to run while a managed lease is held; a managed orchestrator driving the normal answer/review/stop lifecycle uses `send`, which rings the doorbell itself): use `handoffctl dispatch` so the instruction is durably appended before the exact registered handle is touched; confirm `doorbell_sent: true`, otherwise use the returned durable message sequence and stored handle for a narrow manual doorbell; never type the steering body or credentials into cmux/tmux — a doorbell contains only `Check handoff run <run-id>; inbox now through seq <N>.`
+- Never close the watcher's surface to stop a repeating doorbell: it is session-scoped — other workers may still be running and you can still spawn more — so it must live until the orchestrator process exits, which it detects on its own.
+- To silence a run without consuming it or holding a lease, use the credential-free `<helper> orchestrator dismiss --state "$handoff_orchestrator_state" --run <selector>`.
+- For urgent steering while you hold no active orchestrator lease, use `handoffctl dispatch` so the instruction is durably appended before the exact registered handle is touched; confirm `doorbell_sent: true`, otherwise use the returned message sequence and stored handle for a narrow manual doorbell. Never type a steering body or credential into cmux/tmux — a doorbell contains only `Check handoff run <run-id>; inbox now through seq <N>.`
 - A doorbell queues behind a running turn; it cannot interrupt the model. Hooks remain an optimization; the durable journal is authoritative even when a watcher or doorbell fails.
+- Cursor semantics, the two cmux channels, and the generic `watch` observer are in `references/launch-details.md`.
 
 ## Review and finish
 

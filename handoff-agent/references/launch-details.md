@@ -40,3 +40,61 @@ confirmation. Remote Codex is automatic exception: it uses a 30-second ready
 gate so the local launcher can deterministically rescue its exact folder-trust
 dialog if needed. A `.goal` launch already waits because the second command
 cannot be delivered safely before the ready checkpoint.
+
+## Remote Codex folder-trust gate
+
+Within that 30-second gate the launcher makes at most one exact-handle tmux
+capture and sends `C-m` only when it sees Codex's exact folder-trust dialog for
+the supplied `--remote-cwd`; otherwise it returns `startup_unconfirmed`.
+`folder_trust_rescued` means the transport rescue succeeded — resume normal
+event-driven behavior. `--readiness-timeout` overrides the bounded wait.
+
+## Result notification
+
+When a cmux-launched worker publishes a `result`, `handoffctl` makes the result
+and `awaiting_review` state durable *first*, then sends a best-effort native
+cmux notification titled `Handoff result ready` with body `Awaiting orchestrator
+review`, targeting the inherited `CMUX_SURFACE_ID`. Pure tmux runs get no such
+alert. Missing cmux context, command failure, or timeout must never make the
+worker retry publication or leave `awaiting_review`.
+
+## Doorbell delivery mechanics
+
+Why the core's doorbell rules are what they are:
+
+- A cmux orchestrator's doorbell uses two channels, recorded in the run's
+  `last_doorbell_method` (e.g. `cmux_input+cmux_notify`): typed input into the
+  orchestrator surface — counted only when the text visibly echoes, and the only
+  channel that pushes an idle orchestrator agent to act — plus a visible
+  `cmux notify` alert for the human. So a doorbell may arrive as a typed prompt
+  in your own composer.
+- `orchestrator pending` records a per-run `acknowledged_through` cursor, so a
+  result or review you have already loaded stops re-ringing. A strictly newer
+  worker event still rings, and each worker is tracked independently, so acking
+  one never silences another. A repeat doorbell can also occur legitimately when
+  delivery to the composer failed (e.g. an unechoed `cmux_input`); `pending`
+  clears that too, and the worker state is durable in the outbox regardless.
+- `orchestrator dismiss --state <state> --run <selector>` silences a run's
+  current doorbell *without* consuming it or holding a lease — a completed run
+  parked in `awaiting_review` for viewing, or a `blocked` run you are done with.
+  It records a per-run `dismissed_through` cursor, stops even a persistent
+  `blocked` nag, and a strictly newer worker event still re-rings.
+- `watch [--run <selector> ...] --interval 5 --timeout <seconds>` (omit `--run`
+  for every registered run; `--once` for one pass; `--notify-cmux` for
+  metadata-only alerts) is an ad-hoc foreground JSONL observer for debugging or
+  rescue only. It advances only its private observer cursor: it never consumes
+  protocol outbox events, reviews a result, answers a question, or holds a
+  lease. The session watcher likewise performs no semantic actions — it
+  maintains delivery cursors and sends opaque doorbells. Autonomous replies
+  still require an orchestrator agent with authority for the decision.
+- Urgent steering while holding no lease: `dispatch` refuses to run while a
+  managed lease is held, and a managed orchestrator driving the normal
+  answer/review/stop lifecycle uses `send`, which rings the doorbell itself.
+
+## Dispatch on a stale remote package
+
+Remote `dispatch` performs the full owner-side transaction and tmux doorbell in
+one SSH invocation, so it needs an up-to-date `agents` package on the owning
+host. If a dispatched authorization still leaves the worker `blocked` with
+`message.type: steer`, that host runs a stale package — update it (see
+`scripts/update_agents.sh`) rather than hand-rolling a takeover.
