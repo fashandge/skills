@@ -72,11 +72,10 @@ remote Python over SSH. Execute orchestrator mutations the same way with
 `HANDOFF_COORDINATOR_TOKEN_FILE` set inside the remote command. Transfer body or
 data through private files or SSH stdin, never shell interpolation. Construct
 remote commands as shell-quoted argv and use `handoffctl --help` for exact
-payload flags. (The remote host still runs the pre-rename package, so the
-credential filename, the token env var, and the SSH wire keys keep their old
-`coordinator` spellings there — rename them only when the remote package is
-updated. Local runs use `orchestrator.token` and
-`HANDOFF_ORCHESTRATOR_TOKEN_FILE`.)
+payload flags. (Both hosts now run the post-rename package: new runs use
+`orchestrator.token` and `HANDOFF_ORCHESTRATOR_TOKEN_FILE` on either side.
+Credential files created before the rename keep their `coordinator.token`
+names, so read the exact path from the run rather than assuming a spelling.)
 
 For a remote doorbell, append the durable message first, then send only the
 opaque run ID and inbox sequence to the exact remote tmux handle, following the
