@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>local.wired-zone-sampler</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/zsh</string>
+		<string>/Users/jianfuchen/skills/memory-health-check/scripts/sample_wired_zones.sh</string>
+	</array>
+	<key>StartInterval</key>
+	<integer>900</integer>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<!-- SUDO_USER/HOME steer the sampler's CSV log to the real user's
+		     ~/.local/state/ and let it chown rows back to that user. -->
+		<key>SUDO_USER</key>
+		<string>jianfuchen</string>
+		<key>HOME</key>
+		<string>/Users/jianfuchen</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/var/log/wired-zone-sampler.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>/var/log/wired-zone-sampler.err.log</string>
+</dict>
+</plist>

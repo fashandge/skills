@@ -94,6 +94,14 @@ It appends a CSV row per sample (zone size, total wired, swap, process counts) t
 what turns "my Mac is slow" into a filable bug report and lets you A/B which workload drives the
 leak. `-z ZONE` watches a different label; the default is `data.kalloc.1024[vfs.namei]`.
 
+Persistent sampling on this machine: root LaunchDaemon `local.wired-zone-sampler` (plist source
+`launchd/local.wired-zone-sampler.plist` in this skill, installed at
+`/Library/LaunchDaemons/`) takes one sample every 15 min plus one at boot, so the CSV keeps
+growing across reboots without any sudo runs. Manage: `sudo launchctl bootout
+system/local.wired-zone-sampler` to stop, `sudo launchctl bootstrap system
+/Library/LaunchDaemons/local.wired-zone-sampler.plist` to start; stdout/stderr at
+`/var/log/wired-zone-sampler.{out,err}.log`.
+
 Observed on this machine (macOS 26.5.1, build 25F80, 2 days uptime): **16.2 GB** stuck in
 `data.kalloc.1024[vfs.namei]` — the kernel's pathname-lookup buffers, ~1 KB leaked per path
 resolution, so it scales with `open`/`stat`/`access` volume (node module resolution, file
