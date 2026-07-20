@@ -251,7 +251,10 @@ the next checkpoint.
 ## Review and finish
 
 1. Consume the worker's `result` event.
-2. Verify its named artifacts, reported HEAD/dirty state, repository diff, and test evidence directly. A run may start or finish with pre-existing changes; never require the worker to stash, discard, or commit unrelated user work.
+2. Select review depth proportionally; do not redo the delegated task by default.
+   - Always inspect the durable result for completeness, scope compliance, and concrete evidence.
+   - For bounded, low-stakes research, treat timestamped primary-source links and an internally consistent report as sufficient evidence. Do not repeat the same retrieval, web search, calculation, or analysis merely to validate it. Audit only when the evidence is missing or conflicting, the output is anomalous, or the user/task requires independent verification.
+   - For code, named artifacts, multi-step or materially complex analysis, or high-stakes decisions, verify the relevant artifacts, reported HEAD/dirty state, repository diff, test evidence, and pivotal claims directly. A run may start or finish with pre-existing changes; never require the worker to stash, discard, or commit unrelated user work.
 3. Send an accepted or changes-requested review tied to that exact result ID.
 4. Wait for the worker to consume acceptance and emit `succeeded`; do not confuse worker success with coordinator acceptance or integration. Waiting means watching for the watcher's next doorbell, not polling yourself.
 5. Record `control integrate` or `control abandon`, then send a graceful stop and confirm its `doorbell_sent` — without the doorbell the idle worker never learns the run is over.
