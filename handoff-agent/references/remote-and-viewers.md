@@ -26,6 +26,23 @@ Canonical remote Claude launch on that box:
   --orchestrator-state "$handoff_orchestrator_state"
 ```
 
+Remote Codex automatically uses a 30-second ready gate and, only on timeout,
+captures the exact tmux handle once to rescue Codex's exact folder-trust dialog
+for the supplied `--remote-cwd`. No extra flags are needed:
+
+```bash
+~/projects/agents/scripts/handoff_agent.sh <name> <local-kickoff.md> \
+  --agent codex --remote-host oci-box \
+  --remote-cwd /home/opc/projects/investment \
+  --remote-python /home/opc/miniforge3/envs/ml/bin/python \
+  --orchestrator-state "$handoff_orchestrator_state"
+```
+
+The JSON reports `folder_trust_rescued` or `startup_unconfirmed`. Inspect the
+terminal manually only for the latter; otherwise continue with normal
+event-driven coordination. Pass `--readiness-timeout` only to override 30
+seconds.
+
 The launcher sends the local kickoff and optional sibling `.goal` as JSON over
 SSH stdin. It creates the authoritative run and credentials on the remote host,
 starts remote tmux, and returns `run_dir` as an `ssh://` URI plus `remote_host`,
@@ -159,23 +176,30 @@ tmux window is already native there.
 
 ## Keep viewed sessions showing progress
 
-A viewer is only useful if the pane has something to show. Agent workers
-(Claude/Codex/Kimi) render their own TUI, so they need nothing extra. But
-an ad-hoc tmux session running a batch command (a rebuild, a sweep, a bulk
-download) with output redirected to a log file displays a blank pane that
-reads as "dead" — the user cannot tell progress from failure. When
-creating any tmux session the user may view, keep the pane live while
-still capturing the log with the logged-runner helper:
+A viewer is only useful if the pane has something to show — and the pane
+must never own the process. A command run AS the tmux pane command dies
+with the pane, and the mirror mapping is bidirectional, so a user
+accidentally ⌘W-ing a mirror workspace kills the remote session, SIGHUPs
+the pane's process group, and destroys hours of batch work (this happened
+2026-07-20 to a resumable-only-by-luck codex run). Agent workers
+(Claude/Codex/Kimi) launched by the handoff launcher accept this coupling
+deliberately — the durable protocol survives them and `codex exec resume`
+can revive a killed worker — but ad-hoc batch commands (a rebuild, a
+sweep, a bulk download) must be decoupled. Use the logged-runner helper
+for any non-TUI batch job the user may view:
 
 ```bash
 ~/projects/agents/scripts/tmux_run_logged.sh <session-name> <logfile> -- <command...>
 ```
 
-It tees the command's output to both the pane and the logfile and appends
-`EXIT:<code>` taken from `PIPESTATUS[0]` (plain `$?` after a pipe reports
-tee's status, not the command's). If a tool is genuinely silent for long
-stretches, prefer a variant that emits periodic progress (verbose/progress
-flags) so the pane visibly advances.
+It runs the command under `setsid nohup` (immune to tmux/SSH/viewer
+death) with output to the logfile plus a final `EXIT:<code>` line, and
+creates a disposable tmux view session running `tail -F <logfile>` —
+closing the view (or its mirror workspace) kills only the tail. Put any
+completion chain (notification, watchdog re-arm) inside the command
+passed to the helper, never in a tmux session. If a tool is genuinely
+silent for long stretches, prefer a variant that emits periodic progress
+(verbose/progress flags) so the pane visibly advances.
 
 ## Layout-safety invariants
 

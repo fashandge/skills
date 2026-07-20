@@ -73,6 +73,24 @@ cmux send-key --surface <uuid> enter
 tmux send-keys -t <name> Enter
 ```
 
+### Codex folder-trust dialog
+
+The launcher handles this automatically for new remote Codex runs. Use this
+manual fallback only for an older run or a launcher result with
+`startup_unconfirmed`. For the exact dialog with `1. Yes, continue` selected,
+use `C-m` for a tmux worker:
+
+```bash
+ssh <host> tmux send-keys -t <remote-handle> C-m
+ssh <host> tmux capture-pane -p -t <remote-handle> -S -120
+```
+
+Use this only after the five terminal-rescue checks above confirm the exact
+user-authorized repository. Send it once, recapture, and require evidence that
+the Codex agent started or the semantic status advanced. Do not retry keys in a
+loop, use a protocol steer for the dialog, or treat the disappeared prompt as
+task completion.
+
 Never run a generic loop that repeatedly presses Enter, never infer permission
 from the currently highlighted default alone, and never treat disappearance of
 the dialog as semantic task success. Terminal approval is an operational rescue

@@ -36,5 +36,7 @@ sitting unsent.
 ## Readiness waits
 
 Add `--wait-ready` only when the caller truly needs synchronous readiness
-confirmation. A `.goal` launch already waits because the second command cannot
-be delivered safely before the ready checkpoint.
+confirmation. Remote Codex is automatic exception: it uses a 30-second ready
+gate so the local launcher can deterministically rescue its exact folder-trust
+dialog if needed. A `.goal` launch already waits because the second command
+cannot be delivered safely before the ready checkpoint.

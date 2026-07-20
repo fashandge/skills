@@ -14,10 +14,15 @@ set -u
 MP=/usr/bin/memory_pressure
 VMSTAT=/usr/bin/vm_stat
 SYSCTL=/usr/sbin/sysctl
+TOP=/usr/bin/top
 
 [[ -x $MP ]]     || MP=$(command -v memory_pressure 2>/dev/null || echo memory_pressure)
 [[ -x $VMSTAT ]] || VMSTAT=$(command -v vm_stat 2>/dev/null || echo vm_stat)
 [[ -x $SYSCTL ]] || SYSCTL=$(command -v sysctl 2>/dev/null || echo sysctl)
+[[ -x $TOP ]]    || TOP=$(command -v top 2>/dev/null || echo top)
+
+# How many top consumers to list (override: TOPN=20 check_memory.sh).
+TOPN=${TOPN:-12}
 
 mp_out=$("$MP" 2>/dev/null)
 vm_out=$("$VMSTAT" 2>/dev/null)
@@ -108,4 +113,17 @@ print -r -- "Swap used:             ${swap_used_gb} GB  (of ${swap_total:-?} MB 
 print -r -- ""
 print -r -- "VERDICT: ${verdict}"
 for r in "${reasons[@]}"; do print -r -- "  - $r"; done
+
+# --- top memory consumers ----------------------------------------------------
+# top's MEM column is the right per-process ranking here; `ps -o rss` has been
+# seen to report near-zero RSS in some sandboxed/stripped environments, so we
+# use top -l 1 (single non-interactive sample). Print from the PID header down.
+top_out=$("$TOP" -l 1 -o mem -n "$TOPN" -stats pid,command,mem 2>/dev/null)
+print -r -- ""
+print -r -- "=== Top ${TOPN} memory consumers ==="
+if [[ -n "$top_out" ]]; then
+  print -r -- "$top_out" | awk '/^PID/{p=1} p'
+else
+  print -r -- "(top unavailable — non-macOS or tool missing)"
+fi
 exit 0

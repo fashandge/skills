@@ -1,7 +1,7 @@
 ---
 name: memory-health-check
 description: Check whether a macOS machine's memory (RAM) is healthy by running memory_pressure, vm_stat, and sysctl vm.swapusage, then interpreting the results into a healthy / borderline / critical verdict. Use whenever the user asks "is my memory healthy", "am I low on RAM", "why is my Mac slow / beachballing", "check memory pressure", "how much memory am I using", "is my swap too high", or shares an Activity Monitor memory screenshot and wants it assessed. Reads the live system, not just the screenshot, so it gives a precise answer rather than eyeballing a graph.
-allowed-tools: Bash(zsh:*), Bash(memory_pressure:*), Bash(vm_stat:*), Bash(sysctl:*), Bash(/usr/bin/memory_pressure:*), Bash(/usr/bin/vm_stat:*), Bash(/usr/sbin/sysctl:*)
+allowed-tools: Bash(zsh:*), Bash(memory_pressure:*), Bash(vm_stat:*), Bash(sysctl:*), Bash(top:*), Bash(/usr/bin/memory_pressure:*), Bash(/usr/bin/vm_stat:*), Bash(/usr/sbin/sysctl:*), Bash(/usr/bin/top:*)
 ---
 
 # memory-health-check
@@ -13,8 +13,8 @@ and turns them into a plain verdict.
 
 ## How to run it
 
-Run the bundled probe. It gathers all three sources, does the page-size math, and prints a
-verdict block:
+Run the bundled probe. It gathers all three counter sources, does the page-size math, prints a
+verdict block, and then lists the top memory-consuming processes:
 
 ```bash
 ~/skills/memory-health-check/scripts/check_memory.sh
@@ -25,13 +25,24 @@ must not read as a failed step). It uses absolute tool paths so it works under s
 (launchd/cron) too. If the user is on a non-macOS machine the tools won't exist and the script
 will report mostly blanks — say so rather than inventing numbers.
 
+The top-consumers list defaults to 12 processes; override with `TOPN`:
+
+```bash
+TOPN=20 ~/skills/memory-health-check/scripts/check_memory.sh
+```
+
 If you prefer to read the raw sources yourself (e.g. to show the user the underlying output):
 
 ```bash
-memory_pressure | tail -1            # headline "free percentage"
-vm_stat                              # page-level counters (16 KB pages on Apple Silicon)
-/usr/sbin/sysctl vm.swapusage        # swap total / used / free
+memory_pressure | tail -1                        # headline "free percentage"
+vm_stat                                          # page-level counters (16 KB pages on Apple Silicon)
+/usr/sbin/sysctl vm.swapusage                    # swap total / used / free
+top -l 1 -o mem -n 12 -stats pid,command,mem     # top processes by memory
 ```
+
+Use `top` for per-process memory, **not** `ps -o rss` — the latter has been seen to report
+near-zero RSS under sandboxed/stripped environments, giving a bogus ranking. `top -l 1` takes a
+single non-interactive sample and works fine headless.
 
 ## What each metric means
 
@@ -81,3 +92,10 @@ practical fix is closing memory-heavy apps or adding RAM rather than any setting
 If the user shared an Activity Monitor screenshot, reconcile it with the live reading: the
 screenshot's "Compressed" figure should roughly match the script's compressor-occupied GB, and
 its pressure graph color should track the free %.
+
+When the verdict is Borderline or Critical, use the top-consumers list to make the advice
+concrete: name the actual heavy processes and group related ones (e.g. several Chrome helpers,
+or a stack of AI/dev tools) so the total is visible, then point at the biggest realistic wins
+rather than a generic "close some apps". A single large process is one lever; a swarm of
+mid-size ones that sum to gigabytes is another. Don't suggest killing system processes like
+`WindowServer` or `kernel_task`.

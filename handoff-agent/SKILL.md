@@ -107,6 +107,17 @@ rescue command instead of claiming the worker started. Verify
 live run, but later fast dispatch/context must fall back to the retained run
 and handle fields. Report the run and handle immediately without polling status.
 
+### Remote Codex folder-trust gate
+
+Remote Codex launches automatically use a 30-second ready gate, then make at
+most one exact-handle tmux capture. The launcher sends `C-m` only when it sees
+Codex's exact folder-trust dialog for the supplied `--remote-cwd`; otherwise it
+returns `startup_unconfirmed`. Treat `folder_trust_rescued` as a successful
+transport rescue and resume normal event-driven behavior. Do not inspect the
+screen yourself unless the launcher reports `startup_unconfirmed`; then read
+`references/rescue-and-close.md`. Pass `--readiness-timeout` only to override
+the bounded startup wait.
+
 For a managed run, create one dedicated mode-`0700` private directory and add
 `--retain-orchestrator`. When `HANDOFF_CREDENTIAL_DIR` is supplied, the launcher
 uses that exact directory, so the orchestrator token is exactly
