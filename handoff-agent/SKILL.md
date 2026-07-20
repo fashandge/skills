@@ -30,9 +30,18 @@ section owns the boundary — defer to it rather than restating it here).
    after a successful launch. The launcher has already copied it into the
    durable run directory by then; later `handoffctl context` reads that durable
    copy, so retaining the temporary source adds no recovery value.
-4. Add `<kickoff>.goal` only when autonomous continuation is wanted. Put one
+4. Fence shared state in every kickoff that touches it. Have the worker test
+   against throwaway copies (`mktemp -d`) redirected through whatever env var
+   the code already honors, never against live state; a path that cannot be
+   redirected is a defect worth reporting rather than working around. Scratch
+   writes outside the repo are free, but a *durable* change elsewhere (a global
+   skill, a config, an installed hook) must be backed up first and named in the
+   worker's `result` — that edit is invisible to the run repo's `git status`,
+   and the durable outbox is the one channel that survives the worker's
+   context being compacted or lost.
+5. Add `<kickoff>.goal` only when autonomous continuation is wanted. Put one
    complete `/goal ...` command on its first line.
-5. Ask only when the repository, agent, or machine is genuinely ambiguous.
+6. Ask only when the repository, agent, or machine is genuinely ambiguous.
 
 ## Choose the launch mode
 
@@ -289,10 +298,20 @@ the next checkpoint.
    - Always inspect the durable result for completeness, scope compliance, and concrete evidence.
    - For bounded, low-stakes research, treat timestamped primary-source links and an internally consistent report as sufficient evidence. Do not repeat the same retrieval, web search, calculation, or analysis merely to validate it. Audit only when the evidence is missing or conflicting, the output is anomalous, or the user/task requires independent verification.
    - For code, named artifacts, multi-step or materially complex analysis, or high-stakes decisions, verify the relevant artifacts, reported HEAD/dirty state, repository diff, test evidence, and pivotal claims directly. A run may start or finish with pre-existing changes; never require the worker to stash, discard, or commit unrelated user work.
-3. Send an accepted or changes-requested review tied to that exact result ID.
-4. Wait for the worker to consume acceptance and emit `succeeded`; do not confuse worker success with orchestrator acceptance or integration. Waiting means watching for the watcher's next doorbell, not polling yourself.
-5. Record `control integrate` or `control abandon`, then send a graceful stop and confirm its `doorbell_sent` — without the doorbell the idle worker never learns the run is over.
-6. Run read-only `doctor`. Use repair flags only for identified, explicit recovery; never repair implicitly.
+3. For code results, sweep every checkout — not just the run's repo — with
+   `~/projects/agents/scripts/fleet_status.sh`. A worker's edit to a checkout
+   outside its target repo is invisible to that repo's `git status` and one
+   `git checkout` from being lost; unexpected dirt anywhere is part of the
+   result to review. Run it before a remote launch too, so the run starts from
+   a known-good baseline rather than a host that has silently drifted.
+4. With several workers in flight, merge every branch that touched a shared
+   file before reviewing any of them, then add a test exercising one worker's
+   feature against another's data path. Independently correct changes compose
+   into bugs no single worker can see; that interaction is yours to catch.
+5. Send an accepted or changes-requested review tied to that exact result ID.
+6. Wait for the worker to consume acceptance and emit `succeeded`; do not confuse worker success with orchestrator acceptance or integration. Waiting means watching for the watcher's next doorbell, not polling yourself.
+7. Record `control integrate` or `control abandon`, then send a graceful stop and confirm its `doorbell_sent` — without the doorbell the idle worker never learns the run is over.
+8. Run read-only `doctor`. Use repair flags only for identified, explicit recovery; never repair implicitly.
 
 ## Safety rules
 
