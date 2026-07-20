@@ -6,14 +6,14 @@ them.
 
 ## Watcher hosting modes
 
-`coordinator start` picks the watcher's hosting by transport (`--mode auto`):
-cmux coordinators get a **surface-hosted** watcher — a terminal tab named
-`watcher: <coordinator workspace>` parked in the bottom `handoff-watchers`
+`orchestrator start` picks the watcher's hosting by transport (`--mode auto`):
+cmux orchestrators get a **surface-hosted** watcher — a terminal tab named
+`watcher: <orchestrator workspace>` parked in the bottom `handoff-watchers`
 workspace, kept inside the cmux process tree so typed doorbells and native
-alerts work — while tmux and native-app coordinators keep the fully detached
+alerts work — while tmux and native-app orchestrators keep the fully detached
 daemon. Closing the watcher tab (or the `handoff-watchers` workspace) kills
-the watcher; rerun `coordinator start` to relaunch it. Do not force
-`--mode detached` for a cmux coordinator unless degraded transient
+the watcher; rerun `orchestrator start` to relaunch it. Do not force
+`--mode detached` for a cmux orchestrator unless degraded transient
 macOS-banner doorbells are acceptable (the cmux socket rejects out-of-tree
 clients).
 

@@ -1,6 +1,6 @@
 # Launch a Codex desktop-app task
 
-Use this transport only when the coordinator is itself in the Codex app, the
+Use this transport only when the orchestrator is itself in the Codex app, the
 app task controls are available, and the user explicitly asks for a new or
 background Codex task. Do not create a task merely because the user asks how
 the mode works. The created task is user-owned and appears in the app.

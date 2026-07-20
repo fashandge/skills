@@ -23,7 +23,7 @@ Canonical remote Claude launch on that box:
   --agent claude --remote-host oci-box \
   --remote-cwd /home/opc/projects/investment \
   --remote-python /home/opc/miniforge3/envs/ml/bin/python \
-  --coordinator-state "$handoff_coordinator_state"
+  --orchestrator-state "$handoff_orchestrator_state"
 ```
 
 The launcher sends the local kickoff and optional sibling `.goal` as JSON over
@@ -34,7 +34,7 @@ accepts the absolute `remote_run_dir`, not the URI, and must run on the owning
 host through SSH. Never rsync, Git-sync, or mount an active remote run
 directory as a second writable copy.
 
-When not actively babysitting the run, require `coordinator_released: true` and
+When not actively babysitting the run, require `orchestrator_released: true` and
 report the remote run URI and handle without polling; the local session watcher
 observes the credential-free remote registry proxy. For an actively managed
 remote run, choose one exact, unique, mode-`0700` path on the remote host and
@@ -46,12 +46,12 @@ HANDOFF_REMOTE_CREDENTIAL_DIR=/home/opc/.local/state/agents/handoff/coordinators
   --agent claude --remote-host oci-box \
   --remote-cwd /home/opc/projects/investment \
   --remote-python /home/opc/miniforge3/envs/ml/bin/python \
-  --retain-coordinator --coordinator-state "$handoff_coordinator_state"
+  --retain-orchestrator --orchestrator-state "$handoff_orchestrator_state"
 ```
 
-Keep that path private and remember it exactly; the remote coordinator token is
+Keep that path private and remember it exactly; the remote orchestrator token is
 `<remote-private-dir>/coordinator.token`. Execute status/read/doctor with the
-remote Python over SSH. Execute coordinator mutations the same way with
+remote Python over SSH. Execute orchestrator mutations the same way with
 `HANDOFF_COORDINATOR_TOKEN_FILE` set inside the remote command. Transfer body or
 data through private files or SSH stdin, never shell interpolation. Construct
 remote commands as shell-quoted argv and use `handoffctl --help` for exact
@@ -85,7 +85,7 @@ tmux new-window -d -n <name>-worker "ssh -t <host> tmux attach -t <remote-handle
 
 The viewer is deliberately read-write: it is the **user's** window onto the
 worker, and they may interact with it directly. The orchestrator itself never
-types into the viewer — coordinator steering stays in the durable protocol,
+types into the viewer — orchestrator steering stays in the durable protocol,
 and rescue/approval actions go through the exact `ssh <host> tmux ...`
 commands above so they are tied to a verified probe. The viewer is cosmetic
 transport: if it disconnects or is closed, the run is unaffected, and its

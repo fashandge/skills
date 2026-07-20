@@ -42,9 +42,9 @@ advanced `inbox_cursor` proves receipt.
 
 If semantic status is stale, distinguish a live expected agent process from a
 folder-trust TUI or dead session before taking action. Never rotate a worker
-unless the old process is confirmed dead. If coordinator lease ownership has
+unless the old process is confirmed dead. If orchestrator lease ownership has
 expired, use explicit recovery-token takeover; do not keep trying the stale
-coordinator token.
+orchestrator token.
 
 ## Terminal rescue and approval
 
@@ -90,7 +90,7 @@ action may only ever name the exact surface being removed.
 Treat an explicit request to "close", "kill", or "terminate" handoff sessions
 as a transport-level action. Resolve each exact stored handle, perform at most
 one read-only existence check, and close all requested workers directly. Do not
-take over or renew a coordinator lease, append a protocol stop, wait for worker
+take over or renew an orchestrator lease, append a protocol stop, wait for worker
 acknowledgment, consume journals, or run doctor before closing.
 
 ```bash
