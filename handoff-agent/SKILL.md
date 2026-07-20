@@ -110,13 +110,13 @@ and handle fields. Report the run and handle immediately without polling status.
 For a managed run, create one dedicated mode-`0700` private directory and add
 `--retain-orchestrator`. When `HANDOFF_CREDENTIAL_DIR` is supplied, the launcher
 uses that exact directory, so the orchestrator token is exactly
-`$handoff_private_root/coordinator.token`; never search for it with `find`.
+`$handoff_private_root/orchestrator.token`; never search for it with `find`.
 Keep credential paths and contents out of prompts, terminal messages, and user
 responses. Do not use the recovery or worker token during ordinary coordination.
 
 ```bash
-mkdir -p "$HOME/.local/state/agents/handoff/coordinators"
-handoff_private_root=$(mktemp -d "$HOME/.local/state/agents/handoff/coordinators/<name>.XXXXXX")
+mkdir -p "$HOME/.local/state/agents/handoff/orchestrators"
+handoff_private_root=$(mktemp -d "$HOME/.local/state/agents/handoff/orchestrators/<name>.XXXXXX")
 chmod 700 "$handoff_private_root"
 HANDOFF_CREDENTIAL_DIR="$handoff_private_root" \
   ~/projects/agents/scripts/handoff_agent.sh <name> <kickoff.md> <repo> \
@@ -163,7 +163,7 @@ While actively coordinating, renew the orchestrator lease at least every 60
 seconds and before other orchestrator mutations:
 
 ```bash
-HANDOFF_COORDINATOR_TOKEN_FILE=<orchestrator-token-file> \
+HANDOFF_ORCHESTRATOR_TOKEN_FILE=<orchestrator-token-file> \
   <helper> control renew --run-dir <absolute-run-dir>
 ```
 
@@ -226,7 +226,7 @@ For steering, answers, and reviews:
   and fall back to the manual doorbell procedure with the returned `message.seq`
   only when it is `false`.
 - Supply the orchestrator credential through
-  `HANDOFF_COORDINATOR_TOKEN_FILE` or `--token-file`, never argv token bytes.
+  `HANDOFF_ORCHESTRATOR_TOKEN_FILE` or `--token-file`, never argv token bytes.
 
 Run `<helper> <command> --help` for exact payload flags and schemas.
 
