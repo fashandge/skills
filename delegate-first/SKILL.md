@@ -155,10 +155,17 @@ ssh <box> 'command codex exec --yolo -C <remote-repo> --model gpt-5.6-terra \
 
 Workers start with zero session context. Every prompt: goal, exact repo/paths, constraints, non-goals, proof expected (exact test command), output shape ("report files changed + test output"). Spec quality decides success.
 
+Two lines worth carrying in every prompt that touches shared state:
+
+- **Test against copies, not the real thing.** Build throwaway trees with `mktemp -d` and redirect the code at them through whatever env var/parameter it already honors (e.g. `HANDOFF_REGISTRY_FILE`). A path that can't be redirected is a defect worth reporting — it means nobody can test that path safely.
+- **Declare durable writes outside the target repo.** Scratch/temp writes are free and expected. But if the task genuinely requires modifying something durable elsewhere (a global skill, a config, an installed hook), back up the original first and say so explicitly in the report — that edit is invisible to the reviewer's `git status` on the target repo.
+
 ## Verify (Claude, always)
 
 - `git status -sb` + read the full diff; judge like a contributor PR
 - run focused tests yourself or demand proof output; worker claims are advisory
+- **sweep every checkout, not just the target repo** — `~/projects/agents/scripts/fleet_status.sh` reports branch/HEAD/dirty/ahead-behind for each known checkout on each host (plus runtime path and pending state migrations). A worker's edit to a checkout outside its target repo is invisible to `git status` in the target and one `git checkout` from being lost; unexpected dirt anywhere is part of the result to review. Also run it *before* delegating to a remote host, so you inherit a known-good baseline
+- **when two delegations touched the same file, merge both before reviewing either**, then add at least one test exercising A's feature against B's data path. Isolated workers each ship correct code that composes into a bug neither could see — that interaction is the reviewer's job, and it is the only bug class nobody else can catch
 - iterate via resume/`--continue`; after 2 failed rounds, take over and do it directly
 - normal closeout still applies: `$autoreview` before ship
 
