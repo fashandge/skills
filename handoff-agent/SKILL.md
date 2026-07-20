@@ -147,12 +147,35 @@ Read operations need no token:
 ```bash
 <helper> runs list
 <helper> runs show --run <selector>
+<helper> runs doctor
 <helper> context --run <selector>
 <helper> status --run-dir <absolute-run-dir>
 <helper> control show --run-dir <absolute-run-dir>
 <helper> read --run-dir <absolute-run-dir> --journal outbox --after <cursor>
 <helper> doctor --run-dir <absolute-run-dir>
 ```
+
+Registry records are removable, registry-only — the run directory, journals,
+and credentials are never deleted, and a forgotten run stays inspectable by
+absolute `--run-dir`:
+
+```bash
+<helper> runs forget --run <selector> [--force]
+<helper> runs prune [--older-than DAYS] [--host NAME] [--no-terminal-only] (--dry-run | --yes)
+```
+
+`runs forget`/`runs prune` refuse a run that is not known to be terminal
+(a missing run directory counts as terminal — a dangling pointer) unless
+explicitly overridden; `prune` previews with `--dry-run` and requires `--yes`
+for a real run, reporting skipped records with reasons. `runs doctor` names
+invalid records individually when one corrupt entry breaks registry reads;
+`runs forget` is the remedy it points to.
+
+One exception: a record that is invalid only because it predates the
+orchestrator rename is *not* removable. Both commands refuse it and point at
+`scripts/migrate_handoff_state_orchestrator.py`, because the migration
+restores such a record intact while removing it would destroy state. Migrate
+rather than forget when a whole host has drifted.
 
 Every successful terminal launch privately registers the run on its owning
 host; a remote launch also registers a credential-free proxy on the orchestrator
