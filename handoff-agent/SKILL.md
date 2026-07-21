@@ -155,18 +155,23 @@ Read operations need no token:
 <helper> doctor --run-dir <absolute-run-dir>
 ```
 
-Registry records are removable, registry-only — the run directory, journals,
-and credentials are never deleted, and a forgotten run stays inspectable by
-absolute `--run-dir`:
+Registry records are removable, registry-only by default — the run
+directory, journals, and credentials are never deleted, and a forgotten run
+stays inspectable by absolute `--run-dir`:
 
 ```bash
-<helper> runs forget --run <selector> [--force]
-<helper> runs prune [--older-than DAYS] [--host NAME] [--no-terminal-only] (--dry-run | --yes)
+<helper> runs forget --run <selector> [--force] [--delete-run-dir]
+<helper> runs prune [--older-than DAYS] [--host NAME] [--no-terminal-only] [--delete-run-dir] (--dry-run | --yes)
 ```
 
 Both refuse a run not known to be terminal (a missing run directory counts as
 terminal — a dangling pointer) unless overridden; `prune` previews with
-`--dry-run` and requires `--yes`. `runs doctor` names invalid records
+`--dry-run` and requires `--yes`. Pass `--delete-run-dir` to also delete each
+removed run's directory (journals, status, control — never the separate
+credential directory); deletion is skipped for remote runs and refused for a
+directory without `status.json`, so a corrupt record cannot point the delete
+at an arbitrary path. Use `--delete-run-dir` only when the user asked to
+clear run state, not just registry records. `runs doctor` names invalid records
 individually when one corrupt entry breaks every registry read, and `forget` is
 the remedy it points to. **Exception:** a record invalid only because it
 predates the orchestrator rename is refused outright and pointed at
