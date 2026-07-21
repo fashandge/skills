@@ -75,10 +75,12 @@ tmux send-keys -t <name> Enter
 
 ### Codex folder-trust dialog
 
-The launcher handles this automatically for new remote Codex runs. Use this
-manual fallback only for an older run or a launcher result with
-`startup_unconfirmed`. For the exact dialog with `1. Yes, continue` selected,
-use `C-m` for a tmux worker:
+The launcher handles this automatically for new Codex runs, local and remote
+alike (local cmux/tmux launches clear the dialog in the launched surface before
+releasing the orchestrator, reporting `folder_trust_rescued`). Use this manual
+fallback only for an older run or a launcher result with `startup_unconfirmed`.
+For the exact dialog with `1. Yes, continue` selected, use `C-m` for a tmux
+worker:
 
 ```bash
 ssh <host> tmux send-keys -t <remote-handle> C-m

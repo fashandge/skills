@@ -41,13 +41,22 @@ gate so the local launcher can deterministically rescue its exact folder-trust
 dialog if needed. A `.goal` launch already waits because the second command
 cannot be delivered safely before the ready checkpoint.
 
-## Remote Codex folder-trust gate
+## Codex folder-trust gate
 
 Within that 30-second gate the launcher makes at most one exact-handle tmux
 capture and sends `C-m` only when it sees Codex's exact folder-trust dialog for
 the supplied `--remote-cwd`; otherwise it returns `startup_unconfirmed`.
 `folder_trust_rescued` means the transport rescue succeeded — resume normal
 event-driven behavior. `--readiness-timeout` overrides the bounded wait.
+
+Local Codex launches (cmux/tmux) get the same rescue in the launched surface,
+independent of `--wait-ready`: the launcher polls the surface, and on Codex's
+exact dialog for the launch `cwd` it presses Enter once, then reports
+`folder_trust_rescued`. Because a narrow surface truncates or wraps the
+`You are in <cwd>` line, the directory is verified by prefix, not exact match; a
+dialog naming any other directory is left untouched and returns
+`startup_unconfirmed`. An already-trusted directory (no dialog) returns promptly
+after a short grace rather than blocking for the whole timeout.
 
 ## Result notification
 
@@ -68,6 +77,12 @@ Why the core's doorbell rules are what they are:
   channel that pushes an idle orchestrator agent to act — plus a visible
   `cmux notify` alert for the human. So a doorbell may arrive as a typed prompt
   in your own composer.
+- The watcher gates that typed channel on your composer so a doorbell cannot
+  land mid-draft. Two consequences are visible to you: a `deferred_input` in
+  `last_doorbell_method` means the ring was withheld because you were typing
+  and will retry on the next poll, and a doorbell forced into a parked draft
+  arrives with a self-describing prefix to follow. The gating rules themselves
+  live in the script, not here.
 - `orchestrator pending` records a per-run `acknowledged_through` cursor, so a
   result or review you have already loaded stops re-ringing. A strictly newer
   worker event still rings, and each worker is tracked independently, so acking

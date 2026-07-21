@@ -114,9 +114,9 @@ rescue command instead of claiming the worker started. Verify
 live run, but later fast dispatch/context must fall back to the retained run
 and handle fields. Report the run and handle immediately without polling status.
 
-Remote Codex launches rescue their own folder-trust dialog. Do not inspect the
-screen yourself unless the launcher reports `startup_unconfirmed`; then read
-`references/rescue-and-close.md`.
+Codex launches — local and remote — rescue their own folder-trust dialog. Do
+not inspect the screen yourself unless the launcher reports
+`startup_unconfirmed`; then read `references/rescue-and-close.md`.
 
 For a managed run, create one dedicated mode-`0700` private directory and add
 `--retain-orchestrator`. When `HANDOFF_CREDENTIAL_DIR` is supplied, the launcher
