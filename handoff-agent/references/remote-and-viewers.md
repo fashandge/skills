@@ -115,8 +115,9 @@ screen is never durable state.
 
 Use the quiet helper — it owns the whole placement flow (RPC attach with no
 window when the host connection is already up; otherwise `ssh-tmux
---no-focus` with immediate minimize, workspace move under the current
-workspace, and best-effort close of the vacated window):
+--no-focus` with workspace move under the current workspace, and — only for
+a window the call itself provably created and then verifiably emptied —
+minimize and close):
 
 ```bash
 ~/projects/agents/scripts/cmux_ssh_tmux_quiet.sh <host> <worker-session>
@@ -139,9 +140,15 @@ stopping) silently kills the mirror, and sessions created afterward live
 on a new server the dead mirror cannot see. Re-run the quiet helper to
 reconnect; the stale mirror workspace is just a dead view, and
 `cmux rpc remote.tmux.attach '{"host":...,"session":...}'` revives it in
-place with no window. First, leftover mirror-window husks: cmux may refill
-a CLI-closed mirror window with a placeholder workspace instead of dying;
-the helper minimizes such husks to the Dock, and AppleScript cannot reach
+place with no window. First, mirror-window handling: on a warm connection
+`ssh-tmux` can report a PRE-EXISTING window — even the caller's own — as
+the mirror window (2026-07-21: an ungated close here destroyed the
+orchestrator's window and every session in it). The helper therefore
+snapshots windows before the call and never minimizes or closes a window it
+did not just create, closes a new window only once it is verifiably empty,
+and fails loudly if any pre-existing window vanishes. cmux may refill a
+CLI-closed mirror window with a placeholder workspace instead of dying; the
+helper minimizes such husks to the Dock, and AppleScript cannot reach
 windows parked on other macOS Spaces — those need a manual ⌘W. Outside the
 helper, `close-window` remains forbidden (see the layout-safety invariants
 below). Second, the control-mode mapping is
