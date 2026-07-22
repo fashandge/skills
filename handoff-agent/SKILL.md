@@ -164,53 +164,10 @@ Read operations need no token:
 <helper> doctor --run-dir <absolute-run-dir>
 ```
 
-Registry records are removable, registry-only by default — the run
-directory, journals, and credentials are never deleted, and a forgotten run
-stays inspectable by absolute `--run-dir`:
-
-```bash
-<helper> runs forget --run <selector> [--force] [--delete-run-dir]
-<helper> runs prune [--older-than DAYS] [--host NAME] [--no-terminal-only] [--delete-run-dir] (--dry-run | --yes)
-```
-
-Both refuse a run not known to be terminal (a missing run directory counts as
-terminal — a dangling pointer) unless overridden; `prune` previews with
-`--dry-run` and requires `--yes`. Pass `--delete-run-dir` to also delete each
-removed run's directory (journals, status, control — never the separate
-credential directory); deletion is skipped for remote runs and refused for a
-directory without `status.json`, so a corrupt record cannot point the delete
-at an arbitrary path. Use `--delete-run-dir` only when the user asked to
-clear run state, not just registry records. `runs doctor` names invalid records
-individually when one corrupt entry breaks every registry read, and `forget` is
-the remedy it points to. **Exception:** a record invalid only because it
-predates the orchestrator rename is refused outright and pointed at
-`scripts/migrate_handoff_state_orchestrator.py` — migration restores it intact,
-removal destroys it. When a whole host has drifted, migrate rather than forget.
-
-Remote worker sessions do not self-clean: a handoff worker is an interactive
-agent TUI that stays resident after a protocol `stop`, so its remote `tmux`
-session lingers and — because `cmux ssh-tmux` mirrors a host whole — piles up as
-stray mirror workspaces. To reap them, run the explicit, opt-in gc:
-
-```bash
-python -m agents.orchestration.handoff_remote_gc [--host NAME]           # dry-run, all sessions
-python -m agents.orchestration.handoff_remote_gc \
-  --orchestrator-state "$handoff_orchestrator_state"                     # only THIS session's workers
-python -m agents.orchestration.handoff_remote_gc --yes                   # kill stale sessions
-python -m agents.orchestration.handoff_remote_gc --yes --forget [--delete-run-dir]
-```
-
-By default it considers **every** remote run in the registry — including workers
-other orchestrator sessions spawned. Scope it with `--host NAME` and/or, to touch
-only the current session's workers, `--orchestrator-state "$handoff_orchestrator_state"`
-(or `--orchestrator <id>` directly). It verifies on the owning host that each
-remote run is terminal (worker state terminal **or** the orchestrator concluded
-it, `control.desired_state == stop`) and its session still exists, then — with
-`--yes` — kills only those, re-verifying terminality at kill time so a run that
-goes live in between is never reaped. A live worker is always left running.
-`--forget` additionally removes the cleaned runs' registry records
-(`--delete-run-dir` also deletes their run directories on the host). Dry-run is
-the default; use it only when the user asked to clean up remote runs.
+Registry records are removable — teardown of finished runs (leftover
+sessions, records, optionally run dirs) is one command; see **Teardown**
+below. `runs doctor` names invalid records individually when one corrupt
+entry breaks every registry read.
 
 Every successful terminal launch privately registers the run on its owning
 host; a remote launch also registers a credential-free proxy on the orchestrator
@@ -353,6 +310,56 @@ The low-level sequence — `control consume`, `send --type review`, `control
 integrate`/`control abandon`, `send --type stop`, manual takeover — is
 repair-only now, for when `conclude` refuses or the registry is unavailable;
 see `references/rescue-and-close.md`.
+
+## Teardown
+
+Worker sessions do not self-clean: a handoff worker is an interactive agent
+TUI that stays resident after a protocol `stop`, so its session lingers and —
+because `cmux ssh-tmux` mirrors a host whole — remote sessions pile up as
+stray mirror workspaces. One command tears down finished runs — leftover
+sessions, registry records, and optionally run dirs, local and remote in one
+shot:
+
+```bash
+<helper> runs clean --run <selector> [--delete-run-dir]                      # one finished run, immediately
+<helper> runs clean --watcher-state "$handoff_orchestrator_state" --dry-run  # preview this session's finished workers
+<helper> runs clean --watcher-state "$handoff_orchestrator_state" --yes [--delete-run-dir]
+```
+
+Bulk mode (no `--run`) is dry-run by default and requires `--yes` to execute.
+Without a scope filter it considers **every** run in the registry — including
+workers other orchestrator sessions spawned — so scope it before a real run:
+`--watcher-state PATH` reads the orchestrator ID out of this session's
+watcher state file (`--orchestrator <id>` is the direct form), `--host NAME`
+limits to one remote host, `--older-than DAYS` to records older than N days.
+
+A run counts as terminal when its worker state is terminal, the orchestrator
+concluded it (`control.desired_state == stop` — a concluded worker stays
+resident and never emits its terminal checkpoint), or its run directory is
+gone (a dangling pointer). Remote runs are verified and reaped on the owning
+host over SSH. Cleaning kills the run's leftover session — remote tmux via
+the host probe, local tmux directly, a local cmux surface closed by exact
+UUID with before/after layout verification — then drops the record;
+terminality is re-verified at kill time so a run that goes live in between
+is never reaped. A live worker is always skipped, never killed, unless
+`--force` is given.
+
+By default the run directory, journals, and credentials are never deleted,
+and a cleaned run stays inspectable by absolute `--run-dir`.
+`--delete-run-dir` also deletes each cleaned run's directory (never the
+separate credential directory) — locally, or on the owning host for a remote
+run — and is refused for a directory without `status.json`, so a corrupt
+record cannot point the delete at an arbitrary path. Use `--delete-run-dir`
+only when the user asked to clear run state, not just registry records, and
+use `runs clean` at all only when the user asked to clean up runs.
+
+`runs doctor` names invalid records individually when one corrupt entry
+breaks every registry read, and `runs clean --run` is the remedy it points
+to. **Exception:** a record invalid only because it predates the orchestrator
+rename is refused outright and pointed at
+`scripts/migrate_handoff_state_orchestrator.py` — migration restores it
+intact, removal destroys it. When a whole host has drifted, migrate rather
+than clean.
 
 ## Safety rules
 
