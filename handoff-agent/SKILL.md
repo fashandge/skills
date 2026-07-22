@@ -60,19 +60,25 @@ and `orchestrator pending` then loads the unread events. A self-run
 watcher is missing or dead: start or relaunch it with `orchestrator start`
 instead of working around it.
 
-Before the first monitored launch, bootstrap the session watcher once. The
-`--owner-pid` must be the actual long-lived Claude/Codex process PID — never a
-transient tool shell's `$$` or `$PPID` (registration binds PID plus
-process-start identity, so PID reuse cannot preserve an orphaned watcher).
-Keep the printed state path private and reuse it only for this orchestrator
-session:
+Before the first monitored launch, bootstrap the session watcher once. Omit
+`--owner-pid` (or pass `auto`) and the launcher walks this call's process
+ancestry to the long-lived Claude/Codex/Kimi PID itself — never a transient tool
+shell's `$$` or `$PPID` (registration binds PID plus process-start identity, so
+PID reuse cannot preserve an orphaned watcher). Do not hand-run `ps`/parent-walks
+for this. Keep the printed state path private and reuse it only for this
+orchestrator session:
 
 ```bash
-~/projects/agents/scripts/handoff_orchestrator_ensure.sh \
-  --transport cmux --owner-pid "$orchestrator_pid"
-# tmux: --transport tmux --target <exact-orchestrator-handle> --owner-pid "$orchestrator_pid"
+~/projects/agents/scripts/handoff_orchestrator_ensure.sh --transport cmux
+# tmux: --transport tmux --target <exact-orchestrator-handle>
 # already bootstrapped: add --state "$handoff_orchestrator_state" to skip register
+# override auto-detection only if needed: --owner-pid <exact-pid>
 ```
+
+If auto-detection ever fails (the agent is not an ancestor of the calling
+shell), it exits with a JSON error naming the PIDs it inspected; resolve the
+exact PID with `~/projects/agents/scripts/handoff_orchestrator_pid.sh` and pass
+`--owner-pid <pid>` explicitly.
 
 Retain the printed `state` path as `handoff_orchestrator_state` and pass
 `--orchestrator-state "$handoff_orchestrator_state"` to every monitored launcher
@@ -180,6 +186,26 @@ the remedy it points to. **Exception:** a record invalid only because it
 predates the orchestrator rename is refused outright and pointed at
 `scripts/migrate_handoff_state_orchestrator.py` — migration restores it intact,
 removal destroys it. When a whole host has drifted, migrate rather than forget.
+
+Remote worker sessions do not self-clean: a handoff worker is an interactive
+agent TUI that stays resident after a protocol `stop`, so its remote `tmux`
+session lingers and — because `cmux ssh-tmux` mirrors a host whole — piles up as
+stray mirror workspaces. To reap them, run the explicit, opt-in gc:
+
+```bash
+python -m agents.orchestration.handoff_remote_gc [--host NAME]           # dry-run
+python -m agents.orchestration.handoff_remote_gc --yes                   # kill stale sessions
+python -m agents.orchestration.handoff_remote_gc --yes --forget [--delete-run-dir]
+```
+
+It verifies on the owning host that each remote run is terminal (worker state
+terminal **or** the orchestrator concluded it, `control.desired_state == stop`)
+and its session still exists, then — with `--yes` — kills only those,
+re-verifying terminality at kill time so a run that goes live in between is never
+reaped. A live worker is always left running. `--forget` additionally removes the
+cleaned runs' registry records (`--delete-run-dir` also deletes their run
+directories on the host). Dry-run is the default; use it only when the user asked
+to clean up remote runs.
 
 Every successful terminal launch privately registers the run on its owning
 host; a remote launch also registers a credential-free proxy on the orchestrator
