@@ -1,6 +1,6 @@
 ---
 name: memory-health-check
-description: Check whether a macOS machine's memory (RAM) is healthy by running memory_pressure, vm_stat, and sysctl vm.swapusage, then interpreting the results into a healthy / borderline / critical verdict. Use whenever the user asks "is my memory healthy", "am I low on RAM", "why is my Mac slow / beachballing", "check memory pressure", "how much memory am I using", "is my swap too high", or shares an Activity Monitor memory screenshot and wants it assessed. Reads the live system, not just the screenshot, so it gives a precise answer rather than eyeballing a graph.
+description: Check whether a macOS machine's memory (RAM) is healthy by running memory_pressure, vm_stat, and sysctl vm.swapusage plus a wired (kernel) memory and wired-zone leak check, then interpreting the results into a healthy / borderline / critical verdict. Use whenever the user asks "is my memory healthy", "am I low on RAM", "why is my Mac slow / beachballing", "check memory pressure", "how much memory am I using", "is my swap too high", "is the kernel leaking wired memory", or shares an Activity Monitor memory screenshot and wants it assessed. Reads the live system, not just the screenshot, so it gives a precise answer rather than eyeballing a graph.
 allowed-tools: Bash(zsh:*), Bash(memory_pressure:*), Bash(vm_stat:*), Bash(sysctl:*), Bash(top:*), Bash(/usr/bin/memory_pressure:*), Bash(/usr/bin/vm_stat:*), Bash(/usr/sbin/sysctl:*), Bash(/usr/bin/top:*)
 ---
 
@@ -13,12 +13,20 @@ and turns them into a plain verdict.
 
 ## How to run it
 
-Run the bundled probe. It gathers all three counter sources, does the page-size math, prints a
-verdict block, and then lists the top memory-consuming processes:
+Run the bundled probe. It gathers all three userland counter sources, does the page-size math,
+**also reads the wired (kernel) figure and the wired-zone leak trend**, prints a verdict block,
+and then lists the top memory-consuming processes:
 
 ```bash
 ~/skills/memory-health-check/scripts/check_memory.sh
 ```
+
+The wired check is part of the default run — don't treat it as optional. A machine can pass every
+userland signal (free %, swap, compressor) while the kernel quietly eats its RAM, and only the
+wired figure catches that, so always read out both what it says about *right now* and about the
+*kernel wired-zone trend*. The two sudo-free wired signals it prints are the live wired share of
+RAM (from `top`'s PhysMem line) and, when the sampler CSV exists, the recent growth trend of the
+watched zone; per-zone live attribution still needs the sudo sampler below.
 
 The script always exits 0 with its answer in stdout (a probe meaning "here are the numbers"
 must not read as a failed step). It uses absolute tool paths so it works under stripped PATHs
@@ -67,9 +75,14 @@ Apple Silicon, 4096 on Intel) to get bytes. The script does this for you.
 
 ## When wired memory is the problem
 
-The three signals above cover userland demand. They do **not** explain a machine whose RAM is
-eaten by the kernel. Check for this whenever `top -l 1 -n 0` shows a wired figure that is a large
-fraction of physical RAM (normal is roughly 3–4 GB on a 24 GB Mac; double digits is pathological):
+The three userland signals cover userland demand. They do **not** explain a machine whose RAM is
+eaten by the kernel — that's what the script's wired figure and leak-watch block are for. The
+default run flags this for you: `check_memory.sh` escalates the verdict to Borderline at ≥30% of
+RAM wired and Critical at ≥45% (normal is roughly 3–4 GB, ~10–17% on a 24 GB Mac; double digits GB
+is pathological), and its "Kernel wired-zone leak watch" section reports whether the watched zone
+is growing. When either shows elevated or growing wired memory, this section is the deep dive.
+
+The raw one-liner behind the script's wired figure, if you want to show it:
 
 ```bash
 top -l 1 -n 0 | grep PhysMem     # "23G used (19G wired, 1.9G compressor), 100M unused"
@@ -81,8 +94,8 @@ how few apps are open, and per-process rankings will look innocent. Rule out thi
 first (`systemextensionsctl list`, `kmutil showloaded --collection-type auxiliary`); if both come
 back empty, it is Apple's own kernel.
 
-To attribute it, use the companion sampler — `zprint` reports every size as `0K` to unprivileged
-callers, so this one genuinely needs `sudo`:
+To attribute it to a specific zone, use the companion sampler — `zprint` reports every size as
+`0K` to unprivileged callers, so this one genuinely needs `sudo`:
 
 ```bash
 sudo ~/skills/memory-health-check/scripts/sample_wired_zones.sh --top       # rank wired allocations now
@@ -93,6 +106,14 @@ It appends a CSV row per sample (zone size, total wired, swap, process counts) t
 `~/.local/state/wired-zone-samples.csv` and prints the growth rate across the whole log, which is
 what turns "my Mac is slow" into a filable bug report and lets you A/B which workload drives the
 leak. `-z ZONE` watches a different label; the default is `data.kalloc.1024[vfs.namei]`.
+
+`check_memory.sh` reads this same CSV (no sudo — it only reads, never runs `zprint`) for its
+leak-watch block, but computes its trend over the **most recent ~6 h window**, not first-vs-last
+across the whole log: a reboot clears wired memory, so a whole-log delta that spans one shows a
+meaningless large negative. If the CSV is absent — the sampler daemon was never installed, or you
+stopped it — the leak-watch block simply says the log is missing and points at the sudo sampler;
+if the newest row is over an hour old, it notes the daemon may be stopped. Override the path it
+reads with `WZLOG=/path/to.csv`.
 
 Persistent sampling on this machine: root LaunchDaemon `local.wired-zone-sampler` (plist source
 `launchd/local.wired-zone-sampler.plist` in this skill, installed at
@@ -118,6 +139,7 @@ The script applies these thresholds; apply the same judgment if reading raw:
 | `memory_pressure` free | ≥ 30% | 15–30% | < 15% |
 | Swap used | < 2 GB | 2–4 GB | ≥ 4 GB (or near swap total) |
 | Compressor share of RAM | < 35% | 35–50% (watch) | — (see note) |
+| Wired share of RAM | < 30% | 30–45% | ≥ 45% (likely kernel leak) |
 
 The worst signal sets the verdict. Compressor share alone doesn't push to Critical — it's a
 "you're at your ceiling" flag, not an acute failure — but combined with low free % or rising
@@ -127,11 +149,15 @@ Healthy free %; a graph trending up or turning yellow/red corroborates Borderlin
 ## How to report back
 
 Lead with the verdict, then explain it in terms the user can act on. Separate **"right now"**
-(driven by free % and swap) from **"structurally"** (driven by compressor load) — a machine can
-be fine this moment yet clearly maxed out for its workload, and conflating the two misleads. Be
-honest when it's only borderline; don't round a squeezed machine up to "healthy". Close with
-what to watch for (pressure turning yellow/red, swap past ~2–3 GB) and, when relevant, that the
-practical fix is closing memory-heavy apps or adding RAM rather than any setting.
+(driven by free % and swap), **"structurally"** (driven by compressor load), and **"the kernel"**
+(driven by the wired figure and leak-watch) — a machine can be fine this moment yet maxed out for
+its workload, or fine on every userland signal yet quietly leaking wired memory, and conflating
+these misleads. Always report the wired result, not just the userland verdict; a "healthy" that
+silently skipped the wired check is the exact gap this skill closes. Be honest when it's only
+borderline; don't round a squeezed machine up to "healthy". Close with what to watch for (pressure
+turning yellow/red, swap past ~2–3 GB, wired trending up) and, when relevant, that the practical
+fix is closing memory-heavy apps or adding RAM — or, for a wired leak, a reboot — rather than any
+setting.
 
 If the user shared an Activity Monitor screenshot, reconcile it with the live reading: the
 screenshot's "Compressed" figure should roughly match the script's compressor-occupied GB, and
