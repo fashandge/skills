@@ -193,19 +193,24 @@ session lingers and — because `cmux ssh-tmux` mirrors a host whole — piles u
 stray mirror workspaces. To reap them, run the explicit, opt-in gc:
 
 ```bash
-python -m agents.orchestration.handoff_remote_gc [--host NAME]           # dry-run
+python -m agents.orchestration.handoff_remote_gc [--host NAME]           # dry-run, all sessions
+python -m agents.orchestration.handoff_remote_gc \
+  --orchestrator-state "$handoff_orchestrator_state"                     # only THIS session's workers
 python -m agents.orchestration.handoff_remote_gc --yes                   # kill stale sessions
 python -m agents.orchestration.handoff_remote_gc --yes --forget [--delete-run-dir]
 ```
 
-It verifies on the owning host that each remote run is terminal (worker state
-terminal **or** the orchestrator concluded it, `control.desired_state == stop`)
-and its session still exists, then — with `--yes` — kills only those,
-re-verifying terminality at kill time so a run that goes live in between is never
-reaped. A live worker is always left running. `--forget` additionally removes the
-cleaned runs' registry records (`--delete-run-dir` also deletes their run
-directories on the host). Dry-run is the default; use it only when the user asked
-to clean up remote runs.
+By default it considers **every** remote run in the registry — including workers
+other orchestrator sessions spawned. Scope it with `--host NAME` and/or, to touch
+only the current session's workers, `--orchestrator-state "$handoff_orchestrator_state"`
+(or `--orchestrator <id>` directly). It verifies on the owning host that each
+remote run is terminal (worker state terminal **or** the orchestrator concluded
+it, `control.desired_state == stop`) and its session still exists, then — with
+`--yes` — kills only those, re-verifying terminality at kill time so a run that
+goes live in between is never reaped. A live worker is always left running.
+`--forget` additionally removes the cleaned runs' registry records
+(`--delete-run-dir` also deletes their run directories on the host). Dry-run is
+the default; use it only when the user asked to clean up remote runs.
 
 Every successful terminal launch privately registers the run on its owning
 host; a remote launch also registers a credential-free proxy on the orchestrator
