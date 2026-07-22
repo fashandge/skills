@@ -66,6 +66,14 @@ HANDOFF_REMOTE_CREDENTIAL_DIR=/home/opc/.local/state/agents/handoff/orchestrator
   --retain-orchestrator --orchestrator-state "$handoff_orchestrator_state"
 ```
 
+Close out a remote run from the orchestrator host with one command —
+`handoffctl conclude --run <selector>`: the credential-free local registry
+proxy resolves the owning host, and the whole owner-side transaction (review,
+integration, stop, doorbell) is a single SSH request, with a
+changes-requested body passed on stdin and `--reason`/`--commit` as argv. The
+manual token-over-SSH discipline below is for managed `--retain-orchestrator`
+runs and repair only.
+
 Keep that path private and remember it exactly; the remote orchestrator token is
 `<remote-private-dir>/coordinator.token`. Execute status/read/doctor with the
 remote Python over SSH. Execute orchestrator mutations the same way with

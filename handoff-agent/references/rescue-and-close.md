@@ -46,6 +46,26 @@ unless the old process is confirmed dead. If orchestrator lease ownership has
 expired, use explicit recovery-token takeover; do not keep trying the stale
 orchestrator token.
 
+Try `conclude`/`dispatch` first — they take over with their own ephemeral
+token and cover ordinary close-out and steering. Manual takeover is
+repair-only, for when they refuse or the registry is unavailable:
+
+```bash
+handoffctl control takeover --run-dir <absolute-run-dir> \
+  --recovery-token-file <credential-dir>/recovery.token \
+  --new-token-file <fresh-path-outside-run-dir> \
+  --reason-file <private-file>
+```
+
+The recovery token is `recovery.token` in the run's credential directory —
+for a managed run, the exact private directory created at launch. The
+`--new-token-file` must be a fresh, non-existent path outside the run
+directory: an existing path exits 4 rather than overwriting, and a path
+inside the run directory is refused outright. Without `--force`, takeover
+also exits 4 while the recorded lease is still active; use `--force` only for
+a provably stale lease — its holder confirmed dead — never to shortcut a live
+one.
+
 ## Terminal rescue and approval
 
 Use terminal key input only when the worker is blocked below the agent loop and

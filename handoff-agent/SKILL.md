@@ -118,7 +118,10 @@ Codex launches — local and remote — rescue their own folder-trust dialog. Do
 not inspect the screen yourself unless the launcher reports
 `startup_unconfirmed`; then read `references/rescue-and-close.md`.
 
-For a managed run, create one dedicated mode-`0700` private directory and add
+The private registry record carries the run's credential directory, so
+`conclude` and `dispatch` resolve it themselves — never rediscover it by
+searching the state tree. Exact-path discipline matters only for a managed
+run: create one dedicated mode-`0700` private directory and add
 `--retain-orchestrator`. When `HANDOFF_CREDENTIAL_DIR` is supplied, the launcher
 uses that exact directory, so the orchestrator token is exactly
 `$handoff_private_root/orchestrator.token`; never search for it with `find`.
@@ -267,8 +270,8 @@ commits, and results. A message sent during a long model turn may wait until
 the next checkpoint.
 
 - The session watcher is started with `orchestrator start`; never replace it with a time-limited generic observer — a self-run `watch --timeout` is for debugging only, never for waiting on worker events.
-- A doorbell may arrive as a typed prompt in your own composer. Treat it as the trigger to inspect the exact pending prefix with `<helper> orchestrator pending --state "$handoff_orchestrator_state"`, which also **acknowledges** what it surfaces.
-- Ringing is **state-aware**: a worker **blocked** on a question keeps re-ringing until it is answered (a bare ack does not silence a stuck worker — it needs the answer, not just to be seen); a result rings until loaded; pure progress checkpoints and terminal (`succeeded`/`stopped`) states do not ring at all. The cure for a repeating doorbell on a *result* is `orchestrator pending`, never killing or closing the watcher.
+- A doorbell may arrive as a typed prompt in your own composer. Treat it as the trigger to run `<helper> orchestrator pending --state "$handoff_orchestrator_state"` first and batch-triage **all** pending runs in one pass — `conclude` the quick accepts before starting a long per-run review, instead of diving into one run while others wait. `pending` also **acknowledges** what it surfaces.
+- Ringing is **state-aware** and rate-limited: a new actionable event rings a typed prompt **at most once per new-event cycle**, then reminders continue as passive banners (alert only, no typed input) on an exponential backoff — 30 s doubling to a 300 s cap. A worker **blocked** on a question keeps re-ringing until it is answered (a bare ack does not silence a stuck worker — it needs the answer, not just to be seen); a result rings until loaded; pure progress checkpoints do not ring at all. A concluded run — integration recorded or stop requested — goes quiet on its own, including the final `stopped` checkpoint the worker emits after `conclude`; only a run that died with a fatal error keeps ringing. The cure for a repeating doorbell on a *result* is `orchestrator pending`, never killing or closing the watcher.
 - Never close the watcher's surface to stop a repeating doorbell: it is session-scoped — other workers may still be running and you can still spawn more — so it must live until the orchestrator process exits, which it detects on its own.
 - To silence a run without consuming it or holding a lease, use the credential-free `<helper> orchestrator dismiss --state "$handoff_orchestrator_state" --run <selector>`.
 - For urgent steering while you hold no active orchestrator lease, use `handoffctl dispatch` so the instruction is durably appended before the exact registered handle is touched; confirm `doorbell_sent: true`, otherwise use the returned message sequence and stored handle for a narrow manual doorbell. Never type a steering body or credential into cmux/tmux — a doorbell contains only `Check handoff run <run-id>; inbox now through seq <N>.`
@@ -277,7 +280,9 @@ the next checkpoint.
 
 ## Review and finish
 
-1. Consume the worker's `result` event.
+1. A result doorbell starts the flow: load the worker's `result` event with
+   `<helper> orchestrator pending --state "$handoff_orchestrator_state"` —
+   never by polling yourself.
 2. Select review depth proportionally; do not redo the delegated task by default.
    - Always inspect the durable result for completeness, scope compliance, and concrete evidence.
    - For bounded, low-stakes research, treat timestamped primary-source links and an internally consistent report as sufficient evidence. Do not repeat the same retrieval, web search, calculation, or analysis merely to validate it. Audit only when the evidence is missing or conflicting, the output is anomalous, or the user/task requires independent verification.
@@ -292,10 +297,31 @@ the next checkpoint.
    file before reviewing any of them, then add a test exercising one worker's
    feature against another's data path. Independently correct changes compose
    into bugs no single worker can see; that interaction is yours to catch.
-5. Send an accepted or changes-requested review tied to that exact result ID.
-6. Wait for the worker to consume acceptance and emit `succeeded`; do not confuse worker success with orchestrator acceptance or integration. Waiting means watching for the watcher's next doorbell, not polling yourself.
-7. Record `control integrate` or `control abandon`, then send a graceful stop and confirm its `doorbell_sent` — without the doorbell the idle worker never learns the run is over.
-8. Run read-only `doctor`. Use repair flags only for identified, explicit recovery; never repair implicitly.
+5. Close out with one command:
+
+   ```bash
+   <helper> conclude --run <selector>
+   <helper> conclude --run <selector> --disposition changes-requested --body-file -
+   ```
+
+   `conclude` consumes the outbox, sends the review tied to the exact pending
+   result, and — on the default `accepted` disposition — records integration
+   (commit default: the result's reported HEAD; override with `--commit`, skip
+   with `--no-integrate`) and sends a graceful stop: one takeover, one
+   doorbell, no waiting for `succeeded` before integrating — the worker drains
+   review, integration, and stop from its inbox in order. Confirm
+   `doorbell_sent: true`; without the doorbell the idle worker never learns
+   the run is over. The `changes-requested` path (body required) appends only
+   the review and lets the worker resume — no integration, no stop. The
+   watcher auto-quiets a concluded run on its next poll, including the final
+   `stopped` checkpoint the worker emits afterward; do not consume or dismiss
+   it yourself.
+6. Run read-only `doctor`. Use repair flags only for identified, explicit recovery; never repair implicitly.
+
+The low-level sequence — `control consume`, `send --type review`, `control
+integrate`/`control abandon`, `send --type stop`, manual takeover — is
+repair-only now, for when `conclude` refuses or the registry is unavailable;
+see `references/rescue-and-close.md`.
 
 ## Safety rules
 

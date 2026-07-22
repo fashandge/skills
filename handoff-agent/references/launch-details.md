@@ -83,6 +83,16 @@ Why the core's doorbell rules are what they are:
   and will retry on the next poll, and a doorbell forced into a parked draft
   arrives with a self-describing prefix to follow. The gating rules themselves
   live in the script, not here.
+- Each poll's coalesced doorbell carries an **urgency**: *active* (typed input
+  plus alert) or *passive* (alert channels only, never typed input). A new
+  actionable event is active at most once per event cycle; its retries are
+  passive, as is any re-ring while the run's `control_through` is moving (an
+  orchestrator mid-consume — exactly when typed input is most disruptive). A
+  worker blocked on a question is the exception: its re-rings stay active
+  until it is answered. Retries back off exponentially from the base retry
+  interval — default 30 s, doubling to a 300 s cap — and reset when newer
+  worker events arrive; `watch` and `orchestrator start` accept
+  `--retry-seconds` to change the base.
 - `orchestrator pending` records a per-run `acknowledged_through` cursor, so a
   result or review you have already loaded stops re-ringing. A strictly newer
   worker event still rings, and each worker is tracked independently, so acking
@@ -94,6 +104,13 @@ Why the core's doorbell rules are what they are:
   parked in `awaiting_review` for viewing, or a `blocked` run you are done with.
   It records a per-run `dismissed_through` cursor, stops even a persistent
   `blocked` nag, and a strictly newer worker event still re-rings.
+- A concluded run quiets itself: once control shows the orchestrator's decision
+  (integration no longer `pending`, or `stop` requested), the watcher advances
+  `dismissed_through` over the remaining tail on its next poll — including the
+  final `stopped` checkpoint, which arrives only after the worker exits and so
+  can never be consumed. The one exemption is a fatal tail — a `failed` state
+  or fatal error event — which keeps ringing so a badly-dying run is never
+  silenced.
 - `watch [--run <selector> ...] --interval 5 --timeout <seconds>` (omit `--run`
   for every registered run; `--once` for one pass; `--notify-cmux` for
   metadata-only alerts) is an ad-hoc foreground JSONL observer for debugging or
@@ -105,6 +122,14 @@ Why the core's doorbell rules are what they are:
 - Urgent steering while holding no lease: `dispatch` refuses to run while a
   managed lease is held, and a managed orchestrator driving the normal
   answer/review/stop lifecycle uses `send`, which rings the doorbell itself.
+- Closing out a result needs no lease either: `conclude --run <selector>` makes
+  the same ephemeral takeover (and likewise refuses while a managed lease is
+  active), appends review + integration + stop in one lease transaction, and
+  rings one doorbell — the worker drains them in order, so the orchestrator
+  never waits for `succeeded` before integrating. It covers `awaiting_review`
+  (full path) and an accepted-but-unintegrated `succeeded` run (resume after a
+  mid-sequence crash), and refuses anything else with a pointer to `dispatch`
+  / `control abandon`.
 
 ## Dispatch on a stale remote package
 
