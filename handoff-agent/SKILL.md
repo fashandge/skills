@@ -70,7 +70,11 @@ orchestrator session:
 
 ```bash
 ~/projects/agents/scripts/handoff_orchestrator_ensure.sh --transport cmux
-# tmux: --transport tmux --target <exact-orchestrator-handle>
+# transport: a cmux-inherited session (CMUX_SURFACE_ID set) has no tmux
+# composer to type into — ALWAYS use --transport cmux there
+# tmux: --transport tmux --target auto (resolves to the current tmux session);
+# an explicit handle must name this orchestrator's own tmux session and is
+# validated at registration
 # already bootstrapped: add --state "$handoff_orchestrator_state" to skip register
 # override auto-detection only if needed: --owner-pid <exact-pid>
 ```
