@@ -122,11 +122,14 @@ screen is never durable state.
 
 ## cmux viewer default: ssh-tmux mirror under the current workspace
 
-Use the quiet helper — it owns the whole placement flow (RPC attach with no
-window when the host connection is already up; otherwise `ssh-tmux
---no-focus` with workspace move under the current workspace, and — only for
-a window the call itself provably created and then verifiably emptied —
-minimize and close):
+Use the quiet helper — it owns the whole placement flow (on a warm
+connection `remote.tmux.mirror`, which creates the views in the current
+window with no new window, then places the wanted sessions and closes only
+the fresh stray mirrors it created — closing a mirror workspace detaches
+the control-mode client but leaves the remote session alive; otherwise
+`ssh-tmux --no-focus` with workspace move under the current workspace, and —
+only for a window the call itself provably created and then verifiably
+emptied — minimize and close):
 
 ```bash
 ~/projects/agents/scripts/cmux_ssh_tmux_quiet.sh <host> <worker-session>
