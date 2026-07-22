@@ -259,7 +259,7 @@ the next checkpoint.
 
 - The session watcher is started with `orchestrator start`; never replace it with a time-limited generic observer — a self-run `watch --timeout` is for debugging only, never for waiting on worker events.
 - A doorbell may arrive as a typed prompt in your own composer. Treat it as the trigger to run `<helper> orchestrator pending --state "$handoff_orchestrator_state"` first and batch-triage **all** pending runs in one pass — `conclude` the quick accepts before starting a long per-run review, instead of diving into one run while others wait. `pending` also **acknowledges** what it surfaces.
-- Ringing is **state-aware** and rate-limited: a new actionable event rings a typed prompt **at most once per new-event cycle**, then reminders continue as passive banners (alert only, no typed input) on an exponential backoff — 30 s doubling to a 300 s cap. A worker **blocked** on a question keeps re-ringing until it is answered (a bare ack does not silence a stuck worker — it needs the answer, not just to be seen); a result rings until loaded; pure progress checkpoints do not ring at all. A concluded run — integration recorded or stop requested — goes quiet on its own, including the final `stopped` checkpoint the worker emits after `conclude`; only a run that died with a fatal error keeps ringing. The cure for a repeating doorbell on a *result* is `orchestrator pending`, never killing or closing the watcher.
+- Ringing is **state-aware** and rate-limited: a new actionable event rings a typed prompt **at most once per new-event cycle**, then reminders continue as passive banners (alert only, no typed input) on an exponential backoff — 30 s doubling to a 300 s cap. A worker **blocked** on a question keeps re-ringing until it is answered (a bare ack does not silence a stuck worker — it needs the answer, not just to be seen); a result rings until loaded; pure progress checkpoints do not ring at all. A stopped run — integration recorded and stop requested — goes quiet on its own, including the final `stopped` checkpoint the worker emits after `conclude --stop`; a paused run (`conclude` default) is not dismissed — it stays silent while idle and re-rings on the worker's next result. Only a run that died with a fatal error keeps ringing. The cure for a repeating doorbell on a *result* is `orchestrator pending`, never killing or closing the watcher.
 - Never close the watcher's surface to stop a repeating doorbell: it is session-scoped — other workers may still be running and you can still spawn more — so it must live until the orchestrator process exits, which it detects on its own.
 - To silence a run without consuming it or holding a lease, use the credential-free `<helper> orchestrator dismiss --state "$handoff_orchestrator_state" --run <selector>`.
 - For urgent steering while you hold no active orchestrator lease, use `handoffctl dispatch` so the instruction is durably appended before the exact registered handle is touched; confirm `doorbell_sent: true`, otherwise use the returned message sequence and stored handle for a narrow manual doorbell. Never type a steering body or credential into cmux/tmux — a doorbell contains only `Check handoff run <run-id>; inbox now through seq <N>.`
@@ -288,26 +288,45 @@ the next checkpoint.
 5. Close out with one command:
 
    ```bash
-   <helper> conclude --run <selector>
+   <helper> conclude --run <selector>                                     # accept, integrate, pause (default)
+   <helper> conclude --run <selector> --stop                              # accept, integrate, final stop
    <helper> conclude --run <selector> --disposition changes-requested --body-file -
    ```
 
    `conclude` consumes the outbox, sends the review tied to the exact pending
    result, and — on the default `accepted` disposition — records integration
    (commit default: the result's reported HEAD; override with `--commit`, skip
-   with `--no-integrate`) and sends a graceful stop: one takeover, one
-   doorbell, no waiting for `succeeded` before integrating — the worker drains
-   review, integration, and stop from its inbox in order. Confirm
-   `doorbell_sent: true`; without the doorbell the idle worker never learns
-   the run is over. The `changes-requested` path (body required) appends only
-   the review and lets the worker resume — no integration, no stop. The
-   watcher auto-quiets a concluded run on its next poll, including the final
-   `stopped` checkpoint the worker emits afterward; do not consume or dismiss
-   it yourself.
-6. Run read-only `doctor`. Use repair flags only for identified, explicit recovery; never repair implicitly.
+   with `--no-integrate`) and pauses the worker: one takeover, one doorbell,
+   no waiting for `succeeded` before integrating — the worker drains review,
+   integration, and pause from its inbox in order, emits a `paused`
+   checkpoint, and idles. A paused worker stays resident with its full
+   context and resumes via `dispatch` (its next result rings normally, and a
+   later `conclude` works); `--stop` is the final teardown — the worker emits
+   `succeeded` then `stopped` and exits. Confirm `doorbell_sent: true`;
+   without the doorbell the idle worker never learns the run moved. The
+   `changes-requested` path (body required) appends only the review and lets
+   the worker resume — no integration, no pause/stop. A paused run is not
+   auto-quieted by the watcher — it stays quiet on its own and re-rings when
+   the worker emits a new result; a `--stop`-concluded run is auto-quieted,
+   including the final `stopped` checkpoint. Do not consume or dismiss
+   either tail yourself.
+6. A paused worker is idle, not finished, and `conclude` requires a pending
+   result — so it cannot stop one. Use the registry-backed graceful final
+   stop (ephemeral takeover, stop + one doorbell, release):
+
+   ```bash
+   <helper> stop --run <selector> [--reason TEXT]
+   ```
+
+   Each paused worker still holds a tmux session or cmux surface, so stop it
+   when its context is no longer needed — that is good hygiene, not optional
+   cleanup. `runs clean` protects paused workers (pause is not terminal) and
+   only `--force` reaps them, so a paused run is never swept accidentally:
+   `stop` first, then clean.
+7. Run read-only `doctor`. Use repair flags only for identified, explicit recovery; never repair implicitly.
 
 The low-level sequence — `control consume`, `send --type review`, `control
-integrate`/`control abandon`, `send --type stop`, manual takeover — is
+integrate`/`control abandon`, `send --type stop`/`pause`, manual takeover — is
 repair-only now, for when `conclude` refuses or the registry is unavailable;
 see `references/rescue-and-close.md`.
 

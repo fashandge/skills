@@ -42,8 +42,27 @@ evidence, current `HEAD`, and dirty state. A successful emit moves the run to
 
 ## Conclude after acceptance
 
-After consuming the accepted `review` and the orchestrator `stop`, emit two
-checkpoints — `succeeded` first, then `stopped`:
+After consuming the accepted `review`, follow the lifecycle message that
+accompanies it. A `pause` (the default) means emit one `paused` checkpoint
+and idle awaiting further instructions — a doorbell arrives with the next
+one; resume by consuming a `steer`/`answer`/`supersede` newer than the
+`pause` and checkpointing back to `working`:
+
+```bash
+<helper> emit --run-dir "$HANDOFF_RUN_DIR" --type checkpoint \
+  --body-file /tmp/ckpt-body.md --data-file /tmp/ckpt-paused.json
+```
+
+`ckpt-paused.json` — valid from `awaiting_review` (or `succeeded`) with a
+consumed matching accepted review and a `pause` message inside the consumed
+prefix:
+
+```json
+{"state": "paused", "stage": "complete", "current_activity": "Result accepted; paused awaiting instructions", "inbox_cursor": 4, "commitments": []}
+```
+
+A `stop` instead means emit two checkpoints — `succeeded` first, then
+`stopped` — and exit:
 
 ```bash
 <helper> emit --run-dir "$HANDOFF_RUN_DIR" --type checkpoint \
@@ -59,7 +78,8 @@ review:
 ```
 
 `ckpt-stopped.json` — requires `desired_state: stop` and the `stop` message
-inside the consumed prefix:
+inside the consumed prefix; from `paused` emit `stopped` directly, without
+`succeeded` first:
 
 ```json
 {"state": "stopped", "stage": "complete", "current_activity": "Consumed orchestrator stop; run concluded", "inbox_cursor": 4, "commitments": []}
@@ -74,4 +94,7 @@ inside the consumed prefix:
 - `inbox_cursor` cannot decrease, cannot exceed the inbox tail, and cannot
   advance across an unanswered blocking question.
 - Terminal checkpoint preconditions live in the state machine: `succeeded`
-  needs the accepted review, `stopped` needs the consumed orchestrator stop.
+  needs the accepted review, `stopped` needs the consumed orchestrator stop,
+  `paused` needs the accepted review plus a consumed orchestrator pause, and
+  resuming from `paused` to `working` needs a `steer`/`answer`/`supersede`
+  newer than the pause.

@@ -104,13 +104,16 @@ Why the core's doorbell rules are what they are:
   parked in `awaiting_review` for viewing, or a `blocked` run you are done with.
   It records a per-run `dismissed_through` cursor, stops even a persistent
   `blocked` nag, and a strictly newer worker event still re-rings.
-- A concluded run quiets itself: once control shows the orchestrator's decision
-  (integration no longer `pending`, or `stop` requested), the watcher advances
-  `dismissed_through` over the remaining tail on its next poll — including the
-  final `stopped` checkpoint, which arrives only after the worker exits and so
-  can never be consumed. The one exemption is a fatal tail — a `failed` state
-  or fatal error event — which keeps ringing so a badly-dying run is never
-  silenced.
+- A concluded run quiets itself: once control shows the orchestrator's final
+  decision (integration no longer `pending` with no pause requested, or
+  `stop` requested), the watcher advances `dismissed_through` over the
+  remaining tail on its next poll — including the final `stopped` checkpoint,
+  which arrives only after the worker exits and so can never be consumed. A
+  paused run (`desired_state: pause`) is exempt: it is resumable, not
+  concluded, so it stays quiet only because `paused` is not a ringing state
+  and re-rings when the worker resumes and emits a new result. The other
+  exemption is a fatal tail — a `failed` state or fatal error event — which
+  keeps ringing so a badly-dying run is never silenced.
 - `watch [--run <selector> ...] --interval 5 --timeout <seconds>` (omit `--run`
   for every registered run; `--once` for one pass; `--notify-cmux` for
   metadata-only alerts) is an ad-hoc foreground JSONL observer for debugging or
@@ -124,12 +127,16 @@ Why the core's doorbell rules are what they are:
   answer/review/stop lifecycle uses `send`, which rings the doorbell itself.
 - Closing out a result needs no lease either: `conclude --run <selector>` makes
   the same ephemeral takeover (and likewise refuses while a managed lease is
-  active), appends review + integration + stop in one lease transaction, and
-  rings one doorbell — the worker drains them in order, so the orchestrator
-  never waits for `succeeded` before integrating. It covers `awaiting_review`
-  (full path) and an accepted-but-unintegrated `succeeded` run (resume after a
-  mid-sequence crash), and refuses anything else with a pointer to `dispatch`
-  / `control abandon`.
+  active), appends review + integration + pause in one lease transaction
+  (`--stop` appends stop instead for a final teardown), and rings one
+  doorbell — the worker drains them in order, so the orchestrator never waits
+  for `succeeded` before integrating. It covers `awaiting_review` (full
+  path), an accepted-but-unintegrated `succeeded` run, and an
+  accepted-and-integrated run missing only its pause/stop (both resume after
+  a mid-sequence crash), and refuses anything else with a pointer to
+  `dispatch` / `control abandon`. A paused worker has no pending result, so
+  `conclude` cannot stop it — `stop --run <selector>` is the same one-shot
+  takeover for that final stop.
 
 ## Dispatch on a stale remote package
 
