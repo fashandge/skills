@@ -342,3 +342,4 @@ see `references/rescue-and-close.md`.
 - Before terminal rescue, closing sessions, or any manual doorbell, you MUST read `references/rescue-and-close.md`.
 - For a Codex desktop-app task, you MUST read `references/codex-app-task.md` first.
 - Launcher internals (model/effort defaults, Kimi delivery mechanics, watcher hosting modes, readiness waits): `references/launch-details.md`.
+- Worker-side `emit` payloads, terminal-checkpoint preconditions, and worked result/checkpoint examples: `references/worker-emit.md`.
