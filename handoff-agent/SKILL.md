@@ -245,9 +245,8 @@ For steering, answers, and reviews:
   or `changes_requested`.
 - `send` rings the worker's terminal doorbell automatically for a registered
   run and reports `doorbell_sent` in its response (`--no-doorbell` opts out).
-  Confirm `doorbell_sent: true` after every send — including the final stop —
-  and fall back to the manual doorbell procedure with the returned `message.seq`
-  only when it is `false`.
+  Confirm `doorbell_sent: true` after every send and fall back to the manual
+  doorbell procedure with the returned `message.seq` only when it is `false`.
 - Supply the orchestrator credential through
   `HANDOFF_ORCHESTRATOR_TOKEN_FILE` or `--token-file`, never argv token bytes.
 
@@ -263,7 +262,7 @@ the next checkpoint.
 
 - The session watcher is started with `orchestrator start`; never replace it with a time-limited generic observer — a self-run `watch --timeout` is for debugging only, never for waiting on worker events.
 - A doorbell may arrive as a typed prompt in your own composer. Treat it as the trigger to run `<helper> orchestrator pending --state "$handoff_orchestrator_state"` first and batch-triage **all** pending runs in one pass — `conclude` the quick accepts before starting a long per-run review, instead of diving into one run while others wait. `pending` also **acknowledges** what it surfaces.
-- Ringing is **state-aware** and rate-limited: a new actionable event rings a typed prompt **at most once per new-event cycle**, then reminders continue as passive banners (alert only, no typed input) on an exponential backoff — 30 s doubling to a 300 s cap. A worker **blocked** on a question keeps re-ringing until it is answered (a bare ack does not silence a stuck worker — it needs the answer, not just to be seen); a result rings until loaded; pure progress checkpoints do not ring at all. A stopped run — integration recorded and stop requested — goes quiet on its own, including the final `stopped` checkpoint the worker emits after `conclude --stop`; a paused run (`conclude` default) is not dismissed — it stays silent while idle and re-rings on the worker's next result. Only a run that died with a fatal error keeps ringing. The cure for a repeating doorbell on a *result* is `orchestrator pending`, never killing or closing the watcher.
+- Ringing is **state-aware** and rate-limited: a new actionable event rings a typed prompt **at most once per new-event cycle**, then reminders continue as passive banners (alert only, no typed input) on an exponential backoff — 30 s doubling to a 300 s cap. A worker **blocked** on a question keeps re-ringing until it is answered (a bare ack does not silence a stuck worker — it needs the answer, not just to be seen); a result rings until loaded; pure progress checkpoints do not ring at all. A finished-marked run goes quiet on its own; a merely paused run is not dismissed — it stays silent while idle and re-rings on the worker's next result. A fatal event in the live worker epoch keeps ringing even on a finished run. The cure for a repeating doorbell on a *result* is `orchestrator pending`, never killing or closing the watcher.
 - Never close the watcher's surface to stop a repeating doorbell: it is session-scoped — other workers may still be running and you can still spawn more — so it must live until the orchestrator process exits, which it detects on its own.
 - To silence a run without consuming it or holding a lease, use the credential-free `<helper> orchestrator dismiss --state "$handoff_orchestrator_state" --run <selector>`.
 - For urgent steering while you hold no active orchestrator lease, use `handoffctl dispatch` so the instruction is durably appended before the exact registered handle is touched; confirm `doorbell_sent: true`, otherwise use the returned message sequence and stored handle for a narrow manual doorbell. Never type a steering body or credential into cmux/tmux — a doorbell contains only `Check handoff run <run-id>; inbox now through seq <N>.`
@@ -292,52 +291,49 @@ the next checkpoint.
 5. Close out with one command:
 
    ```bash
-   <helper> conclude --run <selector>                                     # accept, integrate, pause (default)
-   <helper> conclude --run <selector> --stop                              # accept, integrate, final stop
+   <helper> conclude --run <selector>                                     # accept, integrate, leave resumably paused
+   <helper> conclude --run <selector> --stop                              # accept, integrate, mark finished
    <helper> conclude --run <selector> --disposition changes-requested --body-file -
    ```
 
    `conclude` consumes the outbox, sends the review tied to the exact pending
    result, and — on the default `accepted` disposition — records integration
    (commit default: the result's reported HEAD; override with `--commit`, skip
-   with `--no-integrate`) and pauses the worker: one takeover, one doorbell,
-   no waiting for `succeeded` before integrating — the worker drains review,
-   integration, and pause from its inbox in order, emits a `paused`
-   checkpoint, and idles. A paused worker stays resident with its full
-   context and resumes via `dispatch` (its next result rings normally, and a
-   later `conclude` works); `--stop` is the final teardown — the worker emits
-   `succeeded` then `stopped` and exits. Confirm `doorbell_sent: true`;
-   without the doorbell the idle worker never learns the run moved. The
-   `changes-requested` path (body required) appends only the review and lets
-   the worker resume — no integration, no pause/stop. A paused run is not
-   auto-quieted by the watcher — it stays quiet on its own and re-rings when
-   the worker emits a new result; a `--stop`-concluded run is auto-quieted,
-   including the final `stopped` checkpoint. Do not consume or dismiss
-   either tail yourself.
+   with `--no-integrate`) and leaves the worker resumably paused: one takeover,
+   one doorbell, no lifecycle inbox message and no waiting for a success
+   checkpoint before integrating. The worker drains review and integration,
+   emits one `paused` checkpoint, and idles. It stays resident with its full
+   context and resumes via `dispatch` on work newer than the accepted review
+   (its next result rings normally, and a later `conclude` works). `--stop`
+   writes the durable registry finished marker as the final semantic step;
+   it does not ask the worker to exit. Confirm `doorbell_sent: true` when a
+   review was sent; without it the idle worker may not learn that review is
+   ready. The `changes-requested` path (body required) appends only the review
+   and lets the worker resume — no integration or marker. A paused run is not
+   auto-quieted by the watcher; a finished-marked run is. Do not consume or
+   dismiss either tail yourself.
 6. A paused worker is idle, not finished, and `conclude` requires a pending
-   result — so it cannot stop one. Use the registry-backed graceful final
-   stop (ephemeral takeover, stop + one doorbell, release):
+   result. Mark it finished with the registry-backed idempotent operation:
 
    ```bash
-   <helper> stop --run <selector> [--reason TEXT]
+   <helper> stop --run <selector>
    ```
 
-   Each paused worker still holds a tmux session or cmux surface, so stop it
-   when its context is no longer needed — that is good hygiene, not optional
-   cleanup. `runs clean` protects paused workers (pause is not terminal) and
-   only `--force` reaps them, so a paused run is never swept accidentally:
-   `stop` first, then clean.
+   This writes `finished_at`; it sends no lifecycle message or doorbell and
+   does not exit the resident TUI. When its context is no longer needed,
+   mark it finished and then run cleanup. `runs clean` protects unmarked
+   paused workers, so they are never swept as finished accidentally.
 7. Run read-only `doctor`. Use repair flags only for identified, explicit recovery; never repair implicitly.
 
 The low-level sequence — `control consume`, `send --type review`, `control
-integrate`/`control abandon`, `send --type stop`/`pause`, manual takeover — is
-repair-only now, for when `conclude` refuses or the registry is unavailable;
-see `references/rescue-and-close.md`.
+integrate`/`control abandon`, manual takeover — is repair-only now, for when
+`conclude` refuses or the registry is unavailable; current code cannot send
+legacy `stop`/`pause` lifecycle messages. See `references/rescue-and-close.md`.
 
 ## Teardown
 
 Worker sessions do not self-clean: a handoff worker is an interactive agent
-TUI that stays resident after a protocol `stop`, so its session lingers and —
+TUI that stays resident after it is marked finished, so its session lingers and —
 because `cmux ssh-tmux` mirrors a host whole — remote sessions pile up as
 stray mirror workspaces. One command tears down finished runs — leftover
 sessions, registry records, and optionally run dirs, local and remote in one
@@ -347,6 +343,7 @@ shot:
 <helper> runs clean --run <selector> [--delete-run-dir]                      # one finished run, immediately
 <helper> runs clean --watcher-state "$handoff_orchestrator_state" --dry-run  # preview this session's finished workers
 <helper> runs clean --watcher-state "$handoff_orchestrator_state" --yes [--delete-run-dir]
+<helper> runs clean --watcher-state "$handoff_orchestrator_state" --finished --yes
 ```
 
 Bulk mode (no `--run`) is dry-run by default and requires `--yes` to execute.
@@ -355,12 +352,15 @@ workers other orchestrator sessions spawned — so scope it before a real run:
 `--watcher-state PATH` reads the orchestrator ID out of this session's
 watcher state file (`--orchestrator <id>` is the direct form), `--host NAME`
 limits to one remote host, `--older-than DAYS` to records older than N days.
+Add composable fact filters when needed: `--dead` means the transport answered
+session-absent, `--fatal` means the live worker epoch emitted a fatal error,
+and `--finished` means the orchestrator wrote `finished_at`.
 
-A run counts as terminal when its worker state is terminal, the orchestrator
-concluded it (`control.desired_state == stop` — a concluded worker stays
-resident and never emits its terminal checkpoint), or its run directory is
-gone (a dangling pointer). Remote runs are verified and reaped on the owning
-host over SSH. Cleaning kills the run's leftover session — remote tmux via
+A run is reapable when it is finished-marked, its live worker epoch is fatal,
+its run directory is gone (a dangling pointer), or its session transport
+answered that the session is absent. An unreachable transport means unknown
+liveness and always skips — it is never guessed dead. Remote runs are verified
+and reaped on the owning host over SSH. Cleaning kills the run's leftover session — remote tmux via
 the host probe, local tmux directly, a local cmux surface closed by exact
 UUID with before/after layout verification — then drops the record;
 terminality is re-verified at kill time so a run that goes live in between

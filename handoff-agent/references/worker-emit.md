@@ -42,48 +42,28 @@ evidence, current `HEAD`, and dirty state. A successful emit moves the run to
 
 ## Conclude after acceptance
 
-After consuming the accepted `review`, follow the lifecycle message that
-accompanies it. A `pause` (the default) means emit one `paused` checkpoint
-and idle awaiting further instructions — a doorbell arrives with the next
-one; resume by consuming a `steer`/`answer`/`supersede` newer than the
-`pause` and checkpointing back to `working`:
+After consuming the accepted `review`, emit one `paused` checkpoint and idle
+awaiting further instructions. There is no accompanying lifecycle message and
+no exit checkpoint. A doorbell arrives with the next instruction; resume by
+consuming a `steer`/`answer`/`supersede`/`input-changed`/`base-changed` newer
+than the accepted review and checkpointing back to `working`:
 
 ```bash
 <helper> emit --run-dir "$HANDOFF_RUN_DIR" --type checkpoint \
   --body-file /tmp/ckpt-body.md --data-file /tmp/ckpt-paused.json
 ```
 
-`ckpt-paused.json` — valid from `awaiting_review` (or `succeeded`) with a
-consumed matching accepted review and a `pause` message inside the consumed
-prefix:
+`ckpt-paused.json` — valid from `awaiting_review` with a consumed matching
+accepted review:
 
 ```json
-{"state": "paused", "stage": "complete", "current_activity": "Result accepted; paused awaiting instructions", "inbox_cursor": 4, "commitments": []}
+{"state": "paused", "stage": "complete", "current_activity": "Result accepted; paused awaiting instructions", "inbox_cursor": 2, "commitments": []}
 ```
 
-A `stop` instead means emit two checkpoints — `succeeded` first, then
-`stopped` — and exit:
-
-```bash
-<helper> emit --run-dir "$HANDOFF_RUN_DIR" --type checkpoint \
-  --body-file /tmp/ckpt-body.md --data-file /tmp/ckpt-succeeded.json
-```
-
-`ckpt-succeeded.json` — valid only from `awaiting_review` with a consumed
-matching accepted review in the prefix; `inbox_cursor` covers at least the
-review:
-
-```json
-{"state": "succeeded", "stage": "complete", "current_activity": "Result accepted; reporting succeeded", "inbox_cursor": 3, "commitments": []}
-```
-
-`ckpt-stopped.json` — requires `desired_state: stop` and the `stop` message
-inside the consumed prefix; from `paused` emit `stopped` directly, without
-`succeeded` first:
-
-```json
-{"state": "stopped", "stage": "complete", "current_activity": "Consumed orchestrator stop; run concluded", "inbox_cursor": 4, "commitments": []}
-```
+`conclude --stop` and `stop` write the orchestrator-owned registry
+`finished_at` marker. They do not send worker lifecycle messages, and the
+worker does not emit `succeeded`/`stopped` or exit; cleanup reaps the resident
+session when requested.
 
 ## Validator notes
 
@@ -93,8 +73,8 @@ inside the consumed prefix; from `paused` emit `stopped` directly, without
   bytes.
 - `inbox_cursor` cannot decrease, cannot exceed the inbox tail, and cannot
   advance across an unanswered blocking question.
-- Terminal checkpoint preconditions live in the state machine: `succeeded`
-  needs the accepted review, `stopped` needs the consumed orchestrator stop,
-  `paused` needs the accepted review plus a consumed orchestrator pause, and
-  resuming from `paused` to `working` needs a `steer`/`answer`/`supersede`
-  newer than the pause.
+- New runs can checkpoint only `working` or `paused`. Historical
+  `succeeded`/`stopped` records remain readable for old frozen contracts but
+  are rejected when a current run tries to emit them.
+- `paused` needs the consumed matching accepted review. Resuming from
+  `paused` to `working` needs a work message newer than that review.

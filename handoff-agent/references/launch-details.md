@@ -104,16 +104,14 @@ Why the core's doorbell rules are what they are:
   parked in `awaiting_review` for viewing, or a `blocked` run you are done with.
   It records a per-run `dismissed_through` cursor, stops even a persistent
   `blocked` nag, and a strictly newer worker event still re-rings.
-- A concluded run quiets itself: once control shows the orchestrator's final
-  decision (integration no longer `pending` with no pause requested, or
-  `stop` requested), the watcher advances `dismissed_through` over the
-  remaining tail on its next poll — including the final `stopped` checkpoint,
-  which arrives only after the worker exits and so can never be consumed. A
-  paused run (`desired_state: pause`) is exempt: it is resumable, not
-  concluded, so it stays quiet only because `paused` is not a ringing state
-  and re-rings when the worker resumes and emits a new result. The other
-  exemption is a fatal tail — a `failed` state or fatal error event — which
-  keeps ringing so a badly-dying run is never silenced.
+- A finished-marked run quiets itself: the watcher advances
+  `dismissed_through` over its current tail on the next poll. A merely paused
+  run is resumable, not finished, so it stays quiet only because `paused` is
+  not a ringing state and re-rings after resuming and emitting a new result.
+  A fatal event in the live worker epoch is the exception: its epoch is stored
+  in watcher state and keeps ringing until worker rotation changes the epoch,
+  even if the run is marked finished. Legacy `failed` snapshots remain an
+  upgrade backfill signal.
 - `watch [--run <selector> ...] --interval 5 --timeout <seconds>` (omit `--run`
   for every registered run; `--once` for one pass; `--notify-cmux` for
   metadata-only alerts) is an ad-hoc foreground JSONL observer for debugging or
@@ -123,20 +121,20 @@ Why the core's doorbell rules are what they are:
   maintains delivery cursors and sends opaque doorbells. Autonomous replies
   still require an orchestrator agent with authority for the decision.
 - Urgent steering while holding no lease: `dispatch` refuses to run while a
-  managed lease is held, and a managed orchestrator driving the normal
-  answer/review/stop lifecycle uses `send`, which rings the doorbell itself.
+  managed lease is held, and a managed orchestrator driving normal
+  answer/review messaging uses `send`, which rings the doorbell itself.
 - Closing out a result needs no lease either: `conclude --run <selector>` makes
   the same ephemeral takeover (and likewise refuses while a managed lease is
-  active), appends review + integration + pause in one lease transaction
-  (`--stop` appends stop instead for a final teardown), and rings one
-  doorbell — the worker drains them in order, so the orchestrator never waits
-  for `succeeded` before integrating. It covers `awaiting_review` (full
-  path), an accepted-but-unintegrated `succeeded` run, and an
-  accepted-and-integrated run missing only its pause/stop (both resume after
-  a mid-sequence crash), and refuses anything else with a pointer to
-  `dispatch` / `control abandon`. A paused worker has no pending result, so
-  `conclude` cannot stop it — `stop --run <selector>` is the same one-shot
-  takeover for that final stop.
+  active), appends review plus optional integration, and rings one doorbell.
+  The worker drains them in order, checkpoints `paused`, and the orchestrator
+  never waits for a success checkpoint before integrating. `--stop` writes
+  `finished_at` only after the review/integration sequence is durable; retrying
+  after a lost response returns idempotent success. It covers
+  `awaiting_review`, accepted-but-unintegrated `paused`/legacy `succeeded`, and
+  accepted-and-integrated crash recovery, and refuses anything else with a
+  pointer to `dispatch` / `control abandon`. A paused worker has no pending
+  result, so use `stop --run <selector>` to mark it finished directly; this
+  sends no lifecycle message or doorbell.
 
 ## Dispatch on a stale remote package
 

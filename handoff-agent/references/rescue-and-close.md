@@ -149,11 +149,13 @@ and never widen a close beyond the named handles — no `tab-action` sweeps,
 `close-window`, or `close-workspace` (except an exact mirror-workspace UUID
 per the layout-safety invariants).
 Afterward, report whether each handle closed; the durable run may truthfully
-remain nonterminal or show an unconsumed stop, and that stale semantic state
-must not delay terminal closure.
+remain unmarked as finished, and that accurate semantic state must not delay
+transport closure. A later `runs clean --dead` may reap it only after the
+transport positively reports the session absent.
 
-Use the slower protocol path only when the user asks to stop gracefully,
-preserve/report progress, or complete review/integration. Even then, bound the
-grace period; if the worker is unresponsive and the user authorized closure,
-close the exact transport handle and report that protocol acknowledgment was
-not obtained.
+Use the protocol path when the user asks to preserve/report progress or
+complete review/integration. `conclude --stop` or `stop` marks the run finished
+but does not ask the TUI to exit; session termination remains the cleanup or
+explicit close operation. If the worker is unresponsive and the user
+authorized closure, close the exact transport handle and report that no fresh
+protocol acknowledgment was obtained.

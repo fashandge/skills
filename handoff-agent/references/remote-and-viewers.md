@@ -69,10 +69,13 @@ HANDOFF_REMOTE_CREDENTIAL_DIR=/home/opc/.local/state/agents/handoff/orchestrator
 Close out a remote run from the orchestrator host with one command —
 `handoffctl conclude --run <selector>`: the credential-free local registry
 proxy resolves the owning host, and the whole owner-side transaction (review,
-integration, pause — or stop with `--stop` — doorbell) is a single SSH
-request, with a changes-requested body passed on stdin and
-`--reason`/`--commit` as argv. `handoffctl stop --run <selector>` stops a
-paused remote worker the same way. The manual token-over-SSH discipline
+integration, optional finished marker, and review doorbell) is a single SSH
+request, with a changes-requested body passed on stdin and `--commit` as argv.
+When `--stop` succeeds, the owning host writes `finished_at` marker-last and
+the orchestrator host mirrors it into the local proxy so the watcher can quiet
+the run; a retry repairs a lost mirror idempotently. `handoffctl stop --run
+<selector>` marks a paused remote worker finished the same way, without a
+lifecycle message or doorbell. The manual token-over-SSH discipline
 below is for managed `--retain-orchestrator` runs and repair only.
 
 Keep that path private and remember it exactly; the remote orchestrator token is
