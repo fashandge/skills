@@ -94,8 +94,10 @@ The title, filename, and `# H1` heading must all be **identical**.
 **Verify uniqueness** before writing — the title must not collide with any existing note in the vault:
 
 ```bash
-find ~/notes -name "<Title>.md"
+find -L ~/notes -name "<Title>.md"
 ```
+
+The `-L` is required: `~/notes` is a symlink, and without it `find` returns zero hits for every filename, silently turning this check into an always-pass.
 
 If this returns a hit, add a qualifier to the title and re-check.
 
@@ -237,7 +239,7 @@ Before finishing, verify:
 
 - [ ] Checked the vault (both trees) first: wiki hits judged for merge-over-create, raw hits on the same topic read and cited as `source:` references
 - [ ] **Title = filename = H1** — all three are identical
-- [ ] Title is globally unique (verified with `find ~/notes -name "<Title>.md"`), concrete, and contains no `/`, `\`, `#`, `^`, `[`, `]`, `|`, `:` characters
+- [ ] Title is globally unique (verified with `find -L ~/notes -name "<Title>.md"` — the `-L` is required, see above), concrete, and contains no `/`, `\`, `#`, `^`, `[`, `]`, `|`, `:` characters
 - [ ] Overview section answers "what is this, why does it exist?"
 - [ ] Table of contents uses `[[#Heading Text]]` with exact heading matches, and heading text is unique document-wide
 - [ ] No quotes or special characters in heading text that could break links
