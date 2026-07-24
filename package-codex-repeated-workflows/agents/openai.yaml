@@ -1,4 +1,0 @@
-interface:
-  display_name: "Package Codex Repeated Workflows"
-  short_description: "Find recurring work worth packaging"
-  default_prompt: "Look back over my recent work and package high-confidence repeated workflows into the smallest useful form."
