@@ -120,20 +120,21 @@ Follow-up fixes — cheaper than fresh runs, keeps context. Codex `resume` has n
 
 Run every delegation in a visible cmux/tmux pane so the user can watch the worker live — while keeping the harness-tracked `run_in_background` job that pings you on completion (do NOT poll, and do NOT type the worker command into the pane, which would sever completion tracking). The trick: the background job tees its stream to a file, and the pane just `tail -F`s that file. So the background job still owns execution and completion; the pane is a passive live view.
 
+Open and close the pane **only via the bundled script** — never with hand-rolled `cmux send`/`send-key`/`close-surface` calls:
+
 ```bash
 OUT=/tmp/worker-last.md; STREAM=/tmp/worker-last.stream; : >"$STREAM"
-# 1. Open a visible pane tailing the live stream (unfocused):
-#    cmux: cmux new-surface --type terminal --workspace "$CMUX_WORKSPACE_ID" --focus false
-#          → parse the surface UUID → cmux send/send-key `tail -F "$STREAM"`
-#    tmux: tmux new-window -d -n worker "tail -F '$STREAM'"
+# 1. Open the unfocused live-view pane (prints one JSON line; see --help for schema):
+~/skills/delegate-first/scripts/worker_pane.sh open --stream "$STREAM"
 # 2. Launch the real run as a run_in_background Bash job (completion ping as usual):
 command codex exec --yolo -C <repo> --model gpt-5.6-terra \
   -c model_reasoning_effort="xhigh" -o "$OUT" - <"$P" >"$STREAM" 2>&1
 ```
 
-- **Zero extra Claude tokens.** The pane shows the worker's own stdout via `tail`; it never enters Claude's context — on the completion ping Claude reads `$OUT` only, exactly as in the headless case. Cost is a couple of pane-management CLI calls.
-- The pane is cosmetic: closing it (or `tail` exiting) never affects the run. Close the surface after review, or leave it.
-- **Fallback to a plain detached background run (no pane)** only when there is no cmux/tmux surface — headless/cron, or `CMUX_*` and `$TMUX` both unset. Then run the base `Invoke` command directly under `run_in_background`.
+- **Why the script is mandatory** (2026-07-25 incident): `cmux send`/`send-key`/`close-surface` all default `--surface` to `$CMUX_SURFACE_ID` — **the surface hosting this very Claude session**. A hand-rolled `cmux send 86 "tail …"` typed into the session's own pane; its `OK surface:44` echo (the default target, i.e. the session itself) was then misread as a stray surface, and `close-surface --surface surface:44` killed the session. The script always passes an explicit `--surface` and its `close` refuses the session's own surface. If you ever bypass it, the invariant is: explicit `--surface` on every call, and never target `$CMUX_SURFACE_ID` or the `caller.surface_ref` that `cmux identify` reports.
+- **Zero extra Claude tokens.** The pane shows the worker's own stdout via `tail`; it never enters Claude's context — on the completion ping Claude reads `$OUT` only, exactly as in the headless case. Cost is the two `worker_pane.sh` calls.
+- The pane is cosmetic: closing it (or `tail` exiting) never affects the run. After review, run the exact `close` command the open-JSON reported, or leave the pane.
+- **Fallback to a plain detached background run (no pane)**: the script prints `{"backend":"none",…}` and exits 0 when there is no cmux/tmux (headless/cron) — then just run the base `Invoke` command under `run_in_background`.
 
 ## Remote box (only when explicitly asked)
 
@@ -141,7 +142,7 @@ Default is local. Run a headless worker on a remote box **only when the user exp
 
 ```bash
 ssh <box> 'mkdir -p <remote-work> && : > <remote-stream>'      # prep; prompt goes over SSH stdin
-# visible pane (default): a terminal running  ssh <box> "tail -F <remote-stream>"
+# visible pane (default): ~/skills/delegate-first/scripts/worker_pane.sh open --cmd "ssh <box> tail -F <remote-stream>"
 # the run as a local run_in_background job — the SSH command exiting IS the completion ping:
 ssh <box> 'command codex exec --yolo -C <remote-repo> --model gpt-5.6-terra \
   -c model_reasoning_effort="xhigh" -o <remote-out> - > <remote-stream> 2>&1' < "$P"
