@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Query Gemini / ChatGPT / Grok / Claude / DeepSeek in parallel in a self-spawned logged-in Chrome.
+"""Query Gemini / ChatGPT / Grok / Claude / DeepSeek / Kimi in parallel in a self-spawned logged-in Chrome.
 
 Instead of attaching to a pre-running Chrome on port 9222, this spawns its own
 **logged-in** Chrome via the ``logged-in-chrome`` project in COW (copy-on-write)
@@ -24,7 +24,7 @@ Requires:
 
 Example:
   python scripts/ask_chatbots.py --question "la weather tomorrow"
-  python scripts/ask_chatbots.py --chatbots gemini,chatgpt,grok,claude,deepseek --question "compare VRT vs ETN"
+  python scripts/ask_chatbots.py --chatbots gemini,chatgpt,grok,claude,deepseek,kimi --question "compare VRT vs ETN"
   python scripts/ask_chatbots.py --headless --question "la weather tomorrow"
   python scripts/ask_chatbots.py --no-keep-open --question "la weather tomorrow"
   python scripts/ask_chatbots.py --chatbots chatgpt,gemini,grok,claude --skip-summary --question "compare VRT vs ETN"
@@ -50,6 +50,7 @@ URLS = {
     "grok": "https://grok.com/",
     "claude": "https://claude.ai/new",
     "deepseek": "https://chat.deepseek.com/",
+    "kimi": "https://www.kimi.com/chat",
 }
 
 DEFAULT_CHATBOTS = ["gemini", "chatgpt"]
@@ -67,7 +68,7 @@ def parse_chatbots(value: str | None) -> list[str]:
     for bot in bots:
         if bot not in VALID_CHATBOTS:
             raise SystemExit(
-                f"Unknown chatbot '{bot}'. Valid options: gemini, chatgpt, grok, claude, deepseek"
+                f"Unknown chatbot '{bot}'. Valid options: gemini, chatgpt, grok, claude, deepseek, kimi"
             )
         if bot not in seen:
             deduped.append(bot)
@@ -723,6 +724,150 @@ async def ask_deepseek(page, question: str) -> str:
     return last_seen or (await extract_new_deepseek_response(page, baseline_count)).strip()
 
 
+def kimi_response_locator(page):
+    # Each assistant turn renders as a `.segment-assistant`. The COW profile clone
+    # can carry prior conversation history, so baseline-count these before sending
+    # and read only the newest one after.
+    return page.locator(".segment-assistant")
+
+
+async def extract_new_kimi_response(page, baseline_count: int) -> str:
+    """Return the newest assistant turn's final answer, with links preserved.
+
+    K3 renders its chain-of-thought in `.markdown-container.toolcall-content-text`
+    and the actual answer in plain `.markdown-container` blocks. We select only the
+    non-toolcall containers so the visible "Thinking…" trace is excluded from the
+    captured answer.
+    """
+    locator = kimi_response_locator(page)
+    count = await locator.count()
+    for i in range(count - 1, baseline_count - 1, -1):
+        try:
+            segment = locator.nth(i)
+            blocks = segment.locator(".markdown-container:not(.toolcall-content-text)")
+            n = await blocks.count()
+            parts = []
+            for j in range(n):
+                handle = await blocks.nth(j).element_handle()
+                if handle is None:
+                    continue
+                part = (await handle.evaluate(LINKED_INNER_TEXT_JS)).strip()
+                if part:
+                    parts.append(part)
+            text = "\n\n".join(parts).strip()
+        except Exception:
+            continue
+        if text:
+            return text
+    return ""
+
+
+async def kimi_response_complete(text: str, question: str) -> bool:
+    cleaned = text.strip()
+    if len(cleaned) < 15:  # short factual answers are valid; stability gate guards mid-stream
+        return False
+
+    question_norm = " ".join(question.split()).strip().lower()
+    cleaned_norm = " ".join(cleaned.split()).strip().lower()
+    if cleaned_norm == question_norm:
+        return False
+
+    return True
+
+
+async def kimi_response_finished(page) -> bool:
+    """True when K3 is no longer generating.
+
+    While streaming (and during web search / tool use), Kimi renders a
+    `.core-spiral-loading` spinner; it disappears when the turn completes. There is
+    no visible Stop button to key off, so this spinner is the streaming signal —
+    mirrors `claude_response_finished`'s role. If the spinner class ever disappears
+    from the DOM, return True so the caller falls back to its text-stability gate.
+    """
+    try:
+        if await page.locator(".core-spiral-loading").count():
+            return False
+    except Exception:
+        pass
+    return True
+
+
+async def select_kimi_k3(page) -> None:
+    """Switch the model picker to K3 before asking.
+
+    The COW clone inherits whatever model was last selected in the real profile
+    (often "Instant"), so we explicitly pick K3. Best-effort: if the picker DOM has
+    drifted, log nothing and proceed on the current model rather than failing the
+    whole query.
+    """
+    try:
+        current = page.locator(".current-model").first
+        if not await current.count():
+            return
+        # Already on K3? The trigger text is like "K3\nHigh"; skip the toggle.
+        try:
+            if (await current.inner_text()).strip().split("\n", 1)[0].strip() == "K3":
+                return
+        except Exception:
+            pass
+
+        await current.click()
+        await page.wait_for_timeout(1200)
+        # The dropdown lists each model as a `.model-item` with a `.model-name`.
+        # Match exact "K3" so it doesn't also hit "K3 Swarm".
+        k3 = page.locator(".model-item").filter(
+            has=page.get_by_text("K3", exact=True)
+        ).first
+        if await k3.count():
+            await k3.click()
+            await page.wait_for_timeout(1000)
+    except Exception:
+        pass
+
+
+async def ask_kimi(page, question: str) -> str:
+    # Per the skill's requirement, select the K3 model first (bottom-right of the
+    # input box) before sending anything.
+    await select_kimi_k3(page)
+
+    prompt = page.locator('.chat-input-editor, [contenteditable="true"]:visible').first
+    await prompt.click()
+    try:
+        await prompt.fill(question)
+    except Exception:
+        await page.keyboard.insert_text(question)
+
+    baseline_count = await kimi_response_locator(page).count()
+    await prompt.press("Enter")
+
+    last_seen = ""
+    stable_count = 0
+    # Higher budget than the plain chat bots: K3 may run a web search / tool calls
+    # before writing, so the outer --timeout-seconds (not this inner loop) governs.
+    for _ in range(150):
+        await asyncio.sleep(2)
+        current = (await extract_new_kimi_response(page, baseline_count)).strip()
+        if not current:
+            continue
+        if not await kimi_response_complete(current, question):
+            continue
+        if not await kimi_response_finished(page):
+            last_seen = current
+            stable_count = 0
+            continue
+
+        if current == last_seen:
+            stable_count += 1
+        else:
+            last_seen = current
+            stable_count = 1
+
+        if stable_count >= 2:
+            return current
+
+    return last_seen or (await extract_new_kimi_response(page, baseline_count)).strip()
+
+
 def build_gemini_summary_prompt(question: str, chatbots: list[str], results: dict[str, str]) -> str:
     parts = [
         f'Below are responses from several AI chatbots to the question: "{question}"',
@@ -760,6 +905,7 @@ ASKERS = {
     "grok": ask_grok,
     "claude": ask_claude,
     "deepseek": ask_deepseek,
+    "kimi": ask_kimi,
 }
 
 
@@ -864,7 +1010,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--chatbots",
         default=",".join(DEFAULT_CHATBOTS),
-        help="Comma-separated list of chatbots: gemini, chatgpt, grok, claude, deepseek (default: gemini,chatgpt)",
+        help="Comma-separated list of chatbots: gemini, chatgpt, grok, claude, deepseek, kimi (default: gemini,chatgpt)",
     )
     parser.add_argument(
         "--timeout-seconds",

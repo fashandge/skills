@@ -1,20 +1,22 @@
 ---
 name: ask-chatbots
-description: Query Gemini, ChatGPT or more chatbots (Grok, Claude, and DeepSeek, when specified) in parallel via a self-spawned logged-in Chrome. Output goes to a temp file; optional wiki integration via the /wiki skill.
+description: Query Gemini, ChatGPT or more chatbots (Grok, Claude, DeepSeek, and Kimi, when specified) in parallel via a self-spawned logged-in Chrome. Output goes to a temp file; optional wiki integration via the /wiki skill.
 ---
 
 # Ask Chatbots
 
 Use this when you want to ask the same question to multiple AI chatbots and compare responses.
 
-**Supported chatbots**: gemini, chatgpt, grok, claude, deepseek
+**Supported chatbots**: gemini, chatgpt, grok, claude, deepseek, kimi
 
 **Default**: gemini + chatgpt
+
+Kimi is asked on its **K3** model — the script selects K3 from the model picker (bottom-right of the input box) before sending, since the COW profile clone inherits whatever model was last used.
 
 ## Trigger phrases
 
 - compare chatbot answers
-- ask Gemini / ChatGPT / Grok / Claude / DeepSeek the same question
+- ask Gemini / ChatGPT / Grok / Claude / DeepSeek / Kimi the same question
 - run parallel chatbot queries
 
 ## How it works
@@ -29,9 +31,9 @@ ML=/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python
 # Default: Gemini + ChatGPT, headed window left open, summary only
 $ML ~/skills/ask-chatbots/scripts/ask_chatbots.py --question "la weather tomorrow"
 
-# All five chatbots, include individual responses
+# All six chatbots, include individual responses
 $ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
-  --chatbots gemini,chatgpt,grok,claude,deepseek \
+  --chatbots gemini,chatgpt,grok,claude,deepseek,kimi \
   --include-responses \
   --question "compare VRT vs ETN for a swing trade"
 
@@ -46,7 +48,7 @@ $ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
 | Flag | Default | Description |
 |---|---|---|
 | `--question` | *(required)* | Prompt sent to each chatbot |
-| `--chatbots` | `gemini,chatgpt` | Comma-separated list |
+| `--chatbots` | `gemini,chatgpt` | Comma-separated list: `gemini,chatgpt,grok,claude,deepseek,kimi` |
 | `--timeout-seconds` | `300` | Per-chatbot wait cap |
 | `--skip-summary` | off | Skip the Gemini synthesis step |
 | `--include-responses` | off | Print per-bot responses alongside the summary |
