@@ -1,2 +1,6 @@
 # skill-creator / eval run artifacts
 *-workspace/
+
+# python bytecode
+__pycache__/
+.pytest_cache/
