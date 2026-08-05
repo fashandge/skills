@@ -203,7 +203,7 @@ with the pane, and the mirror mapping is bidirectional, so a user
 accidentally ⌘W-ing a mirror workspace kills the remote session, SIGHUPs
 the pane's process group, and destroys hours of batch work (this happened
 2026-07-20 to a resumable-only-by-luck codex run). Agent workers
-(Claude/Codex/Kimi) launched by the handoff launcher accept this coupling
+(Claude/Codex/Kimi/pi) launched by the handoff launcher accept this coupling
 deliberately — the durable protocol survives them and `codex exec resume`
 can revive a killed worker — but ad-hoc batch commands (a rebuild, a
 sweep, a bulk download) must be decoupled. Use the logged-runner helper

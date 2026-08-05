@@ -5,7 +5,7 @@ doorbell.
 
 ## Manual doorbell (submit discipline)
 
-Agent TUIs (Claude/Codex/Kimi) coalesce a same-burst text+Enter into a
+Agent TUIs (Claude/Codex/Kimi/pi) coalesce a same-burst text+Enter into a
 bracketed paste, so the Enter becomes an input newline and the doorbell sits
 unsent in the composer while looking delivered. Launcher/`handoffctl`
 doorbells handle this automatically (settle + verify + retry). For the narrow

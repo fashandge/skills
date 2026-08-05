@@ -1,6 +1,6 @@
 ---
 name: handoff-agent
-description: Hand a coding task to an autonomous Claude Code, Codex, or Kimi Code worker in local cmux/tmux, a remote SSH-hosted tmux session, or a separate task in the same Codex desktop-app project. Use the durable local-v1 protocol for terminal workers or Codex task controls for app-native launch, monitoring, and steering. Use when the user says "hand this off", "delegate this", "spawn a coding-agent session", "start a background Codex task", "run Claude on a remote box", "monitor the worker", "steer the other agent", or asks about an existing handoff run.
+description: Hand a coding task to an autonomous Claude Code, Codex, Kimi Code, or pi worker in local cmux/tmux, a remote SSH-hosted tmux session, or a separate task in the same Codex desktop-app project. Use the durable local-v1 protocol for terminal workers or Codex task controls for app-native launch, monitoring, and steering. Use when the user says "hand this off", "delegate this", "spawn a coding-agent session", "start a background Codex task", "run Claude on a remote box", "hand this to pi/DeepSeek", "monitor the worker", "steer the other agent", or asks about an existing handoff run.
 ---
 
 # Hand off to an autonomous coding agent
@@ -107,12 +107,19 @@ Canonical monitored launches:
   --agent claude --orchestrator-state "$handoff_orchestrator_state"
 ~/projects/agents/scripts/handoff_agent.sh <name> <kickoff.md> <repo> \
   --agent kimi --orchestrator-state "$handoff_orchestrator_state"
+~/projects/agents/scripts/handoff_agent.sh <name> <kickoff.md> <repo> \
+  --agent pi --orchestrator-state "$handoff_orchestrator_state"
 ```
+
+Each agent launches at its pinned default model and effort; `--model` /
+`--effort` override one run. `--agent pi` runs DeepSeek V4 Flash at `max`
+thinking — cheap and fast on a 1M window, so it is the one to pick for bulk
+mechanical work, and the one to avoid when the task turns on judgment.
 
 With no `--backend`, the launcher uses cmux only when the orchestrator process
 inherits a reachable cmux workspace (the worker launches into it); otherwise
 tmux. Override with `--backend cmux|tmux` only on request or operational need.
-Launcher internals — model/effort defaults, Kimi delivery, watcher hosting
+Launcher internals — model/effort defaults, pi/Kimi delivery, watcher hosting
 modes, readiness waits — live in `references/launch-details.md`.
 
 Parse the launcher's JSON response and retain `run_dir`, `transport`, and

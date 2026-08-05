@@ -20,7 +20,18 @@ clients).
 ## Model/effort defaults and Kimi delivery quirks
 
 The launcher owns agent model/effort defaults. Use `--effort low` for a trivial
-read-only lookup and the normal default for substantial coding. Kimi is launched
+read-only lookup and the normal default for substantial coding. pi is launched
+with `--model deepseek/deepseek-v4-flash` and `--thinking max` (the launcher
+carries one model string, so it uses pi's `provider/id` form rather than the
+separate `--provider`/`--model` flags `delegate-first` spells out); its cheap
+1M window suits bulk mechanical work, and it is the one worker whose kickoff is
+plain argv with no delivery quirk. Its `DEEPSEEK_API_KEY` arrives through
+`env.build_env()`, so a pi worker launched from a launchd/cron-context
+orchestrator is authenticated like any other. pi has no tool-approval gate at all — no
+sandbox, so it never stalls on a permission prompt — and its one interactive
+gate, the project-trust dialog, is always resolved on the command line
+(`--approve` under the default `bypassPermissions`, `--no-approve` otherwise)
+because that dialog blocks below the agent loop. Kimi is launched
 explicitly with the configured alias `--model kimi-code/k3` and thinking effort
 `max`. The underlying model ID is lowercase `k3`; uppercase `K3` is not a valid
 replacement. Kimi starts interactively, then receives a short instruction with
