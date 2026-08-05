@@ -85,13 +85,24 @@ python -m news.src.user_tweets.fetch elonmusk --backfill --target 3000
 python -m news.src.user_tweets.fetch elonmusk --target 500 --fetch-articles
 ```
 
-**For "latest N tweets from @handle": just run the default, then read the newest N from `tweets.jsonl`.** The default front-fills from the top of the timeline to catch tweets posted since the last run, then backfills older only if the cache is short of `--target`. (There is no `--refresh` flag — the default already catches up. Use `--backfill` only when you want deeper *older* history without re-scanning the top.)
+**For "latest N tweets from @handle": just run the default, then read the first N lines of `tweets.jsonl`** — that file is deduped by id and sorted newest-first at the end of every run, so `head -n N` *is* the latest N. The default front-fills from the top of the timeline to catch tweets posted since the last run, then backfills older only if the cache is short of `--target`. (There is no `--refresh` flag — the default already catches up. Use `--backfill` only when you want deeper *older* history without re-scanning the top.)
 
 Hard ceiling: Twitter only serves ~800-3200 most recent tweets per handle regardless of paging.
 
 ## Post-fetch workflow
 
 All snapshots are raw xreach item dicts, one JSONL per line, with fields: `id`, `text`, `createdAt`, `user`, `likeCount`, `retweetCount`, `viewCount`, `replyCount`, etc., plus optional `linked_articles`.
+
+**Never sort or `max()` on the raw `createdAt` string.** Twitter's format leads with the weekday (`Tue Apr 21 16:00:00 +0000 2026`), so lexicographic comparison ranks by weekday name and silently returns a wrong — but plausible — "latest" tweet. Either rely on file order (below) or parse first:
+
+```python
+from news.src.common import xreach
+newest = max(posts, key=lambda p: xreach.parse_twitter_date(p["createdAt"]))
+```
+
+File order by module:
+- `user_tweets/<handle>/tweets.jsonl` — **sorted newest-first**; the latest N are the first N lines, no parsing needed.
+- `x_search` / `x_home_feed` snapshots — **not time-sorted**; they keep the API's own order (relevance rank for `top`, feed rank for home). Parse `createdAt` if you need chronology.
 
 **Token discipline (important):**
 - Don't `cat` every file. After fetching, parse JSONL with Python to get summary stats.
