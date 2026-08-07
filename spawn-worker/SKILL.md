@@ -1,0 +1,100 @@
+---
+name: spawn-worker
+description: Spawn a coding agent (Claude Code, Codex, Kimi Code, or pi) in a new terminal tab — locally in the current herdr/cmux/tmux session, or on a remote box like oci-box — and walk away. No handoff protocol, no monitoring, no bookkeeping. This is the default way to hand work to another agent. Use when the user says "hand this off", "delegate this", "spawn a worker", "run this in another tab", "start an agent on this", "put a worker on it", "run it on the box", or "have codex/pi/kimi do this". Route to handoff-agent instead only when the user explicitly asks for the durable handoff protocol, a monitored review loop, mid-run steering, or cross-session recovery; route to delegate-first for a headless one-shot whose output you will read back and review yourself.
+---
+
+# Spawn a worker in a new tab
+
+This is what a human does: open a tab, start an agent on a task, get on with
+something else. The spawned worker is an ordinary agent session. It gets a task
+prompt and nothing more — no role, no protocol, no reporting obligations. It
+does not know you exist.
+
+Deliberately absent, and not to be added back: run directories, worker tokens,
+leases, a registry, a watcher, doorbells, status polling, an outbox, a
+review/accept loop. Nothing is written under `~/.local/state/agents/handoff`.
+There is no worker list to consult later, by design.
+
+## 1. Write the prompt
+
+Write it to a file in your scratchpad directory. The worker starts with an empty
+context, so anything you learned in this conversation has to be in the file:
+paths, constraints, the verification command, the scope fence, and a done
+condition it can check for itself. Point at a plan or spec by path rather than
+copying it.
+
+Write it as a task, the way you would brief a capable colleague who is going to
+finish the job alone:
+
+- **No role assignment.** Not "you are a worker", not "you are handling a
+  handoff". Just the task.
+- **No protocol.** Do not tell it to ask questions, wait for review, publish a
+  result, emit anything, or check an inbox — there is nothing on the other end.
+- **No mention of an orchestrator**, this session, or the fact that it was
+  spawned.
+- **Say what "done" is**, so it stops in the right place instead of asking.
+
+If the task touches shared state outside the repo, fence it in the prompt: test
+against throwaway copies via `mktemp -d`, redirected through whatever env var
+the code already honors.
+
+## 2. Spawn
+
+The script picks the local backend itself — herdr when you are inside herdr,
+else cmux, else tmux — and creates the tab unfocused, so it never steals the
+user's place.
+
+```bash
+~/projects/agents/scripts/spawn_worker.sh <label> <prompt.md> <repo> --agent claude
+```
+
+On a remote box, the worker lands in that host's own herdr server, in a
+`REMOTE_WORKERS` workspace created on first use:
+
+```bash
+~/projects/agents/scripts/spawn_worker.sh <label> <prompt.md> \
+  --agent pi --remote-host oci-box --remote-cwd /home/opc/projects/<repo>
+```
+
+`--agent claude|codex|kimi|pi`, each at its pinned default model and effort;
+`--model` / `--effort` override one spawn. Pick **pi** for bulk mechanical work
+— it is cheap and fast on a 1M window — and avoid it when the task turns on
+judgment. The prompt file may be `-` to read the prompt from stdin.
+
+One JSON line comes back with the `handle` (a herdr pane ID like `w5:p9`, a cmux
+surface UUID, or a tmux session name) and the `backend`.
+
+## 3. Report, then stop
+
+Tell the user in one line what was spawned and where — the label, the agent, and
+the tab. Then move on to whatever else they asked for.
+
+Do not wait for it, do not poll it, do not open a watcher, and do not start
+checking its output on your own initiative. The whole point of this mode is that
+nobody is minding it.
+
+## 4. Checking on it later
+
+Only when the user asks. For a local herdr worker:
+
+```bash
+herdr agent list
+herdr agent read <pane-or-agent-name> --source recent-unwrapped --lines 120
+```
+
+Prefix with `ssh <host>` for a remote one (`ssh oci-box herdr agent list`). For
+tmux, `tmux capture-pane -pt <session>`. To send a follow-up instruction, type
+it into the tab: `herdr agent prompt <target> "<text>"`.
+
+Closing a finished worker's tab is the user's call — this mode tracks nothing,
+so cleanup is manual by design: `herdr tab close <tab-id>`.
+
+## 5. When this is the wrong tool
+
+Escalate only on an explicit request, and say which you are switching to:
+
+- **`/handoff-agent`** — the user wants the durable handoff protocol, a
+  monitored review/accept loop, mid-run steering through a lease, or a worker
+  that survives this session being compacted or lost.
+- **`/delegate-first`** — the user wants a headless one-shot whose answer you
+  read back and review yourself, with no tab at all.

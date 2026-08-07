@@ -1,9 +1,25 @@
 ---
 name: handoff-agent
-description: Hand a coding task to an autonomous Claude Code, Codex, Kimi Code, or pi worker in a local herdr/cmux/tmux session, a remote SSH-hosted herdr or tmux session, or a separate task in the same Codex desktop-app project. Use the durable local-v1 protocol for terminal workers or Codex task controls for app-native launch, monitoring, and steering. Use when the user says "hand this off", "delegate this", "spawn a coding-agent session", "start a background Codex task", "run Claude on a remote box", "hand this to pi/DeepSeek", "monitor the worker", "steer the other agent", or asks about an existing handoff run.
+description: Hand a coding task to an autonomous Claude Code, Codex, Kimi Code, or pi worker under the durable local-v1 handoff protocol — in a local herdr/cmux/tmux session, a remote SSH-hosted herdr or tmux session, or a separate task in the same Codex desktop-app project. This is the heavyweight mode, used only when the user explicitly asks for it: monitored launch, doorbells, mid-run steering, a review/accept loop, and cross-session durability. Use when the user says "hand this off with the handoff protocol", "monitor the worker", "steer the other agent", "I need to review its result before it finishes", "start a background Codex task", or asks about an existing handoff run. For a plain background worker with none of that machinery — the default way to delegate — use the spawn-worker skill instead.
 ---
 
 # Hand off to an autonomous coding agent
+
+## Mode gate — decide before reading further
+
+Lightweight is the default. Unless the user explicitly asked for one of the
+following, **stop reading this skill** and use the `spawn-worker` skill, which
+opens a tab, starts the agent on the task, and keeps no records:
+
+- the durable handoff protocol, a run directory, or `handoffctl`
+- monitored launch, doorbells, or being notified when the worker needs attention
+- a review/accept/conclude loop over the worker's published result
+- mid-run steering through a lease, or answering the worker's blocking questions
+- durability across this session being compacted, lost, or resumed elsewhere
+- an existing handoff run they want inspected, steered, or torn down
+
+Everything below assumes one of those. A request that is merely large, remote,
+or long-running does not qualify — `spawn-worker` handles all three.
 
 For herdr/cmux/tmux and SSH workers, use the filesystem protocol on the
 worker's owning host as the semantic source of truth. Use the terminal backend
