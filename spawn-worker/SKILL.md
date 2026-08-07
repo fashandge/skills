@@ -17,14 +17,18 @@ There is no worker list to consult later, by design.
 
 ## 1. Write the prompt
 
-Write it to a file in your scratchpad directory. The worker starts with an empty
-context, so anything you learned in this conversation has to be in the file:
-paths, constraints, the verification command, the scope fence, and a done
-condition it can check for itself. Point at a plan or spec by path rather than
-copying it.
+Write it to a file in your scratchpad directory. Use almost the same words as
+the user's request — do not re-engineer it into a brief. Add context only when
+necessary: the task description is incomplete, or it depends on something from
+this session the worker has no way to know (a path, a constraint, a finding).
+Point at a plan or spec by path rather than copying it. A self-contained
+request stays at one or two sentences; detail we learned in conversation does
+not belong in the prompt unless the task fails without it.
 
-Write it as a task, the way you would brief a capable colleague who is going to
-finish the job alone:
+Do not add instructions unless the user asked for them or they are absolutely
+necessary — no boilerplate process, no extra deliverables, no "be thorough",
+no step-by-step how-to for things the worker can figure out. What must never
+be in the prompt:
 
 - **No role assignment.** Not "you are a worker", not "you are handling a
   handoff". Just the task.
@@ -32,7 +36,10 @@ finish the job alone:
   result, emit anything, or check an inbox — there is nothing on the other end.
 - **No mention of an orchestrator**, this session, or the fact that it was
   spawned.
-- **Say what "done" is**, so it stops in the right place instead of asking.
+
+Say what "done" is only when the task is open-ended enough that it might
+otherwise keep going or ask — one short sentence, so it stops in the right
+place instead of asking.
 
 If the task touches shared state outside the repo, fence it in the prompt: test
 against throwaway copies via `mktemp -d`, redirected through whatever env var
