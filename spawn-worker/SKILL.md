@@ -17,13 +17,16 @@ There is no worker list to consult later, by design.
 
 ## 1. Write the prompt
 
-Write it to a file in your scratchpad directory. Use almost the same words as
-the user's request — do not re-engineer it into a brief. Add context only when
+For the common short prompt, send it directly with the spawn command via
+stdin (`-`) — no file needed. This also works for long and multiline prompts:
+the launcher reads all of stdin and keeps a private copy, so nothing is lost.
+Use a prompt file only to point at an existing plan or spec by path rather
+than copying it. Write the prompt in almost the same words as the user's
+request — do not re-engineer it into a brief. Add context only when
 necessary: the task description is incomplete, or it depends on something from
 this session the worker has no way to know (a path, a constraint, a finding).
-Point at a plan or spec by path rather than copying it. A self-contained
-request stays at one or two sentences; detail we learned in conversation does
-not belong in the prompt unless the task fails without it.
+A self-contained request stays at one or two sentences; detail we learned in
+conversation does not belong in the prompt unless the task fails without it.
 
 Do not add instructions unless the user asked for them or they are absolutely
 necessary — no boilerplate process, no extra deliverables, no "be thorough",
@@ -66,7 +69,9 @@ On a remote box, the worker lands in that host's own herdr server, in a
 `--agent claude|codex|kimi|pi`, each at its pinned default model and effort;
 `--model` / `--effort` override one spawn. Pick **pi** for bulk mechanical work
 — it is cheap and fast on a 1M window — and avoid it when the task turns on
-judgment. The prompt file may be `-` to read the prompt from stdin.
+judgment. The prompt goes on stdin with `-` (any length, multiline fine — this
+is the default for short prompts); a prompt file is only needed to point at an
+existing plan or spec.
 
 One JSON line comes back with the `handle` (a herdr pane ID like `w5:p9`, a cmux
 surface UUID, or a tmux session name) and the `backend`.
