@@ -58,9 +58,10 @@ python -m news.src.x_home_feed.fetch
 # Following feed, top 100
 python -m news.src.x_home_feed.fetch --following --count 100
 
-# Explicit feed arg form
-python -m news.src.x_home_feed.fetch --feed following --count 100
-python -m news.src.x_home_feed.fetch --feed for_you --count 50 --no-fetch-articles
+# For You is the DEFAULT feed; --following is the ONLY feed switch. There is
+# NO --feed flag (the module rejects it — two handoff workers hit this in
+# 2026-08). Write `--feed for_you` as nothing, `--feed following` as --following.
+python -m news.src.x_home_feed.fetch --count 50 --no-fetch-articles
 
 # Dry run
 python -m news.src.x_home_feed.fetch --count 20 --no-write

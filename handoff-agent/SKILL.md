@@ -11,6 +11,12 @@ Lightweight is the default. Unless the user explicitly asked for one of the
 following, **stop reading this skill** and use the `spawn-worker` skill, which
 opens a tab, starts the agent on the task, and keeps no records:
 
+**Invoking `/handoff-agent` by name does not opt in.** A plain task — even
+"hand off several agents to do X" — that names none of the features below
+still routes to `spawn-worker` (for a multi-task request, one tab per task).
+Only an explicit ask for monitoring, review, steering, durability, or an
+inspection/teardown of an existing run routes here.
+
 - the durable handoff protocol, a run directory, or `handoffctl`
 - monitored launch, doorbells, or being notified when the worker needs attention
 - a review/accept/conclude loop over the worker's published result
@@ -46,6 +52,11 @@ section owns the boundary — defer to it rather than restating it here).
    after a successful launch. The launcher has already copied it into the
    durable run directory by then; later `handoffctl context` reads that durable
    copy, so retaining the temporary source adds no recovery value.
+   Generate the kickoff with
+   `~/projects/agents/scripts/handoff_kickoff_new.sh <task.md> --out <kickoff.md>`
+   — it pre-fills the handoff-protocol boilerplate (inbox discipline, emit
+   schema, review/paused contract); supply only the task-specific sections
+   (Objective / Instructions / Scope and constraints / Done condition).
 4. Fence shared state in every kickoff that touches it. Have the worker test
    against throwaway copies (`mktemp -d`) redirected through whatever env var
    the code already honors, never against live state; a path that cannot be
@@ -128,6 +139,12 @@ Canonical monitored launches:
 ~/projects/agents/scripts/handoff_agent.sh <name> <kickoff.md> <repo> \
   --agent pi --orchestrator-state "$handoff_orchestrator_state"
 ```
+
+For several workers from one session, launch them in one pass from a TSV
+manifest (name, kickoff, repo, optional agent, optional extra launcher args)
+with `~/projects/agents/scripts/handoff_fleet.sh <manifest> --orchestrator-state "$handoff_orchestrator_state"`:
+it validates every row before launching anything and prints one JSON line per
+worker plus a summary (`--dry-run` previews the exact commands).
 
 Each agent launches at its pinned default model and effort; `--model` /
 `--effort` override one run. `--agent pi` runs DeepSeek V4 Flash at `max`
