@@ -7,8 +7,23 @@ manual-doorbell, rescue, and close procedures live in `rescue-and-close.md`.
 ## Launch on a remote SSH host
 
 Use the SSH adapter when the user asks to run on a named remote box. The remote
-host must already have key-based SSH access, tmux, the selected agent, and a
-compatible installed `agents` package. If the host is stopped and the project
+host must already have key-based SSH access, the selected agent, a compatible
+installed `agents` package, and the remote backend — herdr by default, tmux
+with `--remote-backend tmux`.
+
+Remote workers land in the remote host's **own** herdr server, in a workspace
+labelled `REMOTE_WORKERS`, one new tab per worker. The launcher resolves that
+workspace by label and creates it on first use, so repeat launches on a box
+collect in one place instead of scattering tabs; `--remote-workspace <label>`
+overrides it. An SSH command inherits no `HERDR_WORKSPACE_ID`, which is why the
+placement is by name rather than by inherited ID.
+
+Verify the remote package is new enough before relying on herdr: a host whose
+`agents` checkout predates this backend silently launches tmux instead. The
+launcher records the backend the host reports, not the one it asked for, so
+this degrades safely rather than addressing later doorbells the wrong way —
+but if you wanted herdr, refresh the host first with
+`~/projects/agents/scripts/update_agents.sh <host>`. If the host is stopped and the project
 documents a lifecycle helper, use that helper only when the request authorizes
 using the box. For the investment OCI box, the documented readiness command is:
 
@@ -45,8 +60,10 @@ seconds.
 
 The launcher sends the local kickoff and optional sibling `.goal` as JSON over
 SSH stdin. It creates the authoritative run and credentials on the remote host,
-starts remote tmux, and returns `run_dir` as an `ssh://` URI plus `remote_host`,
-`remote_run_dir`, and `remote_handle`. Retain those remote fields; `handoffctl`
+starts the remote session, and returns `run_dir` as an `ssh://` URI plus
+`remote_host`, `remote_run_dir`, and `remote_handle` — a herdr pane ID such as
+`w9:p3`, or a tmux session name under `--remote-backend tmux`. Read the
+backend that was actually used from `session_transport` rather than assuming. Retain those remote fields; `handoffctl`
 accepts the absolute `remote_run_dir`, not the URI, and must run on the owning
 host through SSH. Never rsync, Git-sync, or mount an active remote run
 directory as a second writable copy.
@@ -90,11 +107,14 @@ Credential files created before the rename keep their `coordinator.token`
 names, so read the exact path from the run rather than assuming a spelling.)
 
 For a remote doorbell, append the durable message first, then send only the
-opaque run ID and inbox sequence to the exact remote tmux handle, following the
+opaque run ID and inbox sequence to the exact remote handle, following the
 manual-doorbell submit discipline (see `rescue-and-close.md`; the short form is
 `~/projects/agents/scripts/handoff_doorbell.sh --run-id <id> --seq <n>
---tmux-session <remote-handle> --remote-host <host>`). Probe and rescue with
-`ssh <host> tmux capture-pane -p -t <remote-handle> -S -2000`; close with
+--herdr-pane <remote-handle> --remote-host <host>`, or `--tmux-session
+<remote-handle>` for a tmux run). Probe and rescue with
+`ssh <host> herdr pane read <remote-handle> --source recent-unwrapped --lines 2000`;
+close with `ssh <host> herdr pane close <remote-handle>`. The tmux equivalents
+are `ssh <host> tmux capture-pane -p -t <remote-handle> -S -2000` and
 `ssh <host> tmux kill-session -t <remote-handle>`. A lost SSH connection means
 the state is unknown, not dead: do not rotate or launch a replacement worker
 until the old one is fenced or confirmed stopped.

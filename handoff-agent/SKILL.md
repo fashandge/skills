@@ -1,14 +1,14 @@
 ---
 name: handoff-agent
-description: Hand a coding task to an autonomous Claude Code, Codex, Kimi Code, or pi worker in local cmux/tmux, a remote SSH-hosted tmux session, or a separate task in the same Codex desktop-app project. Use the durable local-v1 protocol for terminal workers or Codex task controls for app-native launch, monitoring, and steering. Use when the user says "hand this off", "delegate this", "spawn a coding-agent session", "start a background Codex task", "run Claude on a remote box", "hand this to pi/DeepSeek", "monitor the worker", "steer the other agent", or asks about an existing handoff run.
+description: Hand a coding task to an autonomous Claude Code, Codex, Kimi Code, or pi worker in a local herdr/cmux/tmux session, a remote SSH-hosted herdr or tmux session, or a separate task in the same Codex desktop-app project. Use the durable local-v1 protocol for terminal workers or Codex task controls for app-native launch, monitoring, and steering. Use when the user says "hand this off", "delegate this", "spawn a coding-agent session", "start a background Codex task", "run Claude on a remote box", "hand this to pi/DeepSeek", "monitor the worker", "steer the other agent", or asks about an existing handoff run.
 ---
 
 # Hand off to an autonomous coding agent
 
-For cmux/tmux and SSH workers, use the filesystem protocol on the worker's
-owning host as the semantic source of truth. Use cmux/tmux only to launch,
-probe, queue a doorbell, capture diagnostics, perform a narrowly authorized
-rescue/approval action, or stop a stuck process. For an app-native Codex task,
+For herdr/cmux/tmux and SSH workers, use the filesystem protocol on the
+worker's owning host as the semantic source of truth. Use the terminal backend
+only to launch, probe, queue a doorbell, capture diagnostics, perform a
+narrowly authorized rescue/approval action, or stop a stuck process. For an app-native Codex task,
 use Codex task status and history instead of the local-v1 protocol.
 
 Not every delegation needs this machinery: a spec-freezable one-shot that
@@ -69,9 +69,11 @@ for this. Keep the printed state path private and reuse it only for this
 orchestrator session:
 
 ```bash
-~/projects/agents/scripts/handoff_orchestrator_ensure.sh --transport cmux
-# transport: a cmux-inherited session (CMUX_SURFACE_ID set) has no tmux
-# composer to type into — ALWAYS use --transport cmux there
+~/projects/agents/scripts/handoff_orchestrator_ensure.sh --transport herdr
+# transport: match the multiplexer this orchestrator itself runs inside
+# herdr: HERDR_ENV=1 — the pane comes from HERDR_PANE_ID, no --target needed
+# cmux: CMUX_SURFACE_ID set — a cmux surface has no tmux composer to type
+#   into, so ALWAYS use --transport cmux there
 # tmux: --transport tmux --target auto (resolves to the current tmux session);
 # an explicit handle must name this orchestrator's own tmux session and is
 # validated at registration
@@ -116,9 +118,11 @@ Each agent launches at its pinned default model and effort; `--model` /
 thinking — cheap and fast on a 1M window, so it is the one to pick for bulk
 mechanical work, and the one to avoid when the task turns on judgment.
 
-With no `--backend`, the launcher uses cmux only when the orchestrator process
-inherits a reachable cmux workspace (the worker launches into it); otherwise
-tmux. Override with `--backend cmux|tmux` only on request or operational need.
+With no `--backend`, the launcher picks the multiplexer this orchestrator is
+already inside: herdr when it inherits a reachable herdr workspace (the worker
+opens as a new tab in that same workspace, so it appears where the user is
+looking), else cmux when it inherits a reachable cmux workspace, else tmux.
+Override with `--backend herdr|cmux|tmux` only on request or operational need.
 Launcher internals — model/effort defaults, pi/Kimi delivery, watcher hosting
 modes, readiness waits — live in `references/launch-details.md`.
 
@@ -188,8 +192,8 @@ context compaction or after removing a temporary kickoff source. Treat
 `status.json`, `control.json`, and the journals as evidence — never infer
 progress, acknowledgment, or success from terminal echoes.
 
-A cmux result also fires a best-effort native notification, but the durable
-outbox event is always authoritative: a failed or missing alert never
+A herdr or cmux result also fires a best-effort native notification, but the
+durable outbox event is always authoritative: a failed or missing alert never
 invalidates the result (mechanics in `references/launch-details.md`).
 
 While actively coordinating, renew the orchestrator lease at least every 60
@@ -272,7 +276,7 @@ the next checkpoint.
 - Ringing is **state-aware** and rate-limited: a new actionable event rings a typed prompt **at most once per new-event cycle**, then reminders continue as passive banners (alert only, no typed input) on an exponential backoff — 30 s doubling to a 300 s cap. A worker **blocked** on a question keeps re-ringing until it is answered (a bare ack does not silence a stuck worker — it needs the answer, not just to be seen); a result rings until loaded; pure progress checkpoints do not ring at all. A finished-marked run goes quiet on its own; a merely paused run is not dismissed — it stays silent while idle and re-rings on the worker's next result. A fatal event in the live worker epoch keeps ringing even on a finished run. The cure for a repeating doorbell on a *result* is `orchestrator pending`, never killing or closing the watcher.
 - Never close the watcher's surface to stop a repeating doorbell: it is session-scoped — other workers may still be running and you can still spawn more — so it must live until the orchestrator process exits, which it detects on its own.
 - To silence a run without consuming it or holding a lease, use the credential-free `<helper> orchestrator dismiss --state "$handoff_orchestrator_state" --run <selector>`.
-- For urgent steering while you hold no active orchestrator lease, use `handoffctl dispatch` so the instruction is durably appended before the exact registered handle is touched; confirm `doorbell_sent: true`, otherwise use the returned message sequence and stored handle for a narrow manual doorbell. Never type a steering body or credential into cmux/tmux — a doorbell contains only `Check handoff run <run-id>; inbox now through seq <N>.`
+- For urgent steering while you hold no active orchestrator lease, use `handoffctl dispatch` so the instruction is durably appended before the exact registered handle is touched; confirm `doorbell_sent: true`, otherwise use the returned message sequence and stored handle for a narrow manual doorbell. Never type a steering body or credential into a worker's terminal — a doorbell contains only `Check handoff run <run-id>; inbox now through seq <N>.`
 - A doorbell queues behind a running turn; it cannot interrupt the model. Hooks remain an optimization; the durable journal is authoritative even when a watcher or doorbell fails.
 - Cursor semantics, the two cmux channels, and the generic `watch` observer are in `references/launch-details.md`.
 
@@ -367,8 +371,9 @@ A run is reapable when it is finished-marked, its live worker epoch is fatal,
 its run directory is gone (a dangling pointer), or its session transport
 answered that the session is absent. An unreachable transport means unknown
 liveness and always skips — it is never guessed dead. Remote runs are verified
-and reaped on the owning host over SSH. Cleaning kills the run's leftover session — remote tmux via
-the host probe, local tmux directly, a local cmux surface closed by exact
+and reaped on the owning host over SSH. Cleaning kills the run's leftover session — a remote herdr
+pane or tmux session via the host probe, a local tmux session or herdr pane
+directly, a local cmux surface closed by exact
 UUID with before/after layout verification — then drops the record;
 terminality is re-verified at kill time so a run that goes live in between
 is never reaped. A live worker is always skipped, never killed, unless

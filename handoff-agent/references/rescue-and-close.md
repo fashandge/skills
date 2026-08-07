@@ -27,16 +27,25 @@ Retained manual two-step procedure, as background/fallback if the helper is
 unavailable: send the literal text and the Enter as two separate commands with
 ~1s between them — `cmux send --surface <uuid> "<text>"` then `cmux send-key
 --surface <uuid> enter`, or `tmux send-keys -t <name> -l "<text>"` then
-`tmux send-keys -t <name> Enter` (remote tmux: the same via `ssh <host> tmux
-...`) — then capture the pane (`cmux read-screen --surface <uuid>` or
+`tmux send-keys -t <name> Enter` (remote: the same via `ssh <host> ...`) —
+then capture the pane (`cmux read-screen --surface <uuid>` or
 `tmux capture-pane -p -t <name> -S -50`) and check the bottom lines; if the
 doorbell text still sits in the composer, send one more bare Enter.
+
+herdr is the exception and needs no two-step dance: `herdr agent prompt <pane>
+"<text>"` submits text and Enter in one call against the pane's live
+bracketed-paste mode. Fall back to `herdr pane send-text <pane> "<text>"` plus
+`herdr pane send-keys <pane> enter` only when herdr has not recognized an agent
+in that pane yet.
 
 Never assume delivery from a zero exit code; on the worker side, only an
 advanced `inbox_cursor` proves receipt.
 
 ## Probe/capture patterns (rescue only)
 
+- herdr: `herdr pane read <pane> --source recent-unwrapped --lines 2000`
+  (falls back to `--source visible` when the pane is still at a shell prompt;
+  process inventory comes from `herdr pane process-info --pane <pane>`)
 - cmux: `cmux read-screen --surface <uuid> --scrollback`
 - tmux: `tmux capture-pane -p -t <name> -S -2000`
 
@@ -89,6 +98,7 @@ Before sending any key:
 Canonical Enter actions after those checks:
 
 ```bash
+herdr pane send-keys <pane> enter
 cmux send-key --surface <uuid> enter
 tmux send-keys -t <name> Enter
 ```
@@ -96,15 +106,18 @@ tmux send-keys -t <name> Enter
 ### Codex folder-trust dialog
 
 The launcher handles this automatically for new Codex runs, local and remote
-alike (local cmux/tmux launches clear the dialog in the launched surface before
-releasing the orchestrator, reporting `folder_trust_rescued`). Use this manual
-fallback only for an older run or a launcher result with `startup_unconfirmed`.
-For the exact dialog with `1. Yes, continue` selected, use `C-m` for a tmux
-worker:
+alike (local herdr/cmux/tmux launches clear the dialog in the launched surface
+before releasing the orchestrator, reporting `folder_trust_rescued`). Use this
+manual fallback only for an older run or a launcher result with
+`startup_unconfirmed`. For the exact dialog with `1. Yes, continue` selected,
+use `C-m` for a tmux worker or `enter` for a herdr pane:
 
 ```bash
 ssh <host> tmux send-keys -t <remote-handle> C-m
 ssh <host> tmux capture-pane -p -t <remote-handle> -S -120
+
+ssh <host> herdr pane send-keys <remote-handle> enter
+ssh <host> herdr pane read <remote-handle> --source recent-unwrapped --lines 120
 ```
 
 Use this only after the five terminal-rescue checks above confirm the exact
@@ -134,6 +147,7 @@ take over or renew an orchestrator lease, append a protocol stop, wait for worke
 acknowledgment, consume journals, or run doctor before closing.
 
 ```bash
+herdr pane close <exact-pane-id>
 cmux close-surface --surface <exact-surface-handle>
 tmux kill-session -t <exact-session-handle>
 ```
