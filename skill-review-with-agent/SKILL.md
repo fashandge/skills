@@ -1,20 +1,22 @@
 ---
 name: skill-review-with-agent
-description: Have a second agent (Codex or Claude, called via agents-cli) adversarially review a skill — its SKILL.md and supporting files — either reporting findings for you to fix (review loop) or fixing them directly in alternating turns. The reviewer gathers its own review criteria from the skill-authoring skills and docs available to it, rather than being handed a rubric. Use when the user explicitly asks a second agent or second model to review a skill, e.g. "have codex review this skill", "get claude to review and fix my new skill". Do not auto-trigger for ordinary skill creation or editing — skill-creator owns those, and triggering-description quality is measured with skill-creator's evals, not review. For a plan/design doc use plan-with-agent; for code changes use review-with-agent.
+description: Have a second agent (Codex or Claude) adversarially review a skill in a live herdr pane — its SKILL.md and supporting files — either reporting findings for you to fix (review loop) or fixing them directly in alternating turns. The reviewer gathers its own review criteria from the skill-authoring skills and docs available to it, rather than being handed a rubric. Use when the user explicitly asks a second agent or second model to review a skill, e.g. "have codex review this skill", "get claude to review and fix my new skill". Do not auto-trigger for ordinary skill creation or editing — skill-creator owns those, and triggering-description quality is measured with skill-creator's evals, not review. For a plan/design doc use plan-with-agent; for code changes use review-with-agent.
 ---
 
 # Skill Review with Agent
 
 The skill-doc sibling of `plan-with-agent` and `review-with-agent`: this one hardens a skill. A skill is a prompt executed repeatedly by fresh-context agents — on this machine by both Claude Code and Codex — so a cross-vendor reviewer reading it cold is not just a critic but a stand-in for a real consumer: where it misreads the skill, a runtime agent will too.
 
-The reviewer is a second frontier model called via `agents-cli`. The one hard exclusion is self-review: never the exact model this session is running. Each call is fresh-context and one-shot, so every prompt must be fully self-contained.
+The reviewer is a second frontier model running in a live pane beside you. **Read `~/skills/review-with-agent/references/herdr-review-loop.md` for the mechanics** — spawning, placement, waiting, reading, and the next-round prompt — shared with `review-with-agent` so the two cannot drift. The one hard exclusion is self-review: never the exact model this session is running.
+
+Because the reviewer keeps its context between rounds, a follow-up turn is a short delta rather than a restated packet. That matters most in flow 3, where the alternation would otherwise re-send the whole candidate state every turn.
 
 Unlike its siblings, this skill hands the reviewer no rubric. The prompt tells it to gather its own criteria — the skill-authoring skills and docs available to it, and whatever the target skill delegates to — so findings reflect real conventions rather than a stale checklist embedded here.
 
 ## Ground rules
 
-- A saved skill is live behavior, so the reviewer never edits the live skill: flow 1 calls are read-only, and flow 3 calls edit a disposable candidate copy in a temp workspace. The live skill changes only when you (the session agent) edit it — flow 1 fixes after verifying findings, or flow 3's single apply-after-approval step. No git state is required and the skill need not be in a repo.
-- Flow 3 reviewer calls may write exactly two things: files inside the candidate copy, and appends to the review log — both inside the temp workspace. Anything else the reviewer wants changed (cross-referenced docs, sibling skills) it must raise as a finding.
+- A saved skill is live behavior, so the reviewer never edits the live skill: flow 1 turns are read-only, and flow 3 turns edit a disposable candidate copy in a temp workspace. The live skill changes only when you (the session agent) edit it — flow 1 fixes after verifying findings, or flow 3's single apply-after-approval step. No git state is required and the skill need not be in a repo.
+- Flow 3 reviewer turns may write exactly two things: files inside the candidate copy, and appends to the review log — both inside the temp workspace. Anything else the reviewer wants changed (cross-referenced docs, sibling skills) it must raise as a finding.
 - Don't commit or push unless the user asked.
 - Triggering quality of the `description` is out of scope — it's an empirical question owned by skill-creator's evals. Tell the reviewer to skip it unless plainly broken.
 
@@ -38,18 +40,19 @@ Read `~/skills/plan-with-agent/references/model-selection.md` for the current ro
 
 ## Invoking the reviewer
 
-Follow `~/skills/plan-with-agent/references/invoking-agents-cli.md` for the command templates (generic calls only — there is no native review surface for skills), required flags, and retry/failure rules. Work out of a temp workspace (`mktemp -d`): it holds the review log — which must be exactly `<workspace>/review.md`, the one path the helper's round snapshot/restore covers — and in flow 3 also the `original/` and `candidate/` copies of the skill. Everything in it is ephemeral unless the user wants the review log persisted.
+Spawn per the shared herdr reference. Work out of a temp workspace (`mktemp -d`): it holds the review log — which must be exactly `<workspace>/review.md`, the one path the helper's round snapshot/restore covers — and in flow 3 also the `original/` and `candidate/` copies of the skill. Everything in it is ephemeral unless the user wants the review log persisted. Spawn the reviewer with the workspace as its cwd, so `candidate/` and the log are the paths nearest to hand.
 
 For flow 3, use `scripts/candidate_workspace.py` for every copy, snapshot, comparison, restore, and apply operation; run it with the configured Python interpreter and use `-h` for its command contract. Do not reimplement those mechanics with `cp`, `diff`, or Git. The helper compares path presence, entry type, permission bits, and contents; safety-checks every entry before filtering junk (`.DS_Store`, `__pycache__`, `.pytest_cache`) from comparisons and copies; normalizes that junk out of `candidate/` before each round snapshot; restores both writable artifacts exactly; detects live drift; stages the replacement beside the live skill; and verifies or rolls it back. It rejects symlinks and special files because they can escape the disposable workspace; if it rejects the live skill at setup, stop and ask the user how to handle that skill.
 
 ## Flow 1 — the review loop
 
-Up to **6 review calls**; typical convergence is 1–2 rounds — the cap is a backstop, not a target. Each round, send:
+Up to **6 review rounds**; typical convergence is 1–2 — the cap is a backstop, not a target. Spawn the reviewer with the prompt below; each later round is a short follow-up prompt to the same pane, so the "prior rounds" block shrinks to what changed since its last turn rather than restating the whole history.
 
 ```
 You are reviewing a skill — an instruction document executed by fresh-context
-AI coding agents (both Claude Code and Codex). Reviewing only — treat the
-repo and all files as read-only; do not create or modify anything.
+AI coding agents (both Claude Code and Codex). Reviewing only — treat every
+file as read-only; do not create or modify anything, including the skill
+you are reviewing.
 
 Skill under review: <absolute path to the skill's directory>
 Read all of its files (SKILL.md plus any references/, scripts/, agents/).
@@ -82,16 +85,16 @@ Then address the round: verify each finding against the actual conventions and d
 
 ## Flow 3 — alternating review-and-fix
 
-Up to **4 reviewer calls**. The reviewer fixes factual, mechanical, and clarity issues in place, and must raise design-level disagreements (the skill's scope, flow structure, delegation choices) as findings without rewriting them.
+Up to **4 reviewer turns**. The reviewer fixes factual, mechanical, and clarity issues in place, and must raise design-level disagreements (the skill's scope, flow structure, delegation choices) as findings without rewriting them.
 
 **Setup:** create the temp workspace, then run `<python> <absolute path to candidate_workspace.py> setup <live skill dir> <workspace>`. The helper creates `original/` (the pristine baseline, never modified) and `candidate/` (the only copy anyone edits). All rounds — reviewer edits and your fixes alike — happen in `candidate/`; the live skill is untouched until the apply step.
 
 Each cycle:
 
 1. Run the helper's `round-snapshot <workspace> N` command to remove ignored junk from `candidate/`, then snapshot that normalized candidate and the review log exactly.
-2. Invoke the reviewer with the prompt below — it edits `candidate/` only.
-3. Verify the review log changed append-only (exactly one new `## Round N` section). If the call is unusable under the shared retry rules, run `round-restore <workspace> N` before retrying — never retry atop a partial mutation.
-4. Run `round-diff <workspace> N` and verify every reported path, type, mode, and content change; inspect ordinary file diffs as needed, revert wrong changes in `candidate/`, and record `REVERTED — <why>` in your turn. If `round-diff` rejects the candidate (the reviewer introduced a symlink or special file), treat the call as unusable like step 3: `round-restore` and retry — don't ask the user.
+2. Prompt the reviewer — spawn it with the prompt below on the first turn, then `herdr agent prompt --wait` for later ones. It edits `candidate/` only.
+3. Verify the review log changed append-only (exactly one new `## Round N` section). If the turn is unusable, run `round-restore <workspace> N` before re-prompting — never retry atop a partial mutation. A live reviewer remembers its rejected turn, so say plainly that you restored the candidate and what to do differently, or it will assume its edits are still there.
+4. Run `round-diff <workspace> N` and verify every reported path, type, mode, and content change; inspect ordinary file diffs as needed, revert wrong changes in `candidate/`, and record `REVERTED — <why>` in your turn. If `round-diff` rejects the candidate (the reviewer introduced a symlink or special file), treat the turn as unusable like step 3: `round-restore` and re-prompt — don't ask the user.
 5. Address RAISED findings by editing `candidate/`, or `REJECTED — <why>` / `DEFERRED — <why>`; never silently drop one.
 6. Append a `### Session turn` subsection to the round: per-edit and per-finding dispositions plus your own changes. If not converged, send the next turn with an updated digest.
 
