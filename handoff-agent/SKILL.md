@@ -20,7 +20,9 @@ inspection/teardown of an existing run routes here.
 - the durable handoff protocol, a run directory, or `handoffctl`
 - monitored launch, doorbells, or being notified when the worker needs attention
 - a review/accept/conclude loop over the worker's published result
-- mid-run steering through a lease, or answering the worker's blocking questions
+- mid-run steering through a lease, or question-answering that must survive
+  this session (merely staying on call to answer a worker's questions while
+  this session lives is spawn-worker's attended mode, not a handoff)
 - durability across this session being compacted, lost, or resumed elsewhere
 - an existing handoff run they want inspected, steered, or torn down
 
