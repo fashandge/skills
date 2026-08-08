@@ -8,9 +8,11 @@ description: Have one or more other agents (Codex, Claude, pi, kimi) adversarial
 A second frontier model reviews your change set in a live pane next to you, you verify
 and address what it finds, and it reviews again.
 
-**Read `references/herdr-review-loop.md` for the mechanics** — spawning, placement,
-waiting, reading, and the next-round prompt. It is shared with `skill-review-with-agent`
-so the two cannot drift. This file owns what is specific to reviewing *code changes*.
+**Read `references/herdr-review-loop.md` for the mechanics and the loop protocol** —
+spawning, placement, waiting, reading, next-round prompts, finding verification and
+dispositions, the round cap, stopping, escalation, and wrap-up. It is shared with
+`skill-review-with-agent` and `plan-with-agent` so the siblings cannot drift. This file
+owns what is specific to reviewing *code changes*.
 
 The one hard exclusion is self-review: the reviewer must never be the exact model this
 session is running. Same vendor at a different tier is fine.
@@ -47,8 +49,7 @@ Never self-review; honor an explicit user choice of model subject to that; other
 default to a cross-vendor reviewer one tier stronger, or the strongest cross-vendor peer
 when this session is already top tier. Read
 `~/skills/plan-with-agent/references/model-selection.md` for the roster, the
-session→reviewer mapping, and effort. Keep the same reviewer across rounds; lower its
-effort after the first.
+session→reviewer mapping, and effort.
 
 ## 3. The review prompt
 
@@ -78,21 +79,10 @@ Spawn with that prompt, then wait and read, per the shared reference.
 
 ## 4. Verify, then address
 
-**Verify each finding before you act on it.** Read the code path or reproduce the
-failure. A confident, well-written, wrong finding is the main hazard of this workflow —
-and a reviewer that already surfaced three real bugs earns unearned trust for its
-fourth. Reproducing takes a minute and settles it.
-
-Then:
-
-1. Fix blockers and majors; take minors and nits at your judgment.
-2. Re-run the relevant tests after every change.
-3. Record every finding as `FIXED — <what changed>`, `DEFERRED — <valid, intentionally
-   unchanged, why>`, or `REJECTED — <why it is wrong>`. Never silently drop one. Tell the
-   reviewer what you rejected and why in the next round — that is how a wrong finding
-   stops recurring.
-4. Push back when you disagree, and tell the user plainly. Deference to a reviewer that
-   is wrong is worse than no review.
+Follow the shared reference's round protocol — verify each finding against the actual
+code path before acting on it, fix blockers and majors, record every finding's
+disposition, and push back when the reviewer is wrong. Code adds one rule: re-run the
+relevant tests after every change.
 
 With multiple reviewers, combine before addressing: group findings that make the same
 claim, note where reviewers independently agree, and keep genuine disagreements visible
@@ -101,25 +91,8 @@ rather than averaging them away.
 ## 5. Loop
 
 Send the next round per the shared reference — what changed, what you rejected and why,
-and to re-review the working tree.
-
-**Cap at 6 review rounds** unless the user says otherwise. Typical convergence is 2–3, so
-the cap is a backstop rather than a target — but it is set high deliberately: later
-rounds keep finding bugs that earlier *fixes* introduced, so stopping at the first clean
-pass is the wrong instinct. In one observed run, rounds 2 and 3 each caught a defect
-created by the previous round's fix, and the loop converged only on round 4.
-
-If a run reaches 6 without converging, that is a signal about the change rather than
-about the reviewer — say so to the user instead of quietly raising the cap.
-
-**Stop when** the reviewer reports no remaining blockers or majors and no code changed
-after the reviewed state; or the user accepts an unresolved risk; or the cap is hit.
-Escalate to the user rather than looping when a valid blocker will not be fixed, or when
-the reviewer re-raises a rejected finding with a genuinely new argument.
+and to re-review the working tree — and apply its cap, stop, and escalation rules.
 
 ## 6. Wrap up
 
-Report: what changed in response to the review, which reviewer models, rounds used, the
-outcome, test status, and any rejected findings or open disagreements. Say which findings
-you verified and which you took on trust. Approval is not a merge decision — committing,
-pushing, and merging stay with the user.
+Wrap up per the shared reference, and include the final test status.

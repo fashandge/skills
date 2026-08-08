@@ -31,21 +31,15 @@ The user can name a flow explicitly; that wins. Between flows 1 and 2, pick by t
 
 ## Choose the reviewer
 
-Apply these principles in order:
+Never self-review — not the exact model running this session (if the session's exact model is unknown, choose the other vendor). Honor an explicit user choice of vendor, model, or effort subject to that exclusion; if the user requests the current model, explain the conflict and switch only with their agreement. Otherwise default review rounds (flows 1 and 2) to a cross-vendor reviewer one capability tier stronger, or the strongest cross-vendor peer when the session is already top-tier; a stronger same-vendor model is acceptable for unusually hard requirements when diversity matters less than raw capability.
 
-1. **Never self-review.** Do not use the exact model running this session. If the session's exact model is unknown, choose the other vendor.
-2. **Honor an explicit user choice** of vendor, model, or effort unless it violates the self-review exclusion. If the user requests the current model, explain the conflict and use a different model only with their agreement.
-3. **Default first-pass reviews one tier up.** For review rounds in flows 1 and 2, use a cross-vendor reviewer one capability tier stronger when available. If the session is already top-tier or no stronger cross-vendor reviewer is available, use the strongest cross-vendor peer. A stronger same-vendor model is acceptable for unusually hard requirements when diversity matters less than raw capability.
-
-Read [references/model-selection.md](references/model-selection.md) before selecting a concrete model and effort. It owns the dated roster and effort mapping so volatile model names do not dominate this workflow. For default selections, keep the same reviewer model for follow-up rounds but lower its effort; an explicit user effort still wins. Flow 2's independent draft and flow 3's direct-edit turns are deliberate peer-tier exceptions, described below.
-
-For flow 2's independent draft, choose a peer-tier cross-vendor counterpart. Drafting wants competitive alternatives; use extra intelligence in the subsequent review path rather than letting a stronger counterpart dominate synthesis.
-
-For flow 3, prefer a **cross-vendor, peer-tier reviewer**; a modestly stronger reviewer is acceptable. Alternating direct edits only provide a meaningful cross-check when both agents can independently detect mistakes made by the other. If the available pairing has a material capability gap in either direction, tell the user and recommend flow 1, where proposed changes remain explicit findings rather than already-applied edits. If they stick with flow 3, honor it, but report the reduced cross-check confidence rather than implying symmetric verification.
+Read [references/model-selection.md](references/model-selection.md) before selecting a concrete model and effort — it owns the dated roster, the effort mapping, and the rationale for the two deliberate peer-tier exceptions: flow 2's independent draft (competitive alternatives matter more than reviewer authority) and flow 3's direct-edit turns (covered by the alternating reference below).
 
 ## Invoking the counterpart
 
-Spawning, placement, waiting, reading, and the next-round prompt live in
+Spawning, placement, waiting, reading, the next-round prompt, and the shared round
+protocol — finding verification, dispositions, the round cap, stopping, escalation,
+wrap-up — live in
 [`~/skills/review-with-agent/references/herdr-review-loop.md`](../review-with-agent/references/herdr-review-loop.md),
 shared with both review skills — follow it for every turn.
 
@@ -78,19 +72,11 @@ Each planning effort gets its own subfolder `docs/plans/YYYY-MM-DD_<slug>/` (cre
 
 ## Flow 3 — alternating review-and-fix
 
-The reviewer doesn't just report findings — it fixes the plan doc directly, then you review its edits, fix what remains, and hand it back. This replaces the review loop below; the loop's discipline (verify before accepting, logged dispositions, escalation rules) carries over, applied to edits instead of findings.
+The reviewer fixes the plan doc directly, then you verify its edits, fix what remains, and hand it back, replacing the review loop below. Follow the shared protocol in [references/alternating-review-fix.md](references/alternating-review-fix.md) — reviewer choice, division of labor, turn cap, the per-cycle steps, verdict rubric, and stop/escalation rules. This flow's specifics:
 
-The division of labor is severity-agnostic but *kind*-sensitive: the reviewer fixes **factual and mechanical** findings in place (wrong paths, missing steps, wrong sequencing, missing verification) and must **raise design-level disagreements as findings without rewriting them** — a silently rewritten design decision buries exactly the disagreement the review exists to surface.
-
-Up to **4 reviewer turns**. Each cycle:
-
-1. Create a round temp dir. Snapshot both writable artifacts before the turn: copy `plan.md`, and copy `review.md` or record that it does not yet exist. Capture reviewer stdout in this temp dir too.
-2. Invoke the reviewer from the repo root with the prompt below and capture stdout. The explicit write boundary is the guardrail; do not add custom Git-state reconstruction. If an unexpected repository edit is noticed, stop and preserve it for inspection rather than discarding files wholesale.
-3. Verify `review.md` changed append-only: its previous bytes must be intact and exactly one new `## Round N` reviewer section may have been appended. Treat any overwrite, earlier-round edit, duplicate round, or missing entry as an unusable turn.
-4. If the result is unusable, restore both writable artifacts exactly to their pre-turn state (including removing a newly created `review.md`), then re-prompt. Never retry atop a partial reviewer mutation. A live reviewer remembers the turn you discarded, so say plainly that you rolled the artifacts back and what to do differently — otherwise it assumes its edits still stand.
-5. Diff `plan.md` against its snapshot and **verify every edit against the code** — a confident wrong fix is worse than a wrong finding, because it is already in the plan. Revert wrong edits and record `REVERTED — <why>` in your `### Session turn` subsection (step 7) — never edit the reviewer's own entry.
-6. Address the reviewer's RAISED findings: fix them; reject an incorrect finding with `REJECTED — <why>`; or intentionally leave a valid minor/nit unchanged with `DEFERRED — <why>`. Never silently drop one. Then make any further improvements of your own.
-7. Append a `### Session turn` subsection to the round in `review.md`: per-edit and per-finding dispositions, plus a summary of your own changes. If the round has not converged, send the next reviewer turn with an updated history digest.
+- The writable artifacts are `plan.md` and the append-only `review.md`. Snapshot them into a round temp dir before each turn: copy `plan.md`, and copy `review.md` or record that it does not yet exist (restoring an unusable turn then includes removing a newly created `review.md`).
+- The ground truth for verifying reviewer edits and findings is the repo's actual code.
+- The explicit write boundary is the guardrail; do not add custom Git-state reconstruction. If an unexpected repository edit is noticed, stop and preserve it for inspection rather than discarding files wholesale.
 
 Reviewer-turn prompt shape:
 
@@ -133,13 +119,9 @@ verdict rubric.
 Then bullet-summarize your edits and RAISED findings.
 ```
 
-**Stop when:** a reviewer turn returns `VERDICT: APPROVE` **and your handling of that turn makes no further change to `plan.md`**. By the rubric the reviewer made no plan edits, so the final plan state is exactly the state it approved. An `APPROVE` turn may still raise minor/nit findings: record unchanged ones as `REJECTED` or `DEFERRED` to stop; if addressing one changes the plan, send another reviewer turn. Also stop and escalate if the cap is hit, or if a `REVISE` design disagreement remains after your written rebuttal and one follow-up reviewer turn. Present both positions neutrally as in the review loop below.
-
 ## The review loop
 
-Flows 1 and 2; flow 3 replaces this loop with its own cycle above. Up to **6 review rounds** total (flow 2's draft turn doesn't count). Typical convergence is 2–3 rounds; the cap is a backstop, not a target.
-
-Each round, send the reviewer a prompt shaped like:
+Flows 1 and 2; flow 3 replaces this loop with the alternating protocol above. Each round, send the reviewer a prompt shaped like:
 
 ```
 You are reviewing an implementation plan. Reviewing only — treat the repo
@@ -168,18 +150,8 @@ Verdict rubric:
 - REVISE if one or more blocker or major findings remain.
 ```
 
-Then you address the round:
-
-1. **Verify before accepting.** Check the reviewer's factual claims against the code — a confident-sounding wrong finding rewrites a correct plan.
-2. Fix blockers and majors in the plan; take minors/nits at your judgment.
-3. A finding you disagree with: reject with a written rationale — never silently drop it.
-4. Append the round to the review log: verdict, findings, and per-finding disposition (`ACCEPTED — <edit made>` / `REJECTED — <why>`).
-5. Re-review with the updated plan and an updated history digest.
-
-**Stop when:** the reviewer says `VERDICT: APPROVE`, or the cap is hit. Under the verdict rubric, approval means no blocker or major findings remain; take any accompanying minor or nit findings at your judgment and record their dispositions.
-
-**Escalate to the user instead of looping** when the cap is hit without approval, or the reviewer re-raises a rejected finding a second time with a genuinely new argument. Present both positions, remaining findings, or persistent verdict inconsistency neutrally.
+Then address the round per the shared reference's round protocol — verifying the reviewer's factual claims against the code, since a confident-sounding wrong finding rewrites a correct plan — and append it to the review log (verdict, findings, per-finding disposition) before re-reviewing with the updated plan and an updated history digest. The shared reference's cap, stop, and escalation rules apply; flow 2's draft turn doesn't count toward the cap.
 
 ## Wrap-up
 
-Report to the user: plan doc path, reviewer model used, rounds used, final verdict, any material capability asymmetry in a flow-3 pairing, and any rejected or deferred findings, reverted reviewer edits, or open disagreements. Approval of the plan is not approval to implement — implementation is a separate decision for the user.
+Wrap up per the shared reference; include the plan doc path, any material capability asymmetry in a flow-3 pairing, and any reverted reviewer edits.

@@ -7,7 +7,7 @@ description: Have a second agent (Codex or Claude) adversarially review a skill 
 
 The skill-doc sibling of `plan-with-agent` and `review-with-agent`: this one hardens a skill. A skill is a prompt executed repeatedly by fresh-context agents — on this machine by both Claude Code and Codex — so a cross-vendor reviewer reading it cold is not just a critic but a stand-in for a real consumer: where it misreads the skill, a runtime agent will too.
 
-The reviewer is a second frontier model running in a live pane beside you. **Read `~/skills/review-with-agent/references/herdr-review-loop.md` for the mechanics** — spawning, placement, waiting, reading, and the next-round prompt — shared with `review-with-agent` so the two cannot drift. The one hard exclusion is self-review: never the exact model this session is running.
+The reviewer is a second frontier model running in a live pane beside you. **Read `~/skills/review-with-agent/references/herdr-review-loop.md` for the mechanics and the loop protocol** — spawning, placement, waiting, reading, next-round prompts, finding verification and dispositions, the round cap, stopping, escalation, and wrap-up — shared with `review-with-agent` and `plan-with-agent` so the siblings cannot drift. The one hard exclusion is self-review: never the exact model this session is running.
 
 Because the reviewer keeps its context between rounds, a follow-up turn is a short delta rather than a restated packet. That matters most in flow 3, where the alternation would otherwise re-send the whole candidate state every turn.
 
@@ -36,7 +36,7 @@ Never self-review; honor an explicit user choice of vendor/model/effort subject 
 - **Flow 1**: a cross-vendor reviewer one capability tier stronger when available; otherwise the strongest cross-vendor peer.
 - **Flow 3**: a cross-vendor **peer-tier** reviewer — alternating direct edits only cross-check when both agents can catch each other's mistakes.
 
-Read `~/skills/plan-with-agent/references/model-selection.md` for the current roster and effort mapping. Keep the same reviewer for follow-up rounds at lower effort.
+Read `~/skills/plan-with-agent/references/model-selection.md` for the current roster and effort mapping.
 
 ## Invoking the reviewer
 
@@ -46,7 +46,7 @@ For flow 3, use `scripts/candidate_workspace.py` for every copy, snapshot, compa
 
 ## Flow 1 — the review loop
 
-Up to **6 review rounds**; typical convergence is 1–2 — the cap is a backstop, not a target. Spawn the reviewer with the prompt below; each later round is a short follow-up prompt to the same pane, so the "prior rounds" block shrinks to what changed since its last turn rather than restating the whole history.
+Spawn the reviewer with the prompt below; each later round is a short follow-up prompt to the same pane, so the "prior rounds" block shrinks to what changed since its last turn rather than restating the whole history.
 
 ```
 You are reviewing a skill — an instruction document executed by fresh-context
@@ -79,26 +79,19 @@ Verdict rubric:
 - REVISE if one or more blocker or major findings remain.
 ```
 
-Then address the round: verify each finding against the actual conventions and delegated-to docs before accepting (a confident wrong finding rewrites a correct skill); fix blockers and majors; take minors/nits at your judgment; reject with a written rationale rather than silently dropping. Log verdict, findings, and per-finding disposition (`ACCEPTED — <edit>` / `REJECTED — <why>` / `DEFERRED — <why>`) as a `## Round N` section in the review log, reviewer model in the header. Re-review with an updated digest.
-
-**Stop when** the reviewer says `VERDICT: APPROVE` and addressing that round makes no further change to the skill — the final state is exactly what was approved. If any accepted finding changes the skill, re-review it even when the preceding verdict was `APPROVE`. Also stop at the cap. **Escalate to the user** instead of looping when the cap is hit without approval or the reviewer re-raises a rejected finding with a genuinely new argument — present both positions neutrally.
+Then address the round per the shared reference's round protocol, verifying each finding against the actual conventions and delegated-to docs it appeals to — a confident wrong finding rewrites a correct skill. Log each round as a `## Round N` section in the review log (reviewer model in the header): verdict, findings, and per-finding disposition. The shared reference's cap, stop, and escalation rules apply; re-review with an updated digest.
 
 ## Flow 3 — alternating review-and-fix
 
-Up to **4 reviewer turns**. The reviewer fixes factual, mechanical, and clarity issues in place, and must raise design-level disagreements (the skill's scope, flow structure, delegation choices) as findings without rewriting them.
+Follow the shared protocol in `~/skills/plan-with-agent/references/alternating-review-fix.md` — division of labor, turn cap, the per-cycle steps, verdict rubric, and stop/escalation rules. Here the artifact is the candidate copy, the ground truth is the actual authoring conventions and delegated-to docs, and the snapshot mechanics run through the helper:
 
 **Setup:** create the temp workspace, then run `<python> <absolute path to candidate_workspace.py> setup <live skill dir> <workspace>`. The helper creates `original/` (the pristine baseline, never modified) and `candidate/` (the only copy anyone edits). All rounds — reviewer edits and your fixes alike — happen in `candidate/`; the live skill is untouched until the apply step.
 
-Each cycle:
+- **Snapshot before each turn**: `round-snapshot <workspace> N` — removes ignored junk from `candidate/`, then snapshots the normalized candidate and the review log exactly.
+- **Restore an unusable turn**: `round-restore <workspace> N` before re-prompting. If `round-diff` rejects the candidate because the reviewer introduced a symlink or special file, treat that turn as unusable the same way — restore and re-prompt, don't ask the user.
+- **Verify the turn's edits**: `round-diff <workspace> N` reports every path, type, mode, and content change; inspect ordinary file diffs as needed and revert wrong changes in `candidate/`.
 
-1. Run the helper's `round-snapshot <workspace> N` command to remove ignored junk from `candidate/`, then snapshot that normalized candidate and the review log exactly.
-2. Prompt the reviewer — spawn it with the prompt below on the first turn, then `herdr agent prompt --wait` for later ones. It edits `candidate/` only.
-3. Verify the review log changed append-only (exactly one new `## Round N` section). If the turn is unusable, run `round-restore <workspace> N` before re-prompting — never retry atop a partial mutation. A live reviewer remembers its rejected turn, so say plainly that you restored the candidate and what to do differently, or it will assume its edits are still there.
-4. Run `round-diff <workspace> N` and verify every reported path, type, mode, and content change; inspect ordinary file diffs as needed, revert wrong changes in `candidate/`, and record `REVERTED — <why>` in your turn. If `round-diff` rejects the candidate (the reviewer introduced a symlink or special file), treat the turn as unusable like step 3: `round-restore` and re-prompt — don't ask the user.
-5. Address RAISED findings by editing `candidate/`, or `REJECTED — <why>` / `DEFERRED — <why>`; never silently drop one.
-6. Append a `### Session turn` subsection to the round: per-edit and per-finding dispositions plus your own changes. If not converged, send the next turn with an updated digest.
-
-**Apply after approval:** run `<python> <absolute path to candidate_workspace.py> apply <workspace> <pinned live skill dir>`. The helper refuses to apply if the live skill drifted, uses a same-filesystem staged replacement, verifies the installed candidate and unchanged backup, and rolls back on failure. If it reports live drift or cannot complete or roll back safely, stop and reconcile with the user; never improvise a partial copy. Report the helper's pending and apply output.
+Reviewer-turn prompt shape:
 
 ```
 You are reviewing AND fixing a skill — an instruction document executed by
@@ -144,8 +137,8 @@ VERDICT: APPROVE | REVISED | REVISE
 Then bullet-summarize your edits and RAISED findings.
 ```
 
-**Stop when** a turn returns `VERDICT: APPROVE` and your handling of it makes no further change to `candidate/` — the state you apply is then exactly the state that was approved. Also stop and escalate if the cap is hit or a design disagreement survives your written rebuttal plus one follow-up turn; on escalation, don't apply — run `pending-diff <workspace>` and show the user the pending changes to decide.
+**Apply after approval:** run `<python> <absolute path to candidate_workspace.py> apply <workspace> <pinned live skill dir>`. The helper refuses to apply if the live skill drifted, uses a same-filesystem staged replacement, verifies the installed candidate and unchanged backup, and rolls back on failure. If it reports live drift or cannot complete or roll back safely, stop and reconcile with the user; never improvise a partial copy. Report the helper's pending and apply output. On escalation, don't apply — run `pending-diff <workspace>` and show the user the pending changes to decide.
 
 ## Wrap-up
 
-Report: skill path, reviewer model, rounds used, final verdict, a summary of what changed in the live skill, and any rejected/deferred findings, reverted edits, or open disagreements. Remind the user the edited skill is live as saved; if it's git-tracked, suggest committing — committing stays with them.
+Wrap up per the shared reference; include the skill path and a summary of what changed in the live skill, and remind the user the edited skill is live as saved — if it's git-tracked, suggest committing, which stays with them.

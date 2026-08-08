@@ -1,9 +1,11 @@
 # Driving a Reviewer Agent in a herdr Pane
 
-Shared mechanics for `review-with-agent` and `skill-review-with-agent`: how to put a
-reviewer in a visible pane, wait for it without blocking the session, read its output,
-and run the next round. The consuming skill owns *what* to review and *how to judge the
-findings*; this file owns only the plumbing, so the two skills cannot drift apart on it.
+Shared mechanics and loop protocol for `review-with-agent`, `skill-review-with-agent`,
+and `plan-with-agent`: how to put a reviewer in a visible pane, wait for it without
+blocking the session, run the review-address rounds, and decide when to stop. The
+consuming skill owns *what* to review — the artifact, the review prompt, and the ground
+truth findings are verified against; this file owns the plumbing and the round protocol,
+so the consumers cannot drift apart on them.
 
 The reviewer is a full interactive agent, not a one-shot call. Two consequences shape
 everything below:
@@ -76,7 +78,7 @@ a first-run dialog instead of the task — codex prompts "Hooks need review" whe
 hook it knows has changed, and then sits there indefinitely. Check rather than assume:
 
 ```bash
-herdr agent get <handle>    # agent_status: idle | blocked | working
+herdr agent get <handle>    # agent_status: working | idle | blocked | done | unknown
 ```
 
 If blocked, read the pane, answer the dialog with `herdr agent send-keys` or by telling
@@ -94,18 +96,23 @@ what to re-review>" --wait --timeout 1200000
 
 `agent prompt --wait` submits and waits in one call. If the prompt produces no lifecycle
 change within five seconds it returns `agent_prompt_stalled` instead of hanging on an
-agent that never started.
+agent that never started. Always use `prompt --wait` for a follow-up rather than a bare
+submit plus a standalone `agent wait`: the standalone wait can match the agent's settled
+state *before* it starts the turn and return instantly, reading the previous round's
+output as if it were the new review. And a follow-up round takes as long as the first,
+so the background-wait rule above applies here too — run the command in the background,
+and hold the artifact still until it settles.
 
 With multiple reviewers, send every one of them the *same* round summary — including
 findings that came from a different reviewer — so each re-reviews knowing what actually
-changed, and one that disagrees with another's accepted finding can say so. Submit to
-all before waiting on any, so they work in parallel:
+changed, and one that disagrees with another's accepted finding can say so. Background
+each `prompt --wait` so they submit and work in parallel, and run the whole block in the
+background:
 
 ```bash
 for h in <handle-1> <handle-2>; do
-  herdr agent prompt "$h" "<round summary>" &
+  herdr agent prompt "$h" "<round summary>" --wait --timeout 1200000 &
 done; wait
-for h in <handle-1> <handle-2>; do herdr agent wait "$h" --timeout 1200000; done
 ```
 
 ## Keeping the reviewer read-only
@@ -118,6 +125,51 @@ comply with this reliably.
 When a flow genuinely needs the reviewer to edit, give it a disposable copy and name
 that copy as the only writable path, rather than trusting a negative instruction to hold
 across many turns.
+
+## The round protocol
+
+**Verify each finding before you act on it** — read the relevant path or reproduce the
+failure against the ground truth the consuming skill names. A confident, well-written,
+wrong finding is the main hazard of this workflow, and a reviewer that already surfaced
+three real bugs earns unearned trust for its fourth. Verifying takes a minute and
+settles it.
+
+Then fix blockers and majors; take minors and nits at your judgment. **Record every
+finding** — `FIXED`/`ACCEPTED — <what changed>`, `REJECTED — <why it is wrong>`, or
+`DEFERRED — <valid, intentionally unchanged, why>` — and never silently drop one. Tell
+the reviewer what you rejected and why in the next round; that is how a wrong finding
+stops recurring. Push back when you disagree, and tell the user plainly — deference to a
+reviewer that is wrong is worse than no review.
+
+Keep the same reviewer across rounds, lowering its effort after the first
+(`~/skills/plan-with-agent/references/model-selection.md` owns the roster and effort
+mapping).
+
+## Stopping and escalation
+
+**Cap review-address loops at 6 rounds** unless the user says otherwise. Typical
+convergence is 1–3, so the cap is a backstop rather than a target — but it is set high
+deliberately: later rounds keep finding bugs that earlier *fixes* introduced, so
+stopping at the first clean pass is the wrong instinct. In one observed run, rounds 2
+and 3 each caught a defect created by the previous round's fix, and the loop converged
+only on round 4.
+
+**Stop when** the reviewer approves — no remaining blockers or majors — and addressing
+that round changed nothing after the reviewed state, so the final state is exactly what
+was approved; if handling an approved round does change the artifact, re-review it. Also
+stop when the user accepts an unresolved risk, or at the cap.
+
+**Escalate to the user instead of looping** when the cap is hit without approval — that
+is a signal about the artifact rather than the reviewer; say so instead of quietly
+raising the cap — when a valid blocker will not be fixed, or when the reviewer re-raises
+a rejected finding with a genuinely new argument. Present both positions neutrally.
+
+## Wrap-up
+
+Report to the user: which reviewer model(s), rounds used, the outcome, what changed in
+response to the review, any rejected or deferred findings and open disagreements, and
+which findings you verified versus took on trust. Approval is not a decision to commit,
+merge, or implement — those stay with the user.
 
 ## Cleanup
 

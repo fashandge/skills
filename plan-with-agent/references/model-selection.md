@@ -22,7 +22,7 @@ Consumed by the `plan-with-agent`, `review-with-agent`, and `skill-review-with-a
 | Sonnet or Haiku | `gpt-5.6-terra` |
 | Non-Claude, non-GPT vendors | calibrate first; if uncertain, `claude-fable-5` |
 
-These mappings apply to the first review round in `review-with-agent` and to review rounds in plan-with-agent flows 1 and 2. Keep the same reviewer model for follow-up rounds, but lower effort as described below. Two counterpart calls intentionally use peers instead: flow 2's independent draft, where competitive alternatives matter more than reviewer authority, and flow 3's direct-edit turns, where mutual verifiability matters more than maximum strength.
+These mappings apply to the first review round in `review-with-agent` and `skill-review-with-agent` flow 1, and to review rounds in plan-with-agent flows 1 and 2. Keep the same reviewer model for follow-up rounds, but lower effort as described below. Two counterpart calls intentionally use peers instead: flow 2's independent draft, where competitive alternatives matter more than reviewer authority, and flow 3's direct-edit turns, where mutual verifiability matters more than maximum strength.
 
 If the session model is missing from the table, compare its documented capability with the current tiers and choose the other vendor one tier stronger when available. If the session is already top-tier, use the strongest cross-vendor peer. If exact capability is uncertain, choose the stronger eligible reviewer.
 
