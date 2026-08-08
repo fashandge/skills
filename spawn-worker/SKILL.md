@@ -17,14 +17,13 @@ There is no worker list to consult later, by design.
 
 ## 1. Write the prompt
 
-For the common short prompt, send it directly with the spawn command via
-stdin (`-`) — no file needed. This also works for long and multiline prompts:
-the launcher reads all of stdin and keeps a private copy, so nothing is lost.
-Use a prompt file only to point at an existing plan or spec by path rather
-than copying it. Write the prompt in almost the same words as the user's
-request — do not re-engineer it into a brief. Add context only when
-necessary: the task description is incomplete, or it depends on something from
-this session the worker has no way to know (a path, a constraint, a finding).
+Send the prompt via stdin (`-`) — any length, no file needed; the launcher
+keeps a private copy. Use a prompt file only to point at an existing plan or
+spec by path rather than copying it. Write the prompt in almost the same words
+as the user's request — do not re-engineer it into a brief. Add context only
+when necessary: the task description is incomplete, or it depends on something
+from this session the worker has no way to know (a path, a constraint, a
+finding).
 A self-contained request stays at one or two sentences; detail we learned in
 conversation does not belong in the prompt unless the task fails without it.
 
@@ -55,28 +54,24 @@ else cmux, else tmux — and creates the tab unfocused, so it never steals the
 user's place.
 
 ```bash
-~/projects/agents/scripts/spawn_worker.sh <label> <prompt.md> <repo> --agent claude
+~/projects/agents/scripts/spawn_worker.sh <label> - <repo> --agent claude <<'EOF'
+<task prompt — any length, multiline fine>
+EOF
 ```
 
-On a remote box, the worker lands in that host's own herdr server, in a
-`REMOTE_WORKERS` workspace created on first use:
+On a remote box, the worker lands in that host's own herdr server (the prompt
+file here shows the point-at-an-existing-spec form; `-` works remotely too):
 
 ```bash
-~/projects/agents/scripts/spawn_worker.sh <label> <prompt.md> \
+~/projects/agents/scripts/spawn_worker.sh <label> <plan.md> \
   --agent pi --remote-host oci-box --remote-cwd /home/opc/projects/<repo>
 ```
 
-`--split right` (herdr only) puts the worker in a split beside your own pane
-instead of its own tab, and hands focus back. Use it for a worker you intend to
-watch — a reviewer you read as it works — rather than one you walk away from;
-the default tab is right for everything else. `--ratio` tunes the split.
-
-`--agent claude|codex|kimi|pi`, each at its pinned default model and effort;
-`--model` / `--effort` override one spawn. Pick **pi** for bulk mechanical work
-— it is cheap and fast on a 1M window — and avoid it when the task turns on
-judgment. The prompt goes on stdin with `-` (any length, multiline fine — this
-is the default for short prompts); a prompt file is only needed to point at an
-existing plan or spec.
+Pick **pi** for bulk mechanical work — it is cheap and fast on a 1M window —
+and avoid it when the task turns on judgment. `--split right` (herdr only) is
+for a worker you intend to watch as it works — a reviewer — rather than walk
+away from; the default tab is right for everything else. `--help` documents
+the rest: agents, model/effort overrides, workspaces, split ratio.
 
 One JSON line comes back with the `handle` (a herdr pane ID like `w5:p9`, a cmux
 surface UUID, or a tmux session name) and the `backend`.
@@ -100,34 +95,17 @@ herdr agent read <pane-or-agent-name> --source recent-unwrapped --lines 120
 ```
 
 Prefix with `ssh <host>` for a remote one (`ssh oci-box herdr agent list`). For
-tmux, `tmux capture-pane -pt <session>`. To send a follow-up instruction, type
-it into the tab: `herdr agent prompt <target> "<text>"`.
+tmux, `tmux capture-pane -pt <session>`; for a cmux surface,
+`cmux read-screen --surface <uuid> --scrollback`.
 
-### Waiting, when the user asks you to
-
-Occasionally the user does want a loop — "review this, address what it finds,
-then have it review again." Herdr is event-driven, so ask the server to tell you
-rather than writing an `until …; do sleep N; done` poll loop. Polling samples
-state on a timer: it misses transitions between samples, spends a turn per
-sample, and hangs indefinitely when the agent never reaches the state you are
-grepping for.
-
-```bash
-herdr agent wait <target> --timeout <ms>       # blocks until idle, done, or blocked
-herdr agent prompt <target> "<text>" --wait    # submits AND waits, one call
-```
-
-Reach for `prompt --wait` in a send-then-read cycle: it is atomic, and if the
-prompt produces no lifecycle change within five seconds it returns
-`agent_prompt_stalled` rather than waiting on an agent that never started. Add
-`--until <idle|working|blocked|done>` only for a state-specific wait, such as
-catching an already-running agent the moment it blocks for input. For a pane
-running something other than an agent, `herdr pane wait-output <pane> --match
-<text>` is the equivalent.
-
-None of this applies to the cmux or tmux backends, which have no such API — and
-none of it changes the default posture above: absent a request to wait, spawn
-and walk away. `herdr --skill` documents the rest of the API.
+Anything past a quick read — sending a follow-up prompt, or a loop the user
+asked for ("review this, address what it finds, then have it review again") —
+is the herdr skill's territory: read it and use its event-driven waits
+(`herdr agent prompt --wait`, `herdr agent wait`), never a sleep-and-poll
+loop. Its inside-herdr gate applies to the local session only; for a remote
+worker keep the `ssh <host>` prefix. cmux and tmux have no such API — and none
+of this changes the default posture above: absent a request to wait, spawn and
+walk away.
 
 Closing a finished worker's tab is the user's call — this mode tracks nothing,
 so cleanup is manual by design: `herdr tab close <tab-id>`.
