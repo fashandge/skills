@@ -66,6 +66,11 @@ On a remote box, the worker lands in that host's own herdr server, in a
   --agent pi --remote-host oci-box --remote-cwd /home/opc/projects/<repo>
 ```
 
+`--split right` (herdr only) puts the worker in a split beside your own pane
+instead of its own tab, and hands focus back. Use it for a worker you intend to
+watch — a reviewer you read as it works — rather than one you walk away from;
+the default tab is right for everything else. `--ratio` tunes the split.
+
 `--agent claude|codex|kimi|pi`, each at its pinned default model and effort;
 `--model` / `--effort` override one spawn. Pick **pi** for bulk mechanical work
 — it is cheap and fast on a 1M window — and avoid it when the task turns on
