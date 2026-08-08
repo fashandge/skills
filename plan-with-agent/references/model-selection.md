@@ -37,7 +37,7 @@ A user-specified effort wins. Deep passes benefit from fresh whole-problem reaso
 
 ## Availability and fallback
 
-Before a long run, confirm the required provider binary exists and that the chosen model is locally configured or recognized by that provider. `agents-cli` accepts arbitrary model strings, so argument parsing alone is not proof of availability.
+Before a long run, confirm the required provider binary exists and that the chosen model is locally configured or recognized by that provider. `spawn_worker.sh` passes the model string through to the agent, so a successful spawn is not proof the model exists — a bad name surfaces as a pane that dies or sits at an error, which `herdr agent get` reports as `idle` with nothing done.
 
 Handle availability failures without weakening the reviewer requirement:
 

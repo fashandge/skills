@@ -1,13 +1,13 @@
 ---
 name: plan-with-agent
-description: Co-write and adversarially review a plan/design doc with a second agent (Codex or Claude, called via agents-cli), using a draft-review loop, independent dual drafts followed by synthesis, or an alternating review-and-fix loop where the reviewer edits the plan directly and the two agents fix issues in turns. Use when the user explicitly asks to plan with Codex or Claude, requests a second-model opinion or review of a plan, asks for independent co-drafting, asks the second agent to fix or edit the plan directly, or explicitly requests a two-agent audit that produces a remediation plan. Do not auto-trigger for ordinary planning, diagnosis, code review, or audits that do not request a second agent. For second-agent review of code changes instead of a plan doc, use review-with-agent; for second-agent review of a skill, use skill-review-with-agent.
+description: Co-write and adversarially review a plan/design doc with a second agent (Codex or Claude) in a live herdr pane, using a draft-review loop, independent dual drafts followed by synthesis, or an alternating review-and-fix loop where the reviewer edits the plan directly and the two agents fix issues in turns. Use when the user explicitly asks to plan with Codex or Claude, requests a second-model opinion or review of a plan, asks for independent co-drafting, asks the second agent to fix or edit the plan directly, or explicitly requests a two-agent audit that produces a remediation plan. Do not auto-trigger for ordinary planning, diagnosis, code review, or audits that do not request a second agent. For second-agent review of code changes instead of a plan doc, use review-with-agent; for second-agent review of a skill, use skill-review-with-agent.
 ---
 
 # Plan with Agent
 
-Any harness and session model can drive this skill. The reviewer is a second frontier model called via `agents-cli` — Codex (GPT) or Claude — chosen by the rules below. The one hard exclusion is self-review: the reviewer must never be the same model the session is running (same vendor at a higher tier is fine).
+Any harness and session model can drive this skill. The reviewer is a second frontier model — Codex (GPT) or Claude — running in a live pane beside you, chosen by the rules below. The one hard exclusion is self-review: the reviewer must never be the same model the session is running (same vendor at a higher tier is fine).
 
-The output is a plan doc that survived adversarial review by a second frontier model. Each `agents-cli` call is fresh-context and one-shot, so every prompt must be fully self-contained.
+The output is a plan doc that survived adversarial review by a second frontier model. The reviewer keeps its context across rounds, and the user can watch it work and type into its pane.
 
 ## Ground rules (plan-mode discipline)
 
@@ -15,7 +15,7 @@ Planning is read-only with respect to the world:
 
 - Never modify existing source code or production data (databases, data files).
 - Allowed writes: the plan doc, the review log, the counterpart draft doc (flow 2), and ad-hoc scratch scripts for probing/debugging (put them in a temp dir, not the repo). Probes read production data; if a probe must write, run it against a scratch copy (e.g. a dev DB).
-- `agents-cli` runs the reviewer auto-approved, so **every reviewer prompt must state** "Treat the repo and all data as read-only. Do not create or modify any files" — except the files a flow explicitly hands the reviewer: flow 2's draft call may write its single draft doc, and flow 3's reviewer turns may write exactly the plan doc and the review log.
+- The pane agent runs auto-approved with write access to the repo, so **every reviewer prompt must state** "Treat the repo and all data as read-only. Do not create or modify any files" — except the files a flow explicitly hands the reviewer: flow 2's draft turn may write its single draft doc, and flow 3's reviewer turns may write exactly the plan doc and the review log.
 
 ## Step 0 — Ground the requirement
 
@@ -43,9 +43,23 @@ For flow 2's independent draft, choose a peer-tier cross-vendor counterpart. Dra
 
 For flow 3, prefer a **cross-vendor, peer-tier reviewer**; a modestly stronger reviewer is acceptable. Alternating direct edits only provide a meaningful cross-check when both agents can independently detect mistakes made by the other. If the available pairing has a material capability gap in either direction, tell the user and recommend flow 1, where proposed changes remain explicit findings rather than already-applied edits. If they stick with flow 3, honor it, but report the reduced cross-check confidence rather than implying symmetric verification.
 
-## Invoking the reviewer
+## Invoking the counterpart
 
-Command templates, required flags, and the retry/failure rules live in [references/invoking-agents-cli.md](references/invoking-agents-cli.md) (shared with the `review-with-agent` skill — edit them there). Follow it for every call. Remember every call is one-shot: include the requirement brief, paths, constraints, and review history in each prompt.
+Spawning, placement, waiting, reading, and the next-round prompt live in
+[`~/skills/review-with-agent/references/herdr-review-loop.md`](../review-with-agent/references/herdr-review-loop.md),
+shared with both review skills — follow it for every turn.
+
+The counterpart is a live pane agent, so unlike the one-shot calls this skill used to
+make, it keeps its context: a follow-up round is what changed and what you rejected, not
+a restated requirement brief. Spawn it with the repo as its cwd so it can read the plan
+doc and the code the plan is about.
+
+**Flow 2 has an independence hazard the one-shot version did not.** A pane agent can read
+the filesystem, so it can find your draft in `docs/plans/` and anchor on it — which
+destroys the only thing flow 2 buys. Spawn the counterpart *before* you start writing,
+give it the requirement brief and its own output path, and tell it plainly not to read
+the other drafts in that folder. Drafting in parallel is also simply faster than the
+serialized one-shot version: it works while you write.
 
 ## Artifacts
 
@@ -68,12 +82,12 @@ The reviewer doesn't just report findings — it fixes the plan doc directly, th
 
 The division of labor is severity-agnostic but *kind*-sensitive: the reviewer fixes **factual and mechanical** findings in place (wrong paths, missing steps, wrong sequencing, missing verification) and must **raise design-level disagreements as findings without rewriting them** — a silently rewritten design decision buries exactly the disagreement the review exists to surface.
 
-Up to **4 reviewer calls**. Each cycle:
+Up to **4 reviewer turns**. Each cycle:
 
-1. Create a round temp dir. Snapshot both writable artifacts before the call: copy `plan.md`, and copy `review.md` or record that it does not yet exist. Capture reviewer stdout in this temp dir too.
+1. Create a round temp dir. Snapshot both writable artifacts before the turn: copy `plan.md`, and copy `review.md` or record that it does not yet exist. Capture reviewer stdout in this temp dir too.
 2. Invoke the reviewer from the repo root with the prompt below and capture stdout. The explicit write boundary is the guardrail; do not add custom Git-state reconstruction. If an unexpected repository edit is noticed, stop and preserve it for inspection rather than discarding files wholesale.
-3. Verify `review.md` changed append-only: its previous bytes must be intact and exactly one new `## Round N` reviewer section may have been appended. Treat any overwrite, earlier-round edit, duplicate round, or missing entry as an unusable call.
-4. If the result is unusable under the shared retry rules, restore both writable artifacts exactly to their pre-call state (including removing a newly created `review.md`), then retry. Never retry or fall back atop a partial reviewer mutation.
+3. Verify `review.md` changed append-only: its previous bytes must be intact and exactly one new `## Round N` reviewer section may have been appended. Treat any overwrite, earlier-round edit, duplicate round, or missing entry as an unusable turn.
+4. If the result is unusable, restore both writable artifacts exactly to their pre-turn state (including removing a newly created `review.md`), then re-prompt. Never retry atop a partial reviewer mutation. A live reviewer remembers the turn you discarded, so say plainly that you rolled the artifacts back and what to do differently — otherwise it assumes its edits still stand.
 5. Diff `plan.md` against its snapshot and **verify every edit against the code** — a confident wrong fix is worse than a wrong finding, because it is already in the plan. Revert wrong edits and record `REVERTED — <why>` in your `### Session turn` subsection (step 7) — never edit the reviewer's own entry.
 6. Address the reviewer's RAISED findings: fix them; reject an incorrect finding with `REJECTED — <why>`; or intentionally leave a valid minor/nit unchanged with `DEFERRED — <why>`. Never silently drop one. Then make any further improvements of your own.
 7. Append a `### Session turn` subsection to the round in `review.md`: per-edit and per-finding dispositions, plus a summary of your own changes. If the round has not converged, send the next reviewer turn with an updated history digest.
@@ -123,7 +137,7 @@ Then bullet-summarize your edits and RAISED findings.
 
 ## The review loop
 
-Flows 1 and 2; flow 3 replaces this loop with its own cycle above. Up to **6 review calls** total (flow 2's draft call doesn't count). Typical convergence is 2–3 rounds; the cap is a backstop, not a target.
+Flows 1 and 2; flow 3 replaces this loop with its own cycle above. Up to **6 review rounds** total (flow 2's draft turn doesn't count). Typical convergence is 2–3 rounds; the cap is a backstop, not a target.
 
 Each round, send the reviewer a prompt shaped like:
 
