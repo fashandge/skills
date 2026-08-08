@@ -86,11 +86,15 @@ nothing. Do not change any code.
 ## 5. Wait, then read
 
 ```bash
-herdr agent wait <handle> --timeout 1200000
+herdr agent wait <handle> --timeout 1200000   # run this in the background
 herdr agent read <handle> --source recent-unwrapped --lines 200
 ```
 
 `agent wait` blocks until the agent settles (idle, done, or blocked) — it is event-driven over herdr's socket, so never write a polling loop. With several reviewers, wait on each in turn; they run in parallel, so the last wait returns when the slowest finishes.
+
+**Run the wait in the background, not the foreground.** A review takes minutes — 1 to 9 in practice — and a foreground wait makes the user wait too, queueing anything they want to say behind it. Background it and you get a notification when it settles while the user keeps a live session. There is nothing to gain from blocking: the whole point of the pane is that they can watch the review themselves.
+
+**But hold the candidate still while a review is in flight.** Not blocking the session is not licence to keep editing. If the code changes under the reviewer, its findings describe a candidate that no longer exists — line numbers slide, and a "fixed" bug gets reported as live. Use the wait for anything *except* touching the reviewed code: answer the user, read surrounding code, prepare your verification plan. If the code did change mid-review — the user edited something, or you did — discard that round rather than reasoning about which findings survived. Re-establish the scope and re-prompt. A discarded round costs one prompt; a review silently interpreted against the wrong code costs far more.
 
 **`blocked` is a real outcome, not a slow `idle`.** A freshly spawned agent can settle on a first-run dialog instead of the task — codex in particular prompts "Hooks need review" whenever a hook it knows has changed, and then sits there indefinitely. Check the state rather than assuming the review ran:
 
