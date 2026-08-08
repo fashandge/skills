@@ -143,3 +143,6 @@ skill does — one line, label and outcome — plus anything notable from the
 question rounds. Cleanup stays manual (`herdr tab close <tab-id>`, the user's
 call). If the user's request is fully served and other attended workers are
 still going, keep their waits alive until they finish too.
+
+To re-verify this whole protocol after a herdr or agent upgrade, run the
+regression runbook in `references/attended-mode-e2e-test.md`.

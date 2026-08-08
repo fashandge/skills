@@ -451,3 +451,4 @@ than clean.
 - For a Codex desktop-app task, you MUST read `references/codex-app-task.md` first.
 - Launcher internals (model/effort defaults, Kimi delivery mechanics, watcher hosting modes, readiness waits): `references/launch-details.md`.
 - Worker-side `emit` payloads, terminal-checkpoint preconditions, and worked result/checkpoint examples: `references/worker-emit.md`.
+- End-to-end regression runbook for the protocol itself (two rounds, two transports, fresh orchestrator): `~/projects/agents/docs/tests/handoff-two-round-e2e.md` — it versions with the agents repo's code, so it lives there, not here.
