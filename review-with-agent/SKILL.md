@@ -138,7 +138,9 @@ done; wait
 for h in <handle-1> <handle-2>; do herdr agent wait "$h" --timeout 1200000; done
 ```
 
-**Cap at 4 review rounds** unless the user says otherwise. Typical convergence is 2–3. Later rounds surface bugs introduced by earlier fixes, which is exactly why the cycle is worth repeating rather than stopping at the first clean pass.
+**Cap at 6 review rounds** unless the user says otherwise. Typical convergence is 2–3, so the cap is a backstop rather than a target — but it is set high deliberately: later rounds keep finding bugs that earlier *fixes* introduced, so stopping at the first clean pass is the wrong instinct. In one observed run, rounds 2 and 3 each caught a defect created by the previous round's fix, and the loop only converged on round 4.
+
+If a run reaches 6 without converging, that is a signal about the change rather than about the reviewer — say so to the user instead of quietly raising the cap.
 
 **Stop when** the reviewer reports no remaining blockers or majors and no code changed after the reviewed state; or the user accepts an unresolved risk; or the cap is hit. Escalate to the user rather than looping when a valid blocker will not be fixed, or when the reviewer re-raises a rejected finding with a genuinely new argument.
 
