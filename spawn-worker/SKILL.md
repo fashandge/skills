@@ -98,6 +98,32 @@ Prefix with `ssh <host>` for a remote one (`ssh oci-box herdr agent list`). For
 tmux, `tmux capture-pane -pt <session>`. To send a follow-up instruction, type
 it into the tab: `herdr agent prompt <target> "<text>"`.
 
+### Waiting, when the user asks you to
+
+Occasionally the user does want a loop — "review this, address what it finds,
+then have it review again." Herdr is event-driven, so ask the server to tell you
+rather than writing an `until …; do sleep N; done` poll loop. Polling samples
+state on a timer: it misses transitions between samples, spends a turn per
+sample, and hangs indefinitely when the agent never reaches the state you are
+grepping for.
+
+```bash
+herdr agent wait <target> --timeout <ms>       # blocks until idle, done, or blocked
+herdr agent prompt <target> "<text>" --wait    # submits AND waits, one call
+```
+
+Reach for `prompt --wait` in a send-then-read cycle: it is atomic, and if the
+prompt produces no lifecycle change within five seconds it returns
+`agent_prompt_stalled` rather than waiting on an agent that never started. Add
+`--until <idle|working|blocked|done>` only for a state-specific wait, such as
+catching an already-running agent the moment it blocks for input. For a pane
+running something other than an agent, `herdr pane wait-output <pane> --match
+<text>` is the equivalent.
+
+None of this applies to the cmux or tmux backends, which have no such API — and
+none of it changes the default posture above: absent a request to wait, spawn
+and walk away. `herdr --skill` documents the rest of the API.
+
 Closing a finished worker's tab is the user's call — this mode tracks nothing,
 so cleanup is manual by design: `herdr tab close <tab-id>`.
 
