@@ -23,10 +23,8 @@ organizer work (see its entry).
 Match on what the task *touches*, not what it mentions: "add a quick screen
 for NVDA" runs stock_picker tooling (stock_picker), while "fix the quick
 screen fetcher's retry logic" edits it (also stock_picker) — but "make the
-dashboard show quick-screen scores" edits market-pulse. Tasks about note
-*content* (writing a wiki, absorbing clippings, researching the vault) are
-not notes-project tasks — the notes project is the search/organizer
-software; route content tasks by their topic (see the notes entry).
+dashboard show quick-screen scores" edits market-pulse. (Tasks about note
+*content* route by topic, not to notes — see the notes entry.)
 
 ## Inventory
 

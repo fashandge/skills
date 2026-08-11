@@ -18,16 +18,13 @@ decomposition, routing, conflict coordination, and the review discipline.
 
 ## Modes
 
-- **Unattended (default)** — split if splitting helps, spawn the tasks in
-  spawn-worker's plain default mode: every task at once when they are all
-  independent, in completion-gated waves when later tasks depend on earlier
-  ones (§5). Report where the tabs are, stop. No answering, no review, no
-  waiting except between waves — and never on the last wave. Simple and
-  fast — right for most runs. §1–§5, then done.
-- **Attended** — workers are spawned in spawn-worker's attended mode
-  (one sentence added to the prompt, background `herdr agent wait`,
-  `prompt --wait` for answers), you review every diff, and a fresh-context
-  reviewer closes the batch. §1–§4, then §6–§8.
+- **Unattended (default)** — split if splitting helps, spawn everything in
+  spawn-worker's plain default mode (all at once when independent, in
+  completion-gated waves when not — §5), report where the tabs are, stop.
+  Simple and fast — right for most runs. §1–§5, then done.
+- **Attended** — workers spawn in spawn-worker's attended mode, you review
+  every diff and commit per task (§6), and a fresh-context reviewer closes
+  the batch (§7). §1–§4, then §6–§8.
 
 Pick attended only when the user asks for it (the triggers in the
 description, or a `/orchestrate-workers attended …` invocation) — reviewing
@@ -63,33 +60,25 @@ what's installed):
 
 | Task shape | Worker |
 |---|---|
-| Straightforward, self-contained fix; worker can explore and figure it out | claude, opus, high effort |
-| Simple non-coding task needing some judgment and taste (absorb an article into notes, summarize news/articles, research notes, write a wiki) | claude, opus, high effort |
+| Straightforward self-contained fix, or simple non-coding task needing some judgment (absorb an article, summarize news, research notes, write a wiki) | claude, opus, high effort |
+| Global skill creation or edits (`~/skills`) | claude, fable 5, high effort — always, regardless of gauged difficulty |
 | Complicated and taste-heavy (research articles, investment thesis) | kimi, k3, max effort — if out of quota, claude, fable 5, high effort |
 | Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
 | Bulk mechanical sweeps | pi (cheap, 1M window) |
 | Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude fable 5 high over opus workers) |
 
-Prompt sizing follows the same judgment, and the default is **thin**: pass the
-task in the user's own words and add nothing. That is spawn-worker's §1 rule
-and it holds here — a task carrying little from this session ("summarize the
-top 10 posts on my X home feed") gets exactly those words. Workers are
-intelligent enough to work out the how; every sentence you add spends
-orchestrator tokens to make the worker worse at choosing its own approach.
+Prompt sizing is spawn-worker §1's rule, unchanged: thin by default — the
+task in the user's own words, nothing added. On top of it, add only what
+orchestration itself creates:
 
-Add only what the worker cannot know or infer:
-
-- constraints that are actually real — the disjoint file set when parallel
-  workers share a checkout (§4), a fenced shared resource, a path or finding
-  from this session the task fails without
-- a done condition, one sentence, when the task is open-ended enough to run on
-  or stop and ask (matters more unattended: nobody is on call, so a worker
-  that asks is a wasted worker)
+- the §4 constraints — the worker's disjoint file set in a shared checkout,
+  a fenced single-writer resource — plus any path or finding from this
+  session the task fails without
+- a one-sentence done condition when the task could run on or stop and ask
+  (spawn-worker's rule, but it matters more unattended: nobody is on call,
+  so a worker that asks is a wasted worker)
 - the mechanism, acceptance criteria, and expected review artifact — only for
   genuinely error-prone tasks (identity/history rewrites, safety-critical SQL)
-
-Never prescribe implementation for a task the worker can explore, and never
-add process boilerplate ("be thorough", "write tests first", "report back").
 
 Unattended, route one tier up when you hesitate: there is no follow-up cycle
 to correct a worker that guessed wrong, so pay for the deeper model instead.
@@ -97,24 +86,14 @@ to correct a worker that guessed wrong, so pay for the deeper model instead.
 ## 3. Route each task to its project's workspace
 
 Workers run where their project lives, not wherever the orchestrator happens
-to sit. First identify the orchestrator's own project (its cwd): tasks that
-clearly belong to it spawn as new tabs in the current workspace, no
-placement flags. Match each remaining task to the project that owns it — the
-repo it edits, or the data/tooling it runs; generally one of
-`~/projects/<name>`, `~/skills`, or `~/dotfiles` — using
-`references/project-routing.md` (routing rule plus one/two-line descriptions
-and match keywords per project; read it before assigning). Spawn those
-workers with the owning project's directory as cwd and
-`--workspace-label <label>`, which places the tab in that project's herdr
-workspace, creating it on first use. Labels are the project folder name,
-except notes, which splits by subproject (usually `search`; `organize` for
-organizer work — see the routing doc).
-
-A task that belongs to no project ("summarize the top posts in my X home
-feed") stays in the orchestrator's own workspace and cwd. Cross-workspace
-placement is herdr-only — on cmux/tmux spawn everything in the
-orchestrator's session. Waves (§5) and attended waits work unchanged across
-workspaces: herdr handles are global.
+to sit. Read `references/project-routing.md` before assigning — it owns the
+routing rule (current project first, then match by what the task *touches*,
+else stay in the orchestrator's workspace) and the project inventory with
+labels and match keywords. Out-of-project workers spawn with the owning
+project's directory as cwd plus `--workspace-label <label>` (mechanics in
+spawn-worker §2). Cross-workspace placement is herdr-only — on cmux/tmux
+spawn everything in the orchestrator's session. Waves (§5) and attended
+waits work unchanged across workspaces: herdr handles are global.
 
 ## 4. Coordinate shared state
 
@@ -132,12 +111,11 @@ Workers must not step on each other:
   overlap — so a single-wave run gets at most one writer *total*.
 - **Dependent tasks**: if task B edits a file task A also edits, or builds on
   conventions A may change — B runs in a later wave than A. Attended, the
-  wave boundary is a review gate: B spawns after A is reviewed and
-  committed. Unattended, it is a completion gate only: B spawns once A's
-  worker finishes, with nothing reviewed in between (§5). When B is small,
-  or the backend cannot wait (§5), instead fold B into A's prompt as one
-  larger task for one worker, or drop it from this run and tell the user it
-  needs a second pass after A lands.
+  wave boundary is a review gate: B spawns after A is reviewed and committed;
+  unattended, §5 owns the gate. When B is small, or the backend cannot wait
+  (§5), instead fold B into A's prompt as one larger task for one worker, or
+  drop it from this run and tell the user it needs a second pass after A
+  lands.
 
 ## 5. Unattended: spawn in parallel, wave when dependent, hand back
 
@@ -204,14 +182,11 @@ The review is not reading the worker's summary — it is:
 
 ## 7. Attended: finish with a fresh-context strong-model review
 
-After everything is committed, spawn one reviewer on a strong model — prefer
-the strongest model from a different family than the implementers and the
-orchestrator; a same-family model is also fine when it is strictly stronger
-than both (e.g. claude fable 5 high over opus workers, itself generally
-stronger than the other families so far) — fenced (no commits, no writes to
-protected resources), over the whole
-range (`base..HEAD`), with a review-then-fix mandate: fix real issues directly
-+ add tests; report-only anything that is a judgment call or would rewrite
+After everything is committed, spawn one reviewer on a strong model picked
+by §2's review row — fenced (no commits, no writes to protected resources),
+over the whole range (`base..HEAD`), with a review-then-fix mandate: fix
+real issues directly + add tests; report-only anything that is a judgment
+call or would rewrite
 data/history. Fresh context catches what every in-context reviewer misses —
 integration seams between tasks (a DAG-position mismatch, a test suite nobody
 re-ran after a later commit changed its fixture's assumptions). Review the
