@@ -1,6 +1,6 @@
 ---
 name: orchestrate-workers
-description: Run a multi-task job as an orchestrator - split the work into tasks, gauge each task's difficulty, spawn workers (via the spawn-worker skill) on cheaper models to implement them in parallel, then either hand the tabs back and walk away (unattended, the default), or review every diff and close with a fresh-context strong-model review (attended). Use whenever the user asks to "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize this across workers/agents", or hands over a batch of related fixes/features to be done by multiple agents in parallel - especially when the main session runs on an expensive model (Fable/Opus) and implementation should happen on cheaper workers. Use attended mode when the user says "attended", "review the work", "stay on call", "answer their questions", or asks you to commit the results. Not the entry point for a single delegated task (spawn-worker, delegate-first) or a durable cross-session protocol (handoff-agent).
+description: Run a multi-task job as an orchestrator - split the work into tasks, gauge each task's difficulty, route each task to the workspace of the project it belongs to, spawn workers (via the spawn-worker skill) on cheaper models to implement them in parallel, then either hand the tabs back and walk away (unattended, the default), or review every diff and close with a fresh-context strong-model review (attended). Use whenever the user asks to "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize this across workers/agents", or hands over a batch of related fixes/features to be done by multiple agents in parallel - especially when the main session runs on an expensive model (Fable/Opus) and implementation should happen on cheaper workers. Use attended mode when the user says "attended", "review the work", "stay on call", "answer their questions", or asks you to commit the results. Not the entry point for a single delegated task (spawn-worker, delegate-first) or a durable cross-session protocol (handoff-agent).
 ---
 
 # Orchestrate workers
@@ -21,18 +21,18 @@ decomposition, routing, conflict coordination, and the review discipline.
 - **Unattended (default)** — split if splitting helps, spawn the tasks in
   spawn-worker's plain default mode: every task at once when they are all
   independent, in completion-gated waves when later tasks depend on earlier
-  ones (§4). Report where the tabs are, stop. No answering, no review, no
+  ones (§5). Report where the tabs are, stop. No answering, no review, no
   waiting except between waves — and never on the last wave. Simple and
-  fast — right for most runs. §1–§4, then done.
+  fast — right for most runs. §1–§5, then done.
 - **Attended** — workers are spawned in spawn-worker's attended mode
   (one sentence added to the prompt, background `herdr agent wait`,
   `prompt --wait` for answers), you review every diff, and a fresh-context
-  reviewer closes the batch. §1–§3, then §5–§7.
+  reviewer closes the batch. §1–§4, then §6–§8.
 
 Pick attended only when the user asks for it (the triggers in the
 description, or a `/orchestrate-workers attended …` invocation) — reviewing
 and committing on the workers' behalf is what earns its cost. Everything in
-§1–§3 applies to both modes, and matters *more* unattended: a bad split there
+§1–§4 applies to both modes, and matters *more* unattended: a bad split there
 has no review pass to catch it.
 
 ## 1. Plan before spawning
@@ -42,7 +42,7 @@ has no review pass to catch it.
   would have done anyway, costs coordination and buys nothing. If the job is
   really one task, that is one worker — spawn it and stop, don't manufacture a
   breakdown. Splitting is also wrong when the pieces cannot be made
-  file-disjoint, or when they form a single sequential chain — waves (§3, §4)
+  file-disjoint, or when they form a single sequential chain — waves (§4, §5)
   pay only when each wave holds several parallel tasks; a pure chain is one
   worker's job.
 - **Match the planning to the job.** A handful of obvious tasks needs no
@@ -80,7 +80,7 @@ orchestrator tokens to make the worker worse at choosing its own approach.
 Add only what the worker cannot know or infer:
 
 - constraints that are actually real — the disjoint file set when parallel
-  workers share a checkout (§3), a fenced shared resource, a path or finding
+  workers share a checkout (§4), a fenced shared resource, a path or finding
   from this session the task fails without
 - a done condition, one sentence, when the task is open-ended enough to run on
   or stop and ask (matters more unattended: nobody is on call, so a worker
@@ -94,7 +94,29 @@ add process boilerplate ("be thorough", "write tests first", "report back").
 Unattended, route one tier up when you hesitate: there is no follow-up cycle
 to correct a worker that guessed wrong, so pay for the deeper model instead.
 
-## 3. Coordinate shared state
+## 3. Route each task to its project's workspace
+
+Workers run where their project lives, not wherever the orchestrator happens
+to sit. First identify the orchestrator's own project (its cwd): tasks that
+clearly belong to it spawn as new tabs in the current workspace, no
+placement flags. Match each remaining task to the project that owns it — the
+repo it edits, or the data/tooling it runs; generally one of
+`~/projects/<name>`, `~/skills`, or `~/dotfiles` — using
+`references/project-routing.md` (routing rule plus one/two-line descriptions
+and match keywords per project; read it before assigning). Spawn those
+workers with the owning project's directory as cwd and
+`--workspace-label <label>`, which places the tab in that project's herdr
+workspace, creating it on first use. Labels are the project folder name,
+except notes, which splits by subproject (usually `search`; `organize` for
+organizer work — see the routing doc).
+
+A task that belongs to no project ("summarize the top posts in my X home
+feed") stays in the orchestrator's own workspace and cwd. Cross-workspace
+placement is herdr-only — on cmux/tmux spawn everything in the
+orchestrator's session. Waves (§5) and attended waits work unchanged across
+workspaces: herdr handles are global.
+
+## 4. Coordinate shared state
 
 Workers must not step on each other:
 
@@ -112,16 +134,16 @@ Workers must not step on each other:
   conventions A may change — B runs in a later wave than A. Attended, the
   wave boundary is a review gate: B spawns after A is reviewed and
   committed. Unattended, it is a completion gate only: B spawns once A's
-  worker finishes, with nothing reviewed in between (§4). When B is small,
-  or the backend cannot wait (§4), instead fold B into A's prompt as one
+  worker finishes, with nothing reviewed in between (§5). When B is small,
+  or the backend cannot wait (§5), instead fold B into A's prompt as one
   larger task for one worker, or drop it from this run and tell the user it
   needs a second pass after A lands.
 
-## 4. Unattended: spawn in parallel, wave when dependent, hand back
+## 5. Unattended: spawn in parallel, wave when dependent, hand back
 
-Only in unattended mode; attended runs skip to §5.
+Only in unattended mode; attended runs skip to §6.
 
-Everything spawned together must be **fully independent** (§3) — one wave,
+Everything spawned together must be **fully independent** (§4) — one wave,
 the common case, means every task at once. If the split collapses to one
 task, this reduces to plain spawn-worker: spawn it, report the tab, stop.
 
@@ -131,7 +153,7 @@ commits — there is no orchestrator waiting to commit on the worker's behalf �
 unless the task itself calls for one, in which case the prompt scopes it to
 that worker's own files (never `git add -A`, never push).
 
-When the split has genuine dependencies (§3), spawn in **waves**: each wave
+When the split has genuine dependencies (§4), spawn in **waves**: each wave
 a set of mutually independent tasks, each later wave building on the one
 before. The gate between waves is **completion, not review** — retain the
 current wave's handles, background `herdr agent wait` on them, and spawn the
@@ -139,7 +161,7 @@ next wave once they have all finished. Do not judge the work or send
 follow-ups at the gate; a worker that stopped by asking instead of finishing
 is a wasted worker (§2's done-condition rule) — note it in the report, don't
 answer it. The gate needs herdr's event wait; on cmux/tmux there is no wait
-API, so fall back to §3's fold-or-drop instead of waving.
+API, so fall back to §4's fold-or-drop instead of waving.
 
 **Never wait on the last wave.** Once the final wave is spawned there is
 nothing left to gate — spawning it ends the run. Drop any retained handles;
@@ -151,9 +173,9 @@ worker giving the label, agent, and tab. That mapping is the whole
 deliverable — it is how the user finds and judges the work later. Then do not
 poll, wait, read panes, or review on your own initiative, and leave the tabs
 for the user to close. If they want a review afterwards, that is a new
-request (a §6-style fresh-context reviewer, or `/code-review` over the range).
+request (a §7-style fresh-context reviewer, or `/code-review` over the range).
 
-## 5. Attended: review every worker; workers never commit
+## 6. Attended: review every worker; workers never commit
 
 Workers leave changes in the working tree; the orchestrator reviews and
 commits per task. This keeps mixed parallel output reviewable (disjoint file
@@ -180,7 +202,7 @@ The review is not reading the worker's summary — it is:
 5. Then commit that task's files with a proper message, and update the
    progress doc if you kept one.
 
-## 6. Attended: finish with a fresh-context strong-model review
+## 7. Attended: finish with a fresh-context strong-model review
 
 After everything is committed, spawn one reviewer on a strong model — prefer
 the strongest model from a different family than the implementers and the
@@ -193,10 +215,10 @@ range (`base..HEAD`), with a review-then-fix mandate: fix real issues directly
 data/history. Fresh context catches what every in-context reviewer misses —
 integration seams between tasks (a DAG-position mismatch, a test suite nobody
 re-ran after a later commit changed its fixture's assumptions). Review the
-reviewer the same way as §5 (verify its critical find empirically before
+reviewer the same way as §6 (verify its critical find empirically before
 believing it), then commit its surviving fixes.
 
-## 7. Attended: wrap up
+## 8. Attended: wrap up
 
 Push once the batch is coherent, close out the plan doc if there is one, and
 report per task: what landed (commit), what was rejected/reworked and why, what

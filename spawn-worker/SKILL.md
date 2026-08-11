@@ -74,8 +74,12 @@ file here shows the point-at-an-existing-spec form; `-` works remotely too):
 Pick **pi** for bulk mechanical work — it is cheap and fast on a 1M window —
 and avoid it when the task turns on judgment. `--split right` (herdr only) is
 for a worker you intend to watch as it works — a reviewer — rather than walk
-away from; the default tab is right for everything else. `--help` documents
-the rest: agents, model/effort overrides, workspaces, split ratio.
+away from; the default tab is right for everything else. When the task
+belongs to a different project than the session, spawn it where it lives:
+that project's directory as the worker cwd plus `--workspace-label <label>`
+(herdr only), which places the tab in the herdr workspace with that label,
+creating it on first use. `--help` documents the rest: agents, model/effort
+overrides, workspaces, split ratio.
 
 One JSON line comes back with the `handle` (a herdr pane ID like `w5:p9`, a cmux
 surface UUID, or a tmux session name) and the `backend`.
