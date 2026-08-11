@@ -57,10 +57,12 @@ what's installed):
 
 | Task shape | Worker |
 |---|---|
-| Straightforward, self-contained fix; worker can explore and figure it out | codex, strong-fast model (e.g. gpt-5.6-terra), xhigh effort |
-| Complicated, nuanced, multi-file, or history-rewriting | codex, deepest model (e.g. gpt-5.6-sol), high effort |
+| Straightforward, self-contained fix; worker can explore and figure it out | claude, opus, high effort |
+| Simple non-coding task needing some judgment and taste (absorb an article into notes, summarize news/articles, research notes, write a wiki) | claude, opus, high effort |
+| Complicated and taste-heavy (research articles, investment thesis) | kimi, k3, max effort — if out of quota, codex, gpt-5.6-sol, high effort |
+| Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
 | Bulk mechanical sweeps | pi (cheap, 1M window) |
-| Final fresh-context review (attended only) | a *different model family* than the implementers (e.g. kimi k3 max) |
+| Final fresh-context review (attended only) | a strong model from a *different family* than both the implementers and the orchestrator — pick from kimi k3 max, codex gpt-5.6-sol high, claude fable 5 high |
 
 Prompt sizing follows the same judgment, and the default is **thin**: pass the
 task in the user's own words and add nothing. That is spawn-worker's §1 rule
