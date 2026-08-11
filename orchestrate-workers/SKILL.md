@@ -18,10 +18,12 @@ decomposition, routing, conflict coordination, and the review discipline.
 
 ## Modes
 
-- **Unattended (default)** — split if splitting helps, spawn every task at
-  once in spawn-worker's plain default mode, report where the tabs are, stop.
-  No waiting, no answering, no review. Simple and fast — right for most runs.
-  §1–§4, then done.
+- **Unattended (default)** — split if splitting helps, spawn the tasks in
+  spawn-worker's plain default mode: every task at once when they are all
+  independent, in completion-gated waves when later tasks depend on earlier
+  ones (§4). Report where the tabs are, stop. No answering, no review, no
+  waiting except between waves — and never on the last wave. Simple and
+  fast — right for most runs. §1–§4, then done.
 - **Attended** — workers are spawned in spawn-worker's attended mode
   (one sentence added to the prompt, background `herdr agent wait`,
   `prompt --wait` for answers), you review every diff, and a fresh-context
@@ -40,7 +42,9 @@ has no review pass to catch it.
   would have done anyway, costs coordination and buys nothing. If the job is
   really one task, that is one worker — spawn it and stop, don't manufacture a
   breakdown. Splitting is also wrong when the pieces cannot be made
-  file-disjoint or must land in order (both §3).
+  file-disjoint, or when they form a single sequential chain — waves (§3, §4)
+  pay only when each wave holds several parallel tasks; a pure chain is one
+  worker's job.
 - **Match the planning to the job.** A handful of obvious tasks needs no
   artifact — work the split out in your head, name each task, note who touches
   what, spawn. Write the breakdown down only when the job is big enough to
@@ -101,32 +105,49 @@ Workers must not step on each other:
   resolve to the installed checkout, so a worktree silently tests the wrong
   code. Use worktrees only when file sets genuinely overlap.
 - **Single-writer resources** (a DuckDB file, a port, a deploy target): fence
-  everyone but the writer to read-only in their prompts. Attended, at most one
-  worker writes it per wave, with waves sequenced so writers never overlap;
-  unattended there are no waves, so at most one writer *total*.
+  everyone but the writer to read-only in their prompts. In either mode, at
+  most one worker writes it per wave, with waves sequenced so writers never
+  overlap — so a single-wave run gets at most one writer *total*.
 - **Dependent tasks**: if task B edits a file task A also edits, or builds on
-  conventions A may change — attended, B runs in a later wave, after A is
-  reviewed and committed; unattended, fold B into A's prompt as one larger
-  task for one worker, or drop it from this run and tell the user it needs a
-  second pass after A lands.
+  conventions A may change — B runs in a later wave than A. Attended, the
+  wave boundary is a review gate: B spawns after A is reviewed and
+  committed. Unattended, it is a completion gate only: B spawns once A's
+  worker finishes, with nothing reviewed in between (§4). When B is small,
+  or the backend cannot wait (§4), instead fold B into A's prompt as one
+  larger task for one worker, or drop it from this run and tell the user it
+  needs a second pass after A lands.
 
-## 4. Unattended: spawn in parallel and hand back
+## 4. Unattended: spawn in parallel, wave when dependent, hand back
 
 Only in unattended mode; attended runs skip to §5.
 
-Waves are a review-gated device, and unattended has no review gate — so
-whatever you spawn must be **fully independent** (§3's unattended variants)
-before you spawn it. If the split collapses to one task, this reduces to
-plain spawn-worker: spawn it, report the tab, stop.
+Everything spawned together must be **fully independent** (§3) — one wave,
+the common case, means every task at once. If the split collapses to one
+task, this reduces to plain spawn-worker: spawn it, report the tab, stop.
 
-Spawn every task at once in spawn-worker's plain default mode — not attended
-mode, no `herdr agent wait`, no retained handles beyond what you report. Say
-nothing about commits — there is no orchestrator waiting to commit on the
-worker's behalf — unless the task itself calls for one, in which case the
-prompt scopes it to that worker's own files (never `git add -A`, never push).
+Workers go out in spawn-worker's plain default mode — never attended mode:
+no "you may ask" sentence, no answering, no reading diffs. Say nothing about
+commits — there is no orchestrator waiting to commit on the worker's behalf —
+unless the task itself calls for one, in which case the prompt scopes it to
+that worker's own files (never `git add -A`, never push).
 
-Report once and stop: the per-task split with each task's file set, and one
-line per worker giving the label, agent, and tab. That mapping is the whole
+When the split has genuine dependencies (§3), spawn in **waves**: each wave
+a set of mutually independent tasks, each later wave building on the one
+before. The gate between waves is **completion, not review** — retain the
+current wave's handles, background `herdr agent wait` on them, and spawn the
+next wave once they have all finished. Do not judge the work or send
+follow-ups at the gate; a worker that stopped by asking instead of finishing
+is a wasted worker (§2's done-condition rule) — note it in the report, don't
+answer it. The gate needs herdr's event wait; on cmux/tmux there is no wait
+API, so fall back to §3's fold-or-drop instead of waving.
+
+**Never wait on the last wave.** Once the final wave is spawned there is
+nothing left to gate — spawning it ends the run. Drop any retained handles;
+a single-wave run is just this rule applied immediately.
+
+Report once the final wave is spawned, then stop: the per-task split with
+each task's file set (grouped by wave if there were waves), and one line per
+worker giving the label, agent, and tab. That mapping is the whole
 deliverable — it is how the user finds and judges the work later. Then do not
 poll, wait, read panes, or review on your own initiative, and leave the tabs
 for the user to close. If they want a review afterwards, that is a new
