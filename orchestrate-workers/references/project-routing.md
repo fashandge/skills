@@ -28,20 +28,18 @@ dashboard show quick-screen scores" edits market-pulse. (Tasks about note
 
 ## On a remote box
 
-Same three steps, same labels — only where the worker lands changes. Spawn
-with `--remote-host <host>`, the box's copy of the project as `--remote-cwd`
-(`/home/opc/projects/<name>` on oci-box; `~/skills`, `~/dotfiles` and the
-`~/notes` vault sit at its home directory there, as on the Mac), and the
-project label passed as `--remote-workspace <label>` — `--workspace-label` is
-a local flag, and combining the two is rejected. A task matching no project
-keeps that flag's default workspace, which collects the host's stray workers.
+Same three steps, same labels — only where the worker lands changes: the
+box's copy of the project as the worker cwd (`/home/opc/projects/<name>` on
+oci-box; `~/skills`, `~/dotfiles` and the `~/notes` vault sit at its home
+directory, as on the Mac), and the label on `--remote-workspace`, the remote
+counterpart of `--workspace-label` (mechanics in spawn-worker §2). A task
+matching no project keeps that flag's default workspace, which collects the
+host's stray workers.
 
 oci-box carries a checkout of every project in the inventory below, each its
 own clone rather than a view of the Mac's tree — confirm with
 `ssh oci-box ls ~/projects` when it matters, since a clone can be missing or
-behind. Because the work lands over there, route to the box only when the
-user asks for it, and keep any task whose diff you intend to review and
-commit on the Mac.
+behind.
 
 ## Inventory
 
