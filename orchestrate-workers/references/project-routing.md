@@ -26,6 +26,23 @@ screen fetcher's retry logic" edits it (also stock_picker) — but "make the
 dashboard show quick-screen scores" edits market-pulse. (Tasks about note
 *content* route by topic, not to notes — see the notes entry.)
 
+## On a remote box
+
+Same three steps, same labels — only where the worker lands changes. Spawn
+with `--remote-host <host>`, the box's copy of the project as `--remote-cwd`
+(`/home/opc/projects/<name>` on oci-box; `~/skills`, `~/dotfiles` and the
+`~/notes` vault sit at its home directory there, as on the Mac), and the
+project label passed as `--remote-workspace <label>` — `--workspace-label` is
+a local flag, and combining the two is rejected. A task matching no project
+keeps that flag's default workspace, which collects the host's stray workers.
+
+oci-box carries a checkout of every project in the inventory below, each its
+own clone rather than a view of the Mac's tree — confirm with
+`ssh oci-box ls ~/projects` when it matters, since a clone can be missing or
+behind. Because the work lands over there, route to the box only when the
+user asks for it, and keep any task whose diff you intend to review and
+commit on the Mac.
+
 ## Inventory
 
 Projects live under `~/projects/<name>` unless a path is given. Related

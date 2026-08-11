@@ -93,7 +93,17 @@ labels and match keywords. Out-of-project workers spawn with the owning
 project's directory as cwd plus `--workspace-label <label>` (mechanics in
 spawn-worker §2). Cross-workspace placement is herdr-only — on cmux/tmux
 spawn everything in the orchestrator's session. Waves (§5) and attended
-waits work unchanged across workspaces: herdr handles are global.
+waits work unchanged across workspaces: herdr handles are global within one
+herdr server.
+
+Workers on a remote box route the same way, with the differences the routing
+doc's remote section owns: the box's own copy of the project as cwd, the
+project label carried by spawn-worker's remote workspace flag, and handles
+that live in the box's herdr server — so every wave gate and attended wait on
+one takes an `ssh <host>` prefix. Route there only when the user asks for the
+box, and never for a task whose result has to land in the Mac's working tree:
+a remote worker edits the box's checkout, so attended review (§6) becomes
+reading the diff and committing over ssh.
 
 ## 4. Coordinate shared state
 

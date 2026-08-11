@@ -78,8 +78,11 @@ away from; the default tab is right for everything else. When the task
 belongs to a different project than the session, spawn it where it lives:
 that project's directory as the worker cwd plus `--workspace-label <label>`
 (herdr only), which places the tab in the herdr workspace with that label,
-creating it on first use. `--help` documents the rest: agents, model/effort
-overrides, workspaces, split ratio.
+creating it on first use. Remotely the same placement rides on
+`--remote-workspace <label>`, against the host's own herdr server — the local
+flag is rejected there, and without the remote one every worker on that host
+piles into one default workspace. `--help` documents the rest: agents,
+model/effort overrides, workspaces, split ratio.
 
 One JSON line comes back with the `handle` (a herdr pane ID like `w5:p9`, a cmux
 surface UUID, or a tmux session name) and the `backend`.
