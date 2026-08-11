@@ -1,6 +1,6 @@
 ---
 name: orchestrate-workers
-description: Run a multi-task job as an orchestrator - split the work into tasks, gauge each task's difficulty, spawn workers (via the spawn-worker skill) on cheaper models to implement them in parallel, then either review every diff and close with a fresh-context cross-model review (attended, the default), or hand the tabs back and walk away (unattended). Use whenever the user asks to "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize this across workers/agents", or hands over a batch of related fixes/features to be done by multiple agents in parallel - especially when the main session runs on an expensive model (Fable/Opus) and implementation should happen on cheaper workers. Use unattended mode when the user says "unattended", "fire and forget", "just split it and spawn them", or "don't review the work". Not the entry point for a single delegated task (spawn-worker, delegate-first) or a durable cross-session protocol (handoff-agent).
+description: Run a multi-task job as an orchestrator - split the work into tasks, gauge each task's difficulty, spawn workers (via the spawn-worker skill) on cheaper models to implement them in parallel, then either hand the tabs back and walk away (unattended, the default), or review every diff and close with a fresh-context strong-model review (attended). Use whenever the user asks to "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize this across workers/agents", or hands over a batch of related fixes/features to be done by multiple agents in parallel - especially when the main session runs on an expensive model (Fable/Opus) and implementation should happen on cheaper workers. Use attended mode when the user says "attended", "review the work", "stay on call", "answer their questions", or asks you to commit the results. Not the entry point for a single delegated task (spawn-worker, delegate-first) or a durable cross-session protocol (handoff-agent).
 ---
 
 # Orchestrate workers
@@ -18,18 +18,20 @@ decomposition, routing, conflict coordination, and the review discipline.
 
 ## Modes
 
-- **Attended (default)** — workers are spawned in spawn-worker's attended mode
+- **Unattended (default)** — split if splitting helps, spawn every task at
+  once in spawn-worker's plain default mode, report where the tabs are, stop.
+  No waiting, no answering, no review. Simple and fast — right for most runs.
+  §1–§4, then done.
+- **Attended** — workers are spawned in spawn-worker's attended mode
   (one sentence added to the prompt, background `herdr agent wait`,
   `prompt --wait` for answers), you review every diff, and a fresh-context
   reviewer closes the batch. §1–§3, then §5–§7.
-- **Unattended** — split if splitting helps, spawn every task at once in
-  spawn-worker's plain default mode, report where the tabs are, stop. No
-  waiting, no answering, no review. §1–§4, then done.
 
-Pick unattended only when the user asks for it (the triggers in the
-description, or a `/orchestrate-workers unattended …` invocation). Everything
-in §1–§3 applies to both modes, and matters *more* unattended: a bad split
-there has no review pass to catch it.
+Pick attended only when the user asks for it (the triggers in the
+description, or a `/orchestrate-workers attended …` invocation) — reviewing
+and committing on the workers' behalf is what earns its cost. Everything in
+§1–§3 applies to both modes, and matters *more* unattended: a bad split there
+has no review pass to catch it.
 
 ## 1. Plan before spawning
 
@@ -62,7 +64,7 @@ what's installed):
 | Complicated and taste-heavy (research articles, investment thesis) | kimi, k3, max effort — if out of quota, claude, fable 5, high effort |
 | Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
 | Bulk mechanical sweeps | pi (cheap, 1M window) |
-| Final fresh-context review (attended only) | a strong model from a *different family* than both the implementers and the orchestrator — pick from kimi k3 max, codex gpt-5.6-sol high, claude fable 5 high |
+| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude fable 5 high over opus workers) |
 
 Prompt sizing follows the same judgment, and the default is **thin**: pass the
 task in the user's own words and add nothing. That is spawn-worker's §1 rule
@@ -157,10 +159,14 @@ The review is not reading the worker's summary — it is:
 5. Then commit that task's files with a proper message, and update the
    progress doc if you kept one.
 
-## 6. Attended: finish with a fresh-context cross-model review
+## 6. Attended: finish with a fresh-context strong-model review
 
-After everything is committed, spawn one reviewer from a different model
-family, fenced (no commits, no writes to protected resources), over the whole
+After everything is committed, spawn one reviewer on a strong model — prefer
+the strongest model from a different family than the implementers and the
+orchestrator; a same-family model is also fine when it is strictly stronger
+than both (e.g. claude fable 5 high over opus workers, itself generally
+stronger than the other families so far) — fenced (no commits, no writes to
+protected resources), over the whole
 range (`base..HEAD`), with a review-then-fix mandate: fix real issues directly
 + add tests; report-only anything that is a judgment call or would rewrite
 data/history. Fresh context catches what every in-context reviewer misses —
