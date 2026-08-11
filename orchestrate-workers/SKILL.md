@@ -38,7 +38,7 @@ there has no review pass to catch it.
   would have done anyway, costs coordination and buys nothing. If the job is
   really one task, that is one worker — spawn it and stop, don't manufacture a
   breakdown. Splitting is also wrong when the pieces cannot be made
-  file-disjoint (§3) or must land in order (§4).
+  file-disjoint or must land in order (both §3).
 - **Match the planning to the job.** A handful of obvious tasks needs no
   artifact — work the split out in your head, name each task, note who touches
   what, spawn. Write the breakdown down only when the job is big enough to
@@ -75,7 +75,8 @@ Add only what the worker cannot know or infer:
   workers share a checkout (§3), a fenced shared resource, a path or finding
   from this session the task fails without
 - a done condition, one sentence, when the task is open-ended enough to run on
-  or stop and ask
+  or stop and ask (matters more unattended: nobody is on call, so a worker
+  that asks is a wasted worker)
 - the mechanism, acceptance criteria, and expected review artifact — only for
   genuinely error-prone tasks (identity/history rewrites, safety-critical SQL)
 
@@ -95,47 +96,30 @@ Workers must not step on each other:
   worktrees when the project is an editable-installed package — pytest imports
   resolve to the installed checkout, so a worktree silently tests the wrong
   code. Use worktrees only when file sets genuinely overlap.
-- **Single-writer resources** (a DuckDB file, a port, a deploy target): at most
-  one worker may write it per wave; fence everyone else to read-only in their
-  prompts, and sequence the waves so writers never overlap.
-- **Dependent tasks run in later waves**: if task B edits a file task A also
-  edits, or builds on conventions A may change, B waits until A is reviewed
-  and committed.
+- **Single-writer resources** (a DuckDB file, a port, a deploy target): fence
+  everyone but the writer to read-only in their prompts. Attended, at most one
+  worker writes it per wave, with waves sequenced so writers never overlap;
+  unattended there are no waves, so at most one writer *total*.
+- **Dependent tasks**: if task B edits a file task A also edits, or builds on
+  conventions A may change — attended, B runs in a later wave, after A is
+  reviewed and committed; unattended, fold B into A's prompt as one larger
+  task for one worker, or drop it from this run and tell the user it needs a
+  second pass after A lands.
 
 ## 4. Unattended: spawn in parallel and hand back
 
 Only in unattended mode; attended runs skip to §5.
 
 Waves are a review-gated device, and unattended has no review gate — so
-whatever you spawn must be **fully independent** before you spawn it. One task
-is the common case and needs no ceremony: write the prompt, spawn the single
-worker, report the tab, stop. For a genuine multi-task split:
+whatever you spawn must be **fully independent** (§3's unattended variants)
+before you spawn it. If the split collapses to one task, this reduces to
+plain spawn-worker: spawn it, report the tab, stop.
 
-- No dependent tasks. If B builds on A, do not plan to sequence it — fold B
-  into A's prompt as one larger task for one worker, or drop it from this run
-  and tell the user it needs a second pass after A lands.
-- Disjoint file sets, stated in every prompt, exactly as in §3.
-- At most one writer *total* for each single-writer resource, since nothing
-  serializes writers across time; everyone else is fenced read-only.
-- Any task open-ended enough that a worker might stop and ask gets a done
-  condition — nobody is on call, so a worker that asks is a wasted worker.
-  One sentence, and only where the task isn't already self-bounding; this is
-  not licence to re-engineer the thin prompts of §2 into briefs.
-
-Then spawn them all in spawn-worker's plain default mode — not attended mode,
-no `herdr agent wait`, no retained handles beyond what you report:
-
-```bash
-~/projects/agents/scripts/spawn_worker.sh <label> - <repo> --agent codex <<'EOF'
-<the task, in the user's words — plus only what §2 says to add>
-EOF
-```
-
-Commits are not this mode's business: say nothing about them unless the task
-itself calls for one (then the prompt says so, scoped to that worker's own
-files and never `git add -A`, never push). Do not impose a blanket
-"do not commit" rule the way attended mode does — there is no orchestrator
-waiting to commit on the worker's behalf.
+Spawn every task at once in spawn-worker's plain default mode — not attended
+mode, no `herdr agent wait`, no retained handles beyond what you report. Say
+nothing about commits — there is no orchestrator waiting to commit on the
+worker's behalf — unless the task itself calls for one, in which case the
+prompt scopes it to that worker's own files (never `git add -A`, never push).
 
 Report once and stop: the per-task split with each task's file set, and one
 line per worker giving the label, agent, and tab. That mapping is the whole
