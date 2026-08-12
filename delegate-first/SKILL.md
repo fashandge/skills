@@ -55,6 +55,7 @@ Keep in Claude:
 - design, API design, architecture, naming, UX judgment
 - tasks where writing the spec IS the work (ambiguity = design)
 - tiny edits (~<20 lines, single obvious change) — delegation overhead loses
+- skill creation or edits (global `~/skills` or a project's `skills/`) — these default to Fable 5 at high effort, so a cheap worker is the wrong tier
 - anything needing session tools: MCP (browser/computer-use/chronicle), 1Password, secrets
 - destructive/irreversible ops, releases, pushes, GitHub mutations — Claude-side per git rules
 - review of worker output — never delegated, never skipped
