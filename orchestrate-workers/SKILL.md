@@ -1,6 +1,6 @@
 ---
 name: orchestrate-workers
-description: Run a multi-task job as an orchestrator - split the work into tasks, gauge each task's difficulty, route each task to the workspace of the project it belongs to, spawn workers (via the spawn-worker skill) on cheaper models to implement them in parallel, then either hand the tabs back and walk away (unattended, the default), or review every diff and close with a fresh-context strong-model review (attended). Use whenever the user asks to "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize this across workers/agents", or hands over a batch of related fixes/features to be done by multiple agents in parallel - especially when the main session runs on an expensive model (Fable/Opus) and implementation should happen on cheaper workers. Use attended mode when the user says "attended", "review the work", "stay on call", "answer their questions", or asks you to commit the results. Not the entry point for a single delegated task (spawn-worker, delegate-first) or a durable cross-session protocol (handoff-agent).
+description: Run a multi-task job as an orchestrator - split the work into tasks, gauge each task's difficulty, route each to its project's workspace, spawn workers (via the spawn-worker skill) on cheaper models to implement them in parallel, then either hand the tabs back and walk away (unattended, the default), or review every diff and close with a fresh-context strong-model review (attended). Use whenever the user asks to "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize this across workers/agents", or hands over a batch of related fixes/features - especially when the main session runs on an expensive model (Fable/Opus) and implementation should happen on cheaper workers. Use attended mode when the user says "attended", "review the work", "stay on call", "answer their questions", or asks you to commit the results. Not the entry point for a single delegated task (spawn-worker, delegate-first) or a durable cross-session protocol (handoff-agent).
 ---
 
 # Orchestrate workers
@@ -61,11 +61,14 @@ what's installed):
 | Task shape | Worker |
 |---|---|
 | Straightforward self-contained fix, or simple non-coding task needing some judgment (absorb an article, summarize news, research notes, write a wiki) | claude, opus, high effort |
-| Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, fable 5, high effort — always, regardless of gauged difficulty |
-| Complicated and taste-heavy (research articles, investment thesis) | kimi, k3, max effort — if out of quota, claude, fable 5, high effort |
+| Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, Fable 5 (`--model fable`), high effort — always, regardless of gauged difficulty |
+| Complicated and taste-heavy (research articles, investment thesis) | kimi, k3, max effort — if out of quota, claude, Fable 5 (`--model fable`), high effort |
 | Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
 | Bulk mechanical sweeps | pi (cheap, 1M window) |
-| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude fable 5 high over opus workers) |
+| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable 5 high over opus workers) |
+
+For Claude workers on Fable 5, the value the CLI accepts is `--model fable` —
+`fable-5` is rejected at startup ("selected model may not exist").
 
 Prompt sizing is spawn-worker §1's rule, unchanged: thin by default — the
 task in the user's own words, nothing added. On top of it, add only what
