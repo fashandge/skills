@@ -1,6 +1,6 @@
 ---
 name: delegate-first
-description: "Delegate implementation work to cheap headless one-shot workers — Codex CLI (default), a weaker Claude model via claude -p, Kimi Code via kimi -p, or pi with DeepSeek V4 Flash. Orchestrator specs, reviews, verifies. Auto-triggers only in Opus/Fable Claude Code sessions; from Codex/Kimi/pi/other sessions use only on explicit request. Steerable/durable workers route to handoff-agent instead."
+description: "Delegate implementation work to cheap headless one-shot workers — Codex CLI (default), a weaker Claude model via claude -p, Kimi Code via kimi -p, or pi with MiniMax-M3 or DeepSeek V4 Flash. Orchestrator specs, reviews, verifies. Auto-triggers only in Opus/Fable Claude Code sessions; from Codex/Kimi/pi/other sessions use only on explicit request. Steerable/durable workers route to handoff-agent instead."
 ---
 
 # Delegate First
@@ -32,13 +32,13 @@ Rationale: orchestrator (Fable/Opus) tokens are metered + expensive; workers are
 | **Codex** (default) | `codex exec --yolo … -o out.md` | Everything below unless a reason says otherwise — flat-rate, strong at code generation |
 | **Claude weak model** | `claude -p --model opus --effort high --dangerously-skip-permissions` | Codex unavailable/rate-limited; task leans on Claude-family conventions (CLAUDE.md adherence, Claude-style tools); user asks for it. `opus` at `high` effort by default; drop to `sonnet`/`haiku` for simple mechanical edits |
 | **Kimi Code** | `KIMI_MODEL_THINKING_EFFORT=max ~/.kimi-code/bin/kimi -m kimi-code/k3 -p "…"` | User asks for Kimi, or as a third independent perspective. `kimi-code/k3` at `max` thinking effort by default (effort is env-var-only — no CLI flag) |
-| **pi** | `pi --provider deepseek --model deepseek-v4-flash --thinking max -p "…"` | User asks for pi, or the cheapest option for high-volume mechanical work (bulk exploration, wide mechanical migrations, coverage fills). `deepseek-v4-flash` at `max` thinking by default — 1M context, so it swallows large-repo reading the others would choke on |
+| **pi** | `pi --provider minimax --model MiniMax-M3 --thinking high -p "…"` | User asks for pi, a very easy task without much judgment (simple script changes, moving files), or the cheapest option for high-volume mechanical work (bulk exploration, wide mechanical migrations, coverage fills). `MiniMax-M3` at `high` thinking by default; switch to `--provider deepseek --model deepseek-v4-flash --thinking max` only when the task needs its 1M context to swallow large-repo reading the others would choke on |
 
 All four use the same contract: prompt via temp file, result to a file, review by Claude. `claude -p`, `kimi -p`, and `pi -p` print the final answer to stdout — redirect to the out-file (`> out.md`); their streams are not incremental like Codex's, so the visible pane may show little until completion (acceptable; note it to the user for long runs).
 
 Kimi gotchas (verified v0.27.0): the binary lives at `~/.kimi-code/bin/kimi` and is on the *interactive* zsh PATH only — use the absolute path from scripts/tool shells. Prompt mode auto-approves actions and **rejects** `--yolo`/`--auto` (`Cannot combine --prompt with --yolo`) — pass neither. The model alias is lowercase `kimi-code/k3`; thinking effort only via `KIMI_MODEL_THINKING_EFFORT=max`. Follow-ups: it prints `To resume this session: kimi -r <session-id>` — reuse that id with `-p` for the next instruction. On the OCI box, `~/.kimi-code/bin/kimi` is a wrapper that execs `kimi-real` via `/lib/ld-linux-aarch64.so.1` (the UEK kernel rejects the binary's ELF property notes at direct execve); `kimi upgrade` overwrites the wrapper — re-create it after upgrading.
 
-pi gotchas (verified 2026-08-05): no `-C`/`--cd` flag — `cd` into the repo like Claude and Kimi. `-p` auto-approves its read/bash/edit/write tools (no `--yolo` equivalent exists or is needed) and prints only the final answer to stdout, so stderr is normally empty. Provider and model are separate flags (`--provider deepseek --model deepseek-v4-flash`); the `provider/id[:thinking]` pattern form works too but the explicit flags are clearer in a spec. Thinking levels are `off|minimal|low|medium|high|xhigh|max` — `max` is the default here. Unlike `kimi`, `pi` is on the non-interactive PATH (`~/.zshenv`), so no absolute path or `command` prefix is needed. Auth reads `DEEPSEEK_API_KEY` from the environment: interactive shells get it from `~/.config/secrets.env` via the profile, but launchd/cron shells do **not** — source that file first in scheduled contexts. pi discovers `AGENTS.md`/`CLAUDE.md` by default (`--no-context-files` to suppress), so repo conventions land in the worker's context for free.
+pi gotchas (verified 2026-08-05): no `-C`/`--cd` flag — `cd` into the repo like Claude and Kimi. `-p` auto-approves its read/bash/edit/write tools (no `--yolo` equivalent exists or is needed) and prints only the final answer to stdout, so stderr is normally empty. Provider and model are separate flags (`--provider minimax --model MiniMax-M3`); the `provider/id[:thinking]` pattern form works too but the explicit flags are clearer in a spec. Thinking levels are `off|minimal|low|medium|high|xhigh|max` — `high` is the default here. Unlike `kimi`, `pi` is on the non-interactive PATH (`~/.zshenv`), so no absolute path or `command` prefix is needed. Auth reads `MINIMAX_API_KEY` (or `DEEPSEEK_API_KEY` for the deepseek provider) from the environment: interactive shells get it from `~/.config/secrets.env` via the profile, but launchd/cron shells do **not** — source that file first in scheduled contexts. pi discovers `AGENTS.md`/`CLAUDE.md` by default (`--no-context-files` to suppress), so repo conventions land in the worker's context for free.
 
 ## Route
 
@@ -101,8 +101,8 @@ command codex exec --yolo -C <repo> \
 (cd <repo> && KIMI_MODEL_THINKING_EFFORT=max ~/.kimi-code/bin/kimi -m kimi-code/k3 \
   -p "$(cat "$P")" > /tmp/worker-last.md 2>/dev/null)
 # pi (alternative; -p auto-approves tools — no --yolo equivalent; no -C, so cd):
-(cd <repo> && pi --provider deepseek --model deepseek-v4-flash \
-  --thinking max -p "$(cat "$P")" > /tmp/worker-last.md 2>/dev/null)
+(cd <repo> && pi --provider minimax --model MiniMax-M3 \
+  --thinking high -p "$(cat "$P")" > /tmp/worker-last.md 2>/dev/null)
 ```
 
 The skill pins Codex to `gpt-5.6-terra` at `xhigh` effort as its default — deliberately, not relying on `~/.codex/config.toml`'s `model`, which the Codex desktop app mutates on its own. To use a different model for one task, swap the `--model` value (e.g. `--model gpt-5.6-luna`, `--model gpt-5.5`); to fall back to the config default, drop the flag.
@@ -139,7 +139,7 @@ command codex exec --yolo -C <repo> --model gpt-5.6-terra \
 ```
 
 Only Codex has an `-o` out-file flag. The stdout-only workers (`claude -p`, `kimi -p`, `pi -p`) must tee instead, so the pane and the out-file both get the answer — e.g.
-`(cd <repo> && pi --provider deepseek --model deepseek-v4-flash --thinking max -p "$(cat "$P")" 2>&1 | tee "$STREAM" > "$OUT")`.
+`(cd <repo> && pi --provider minimax --model MiniMax-M3 --thinking high -p "$(cat "$P")" 2>&1 | tee "$STREAM" > "$OUT")`.
 
 - **Why the script is mandatory** (2026-07-25 incident): `cmux send`/`send-key`/`close-surface` all default `--surface` to `$CMUX_SURFACE_ID` — **the surface hosting this very Claude session**. A hand-rolled `cmux send 86 "tail …"` typed into the session's own pane; its `OK surface:44` echo (the default target, i.e. the session itself) was then misread as a stray surface, and `close-surface --surface surface:44` killed the session. The script always passes an explicit `--surface` and its `close` refuses the session's own surface. If you ever bypass it, the invariant is: explicit `--surface` on every call, and never target `$CMUX_SURFACE_ID` or the `caller.surface_ref` that `cmux identify` reports.
 - **Zero extra Claude tokens.** The pane shows the worker's own stdout via `tail`; it never enters Claude's context — on the completion ping Claude reads `$OUT` only, exactly as in the headless case. Cost is the two `worker_pane.sh` calls.

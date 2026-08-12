@@ -71,8 +71,11 @@ file here shows the point-at-an-existing-spec form; `-` works remotely too):
   --agent pi --remote-host oci-box --remote-cwd /home/opc/projects/<repo>
 ```
 
-Pick **pi** for bulk mechanical work — it is cheap and fast on a 1M window —
-and avoid it when the task turns on judgment. `--split right` (herdr only) is
+Pick **pi** for very easy tasks without much judgment (simple script changes,
+moving files) and bulk mechanical sweeps, and avoid it when the task turns on
+judgment. Run it on MiniMax-M3 at high effort — pass
+`--model minimax/MiniMax-M3 --effort high`, since the script's pi default is
+still DeepSeek V4 Flash. `--split right` (herdr only) is
 for a worker you intend to watch as it works — a reviewer — rather than walk
 away from; the default tab is right for everything else. When the task
 belongs to a different project than the session, spawn it where it lives:
