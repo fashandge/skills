@@ -63,12 +63,19 @@ what's installed):
 | Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | pi, MiniMax-M3, high effort (`--model minimax/MiniMax-M3 --effort high`) |
 | Straightforward self-contained coding task or fix, or simple non-coding task needing some judgment (absorb an article, summarize news, research notes, write a wiki) | claude, opus, high effort |
 | Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, Fable 5 (`--model fable`), high effort — always, regardless of gauged difficulty |
-| Complicated and taste-heavy (research articles, investment thesis) | kimi, k3, max effort — if out of quota, claude, Fable 5 (`--model fable`), high effort |
+| Complicated and taste-heavy (research articles, investment thesis) | claude, Fable 5 (`--model fable`), high effort — if Fable quota is ≥85% used, kimi, k3, max effort |
 | Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
 | Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable 5 high over opus workers) |
 
 For Claude workers on Fable 5, the value the CLI accepts is `--model fable` —
 `fable-5` is rejected at startup ("selected model may not exist").
+
+Check Fable quota with the `claude-quota` command: every percentage it prints
+is quota *used*, and any window at ≥85% (session, weekly, or the
+Fable-scoped window — all of them gate a Claude worker) flips taste-heavy
+routing to kimi. `claude-quota --check 85` does the threshold test in one
+call (exit 1 = at least one window ≥85%); run it standalone, never batched
+with other commands.
 
 Prompt sizing is spawn-worker §1's rule, unchanged: thin by default — the
 task in the user's own words, nothing added. On top of it, add only what
