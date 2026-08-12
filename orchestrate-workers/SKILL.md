@@ -157,9 +157,10 @@ a single-wave run is just this rule applied immediately.
 Report once the final wave is spawned, then stop: the per-task split with
 each task's file set (grouped by wave if there were waves), and one line per
 worker giving the label, agent, and tab. That mapping is the whole
-deliverable — it is how the user finds and judges the work later. Then do not
-poll, wait, read panes, or review on your own initiative, and leave the tabs
-for the user to close. If they want a review afterwards, that is a new
+deliverable — it is how the user finds and judges the work later. Then
+spawn-worker §3's posture applies unchanged: do not poll, wait, read panes,
+or review on your own initiative, and leave the tabs for the user to close.
+If they want a review afterwards, that is a new
 request (a §7-style fresh-context reviewer, or `/code-review` over the range).
 
 ## 6. Attended: review every worker; workers never commit
