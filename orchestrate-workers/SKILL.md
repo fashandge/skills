@@ -1,6 +1,6 @@
 ---
 name: orchestrate-workers
-description: Run a multi-task job as an orchestrator - split the work into tasks, gauge each task's difficulty, route each to its project's workspace, spawn workers (via the spawn-worker skill) on cheaper models to implement them in parallel, then either hand the tabs back and walk away (unattended, the default), or review every diff and close with a fresh-context strong-model review (attended). Use whenever the user asks to "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize this across workers/agents", or hands over a batch of related fixes/features - especially when the main session runs on an expensive model (Fable/Opus) and implementation should happen on cheaper workers. Use attended mode when the user says "attended", "review the work", "stay on call", "answer their questions", or asks you to commit the results. Not the entry point for a single delegated task - use the spawn-worker skill for that.
+description: Run a multi-task job as an orchestrator - split the work into tasks, gauge each task's difficulty, route each to its project's workspace, spawn workers on cheaper models in parallel, then either hand the tabs back and walk away (unattended, the default), or review every diff and close with a fresh-context strong-model review (attended). Use whenever the user asks to "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize this across workers/agents", or hands over a batch of related fixes/features - especially when the main session runs on an expensive model (Fable/Opus) and implementation should happen on cheaper workers. Use attended mode when the user says "attended", "review the work", "stay on call", "answer their questions", or asks you to commit the results. Not the auto-trigger for one delegated task (spawn-worker owns that), but once invoked always delegate: even a one-task or question-shaped prompt goes to a worker as-is, never answered in-session.
 ---
 
 # Orchestrate workers
@@ -10,7 +10,9 @@ expensive model) plans, routes, coordinates, and — in attended mode — review
 and commits; spawned workers (on cheaper models) explore, implement, and test.
 The economics only work if you resist doing implementation yourself and resist
 over-specifying prompts — both burn orchestrator tokens on work a worker can
-figure out.
+figure out. Answering counts as implementing: this session lives across many
+rounds of batches, and context spent scouting or solving one prompt's substance
+is stolen from every later round.
 
 Spawning mechanics and prompt hygiene belong to the **spawn-worker** skill
 (read it). This skill owns what spawn-worker deliberately doesn't:
@@ -34,6 +36,17 @@ has no review pass to catch it.
 
 ## 1. Plan before spawning
 
+- **Invoked means delegate.** The user chose this skill over just asking you —
+  that choice is itself the instruction to keep the work out of this session,
+  and it still holds when the prompt turns out to be a single task or a
+  question. A design question, an "I wonder what's the best way to…", a
+  one-file fix: each is one task for one worker, who investigates and answers
+  in its own tab and context. Do not scout the code to answer it yourself, do
+  not answer and offer to spawn a worker for the follow-up, and do not turn it
+  into an options menu for the user — deciding, or recommending, is part of
+  what gets delegated. Handle a prompt inline only when it is about this
+  session itself (steering a batch already running, reporting on workers you
+  spawned).
 - **Split only when the split buys something.** Tasks exist to run in
   parallel; a division that yields dependent pieces, or pieces one worker
   would have done anyway, costs coordination and buys nothing. If the job is
@@ -49,9 +62,13 @@ has no review pass to catch it.
   compacted. Then it is a goal-mode plan doc holding tasks, dependencies,
   shared resources, and planned waves, mirrored as you go — that doc is what
   survives compaction and lets the user audit mid-run.
-- Do cheap scouting yourself (a grep, reading an issue note) only to *scope*
-  tasks, not to solve them. You usually don't need implementation details to
-  judge a task's difficulty.
+- **A self-contained prompt passes through untouched.** When the prompt leans
+  on nothing from this session, the split, tier (§2), and workspace (§3) are
+  all decidable from its own words — decide them from the prompt alone and
+  spawn with zero file reads. Scout yourself (a grep, reading an issue note)
+  only when a split or routing decision genuinely cannot be made from the
+  prompt, and then only to *scope* tasks, never to solve them. You don't need
+  implementation details to judge a task's difficulty.
 
 ## 2. Route by difficulty
 
