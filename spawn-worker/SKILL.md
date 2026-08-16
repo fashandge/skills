@@ -146,6 +146,11 @@ rules (what you may answer yourself versus what goes to the user).
 
 ## 6. When this is the wrong tool
 
+- **A sub-step of your own task** — you need the answer mid-task to continue
+  your own work (a second opinion, a review verdict, a computed result): run
+  it headless with `agents-cli` (see `~/.claude/docs/agents-cli.md`). A tab
+  is for work the user owns — even attended mode reads the pane only to
+  unblock the worker, not to consume its result.
 - **A batch of related tasks** across several workers — switch to
   `/orchestrate-workers`, which fans out via this skill and owns the
   split/route/review loop.
