@@ -125,7 +125,7 @@ Submit work through the agent surface:
 herdr agent prompt reviewer "Review the current diff and report only actionable findings." --wait --timeout 120000
 ```
 
-`agent prompt` atomically submits text and encoded Enter while honoring the pane's live bracketed-paste mode. For normal agent work, `--wait` is enough: it waits for the first settled `idle`, `done`, or `blocked` state. Do not repeat those defaults with `--until`.
+`agent prompt` atomically submits text and encoded Enter while honoring the pane's live bracketed-paste mode. `--timeout` is in **milliseconds** here and in every Herdr wait: `120000` is two minutes, and a seconds-looking `5400` is a 5.4-second wait that expires almost immediately. For normal agent work, `--wait` is enough: it waits for the first settled `idle`, `done`, or `blocked` state. Do not repeat those defaults with `--until`.
 
 A prompt sent from a non-working state must produce an observed lifecycle change within five seconds. Otherwise Herdr returns `agent_prompt_stalled` instead of waiting indefinitely. This wait tracks lifecycle state, not an individual turn; if the agent is already working, completion of the active turn may satisfy it.
 
@@ -151,7 +151,7 @@ herdr agent get reviewer
 herdr agent read reviewer --source recent-unwrapped --lines 120
 ```
 
-If a wait fails or returns `blocked`, inspect `agent get` and `agent read` before deciding what input to send. Use the pane surface only when raw terminal control is intentional.
+A wait that returns `{"error":{"code":"timeout"}}` only means the timeout elapsed — the agent is usually still working; re-issue the wait. Before reading an agent as hung, cross-check elapsed real time (`ps -Ao pid,etime | grep <agent-pid>`) against the wait you thought you gave it — an instant expiry usually means the timeout was written in seconds instead of milliseconds. If a wait fails or returns `blocked`, inspect `agent get` and `agent read` before deciding what input to send. Use the pane surface only when raw terminal control is intentional.
 
 ## Run an ordinary command in another pane
 
@@ -169,7 +169,7 @@ herdr pane wait-output <returned-pane-id> --match "test result" --timeout 120000
 herdr pane read <returned-pane-id> --source recent-unwrapped --lines 120
 ```
 
-`pane run` atomically sends command text and Enter. `pane wait-output` searches the selected snapshot immediately, so output that already exists can match. Use `--match <text>` for a literal substring or `--regex <pattern>` for a Rust regular expression. Omitting `--timeout` allows an indefinite wait.
+`pane run` atomically sends command text and Enter. `pane wait-output` searches the selected snapshot immediately, so output that already exists can match. Use `--match <text>` for a literal substring or `--regex <pattern>` for a Rust regular expression. `--timeout` is in milliseconds, as in every Herdr wait; omitting it allows an indefinite wait.
 
 Use the read source that matches the task:
 

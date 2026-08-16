@@ -54,7 +54,9 @@ instantly:
 herdr agent get <handle>    # expect agent_status: working; if not, recheck once before waiting
 ```
 
-Then background the wait — never run it in the foreground, and never poll:
+Then background the wait — never run it in the foreground, and never poll.
+`--timeout` is in milliseconds (`3600000` = one hour); a seconds-style value
+like `5400` expires in 5.4 seconds:
 
 ```bash
 herdr agent wait <handle> --timeout 3600000   # background task
@@ -70,7 +72,11 @@ hold a turn open "monitoring", and do not decline or defer the user's other
 work because a worker is running — a quiet worker costs you nothing.
 
 A timeout expiry means the worker is still working — re-issue the background
-wait and end your turn again; it says nothing about the worker's health.
+wait and end your turn again; it says nothing about the worker's health. If
+expiries seem to come back suspiciously fast, cross-check elapsed real time
+(`ps -Ao pid,etime | grep <agent-pid>`) before reading the worker as stuck —
+an instant `timeout` usually means the value was written in seconds instead
+of milliseconds.
 
 ## On wake: read before deciding
 
