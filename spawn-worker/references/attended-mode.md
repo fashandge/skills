@@ -8,11 +8,12 @@ the worker stops, you read why, and you answer. There is still no file
 protocol, no run directory, no registry, no watcher process — herdr is the
 watcher, and the worker's pane is the channel.
 
-The trade-off you accepted by not using `/handoff-agent`: attendance lives and
-dies with this session. If this session ends or compacts away the handle, the
-worker keeps running but nobody is on call anymore — there is no durable
-journal to recover from. That is fine for a task that finishes within the
-session; it is the wrong tool for one that must outlive it.
+The built-in trade-off of attended mode: attendance lives and dies with this
+session. If this session ends or compacts away the handle, the worker keeps
+running but nobody is on call anymore — there is no durable journal to recover
+from. That is fine for a task that finishes within the session; it is the
+wrong tool for one that must outlive it, and no live skill covers that case —
+warn the user instead of pretending durability.
 
 ## Requires herdr
 
@@ -22,7 +23,7 @@ test "${HERDR_ENV:-}" = 1
 
 Lifecycle waits are herdr-only; cmux and tmux cannot signal "the worker
 stopped". If the backend would resolve to cmux or tmux, say attended mode is
-not available there and offer the plain spawn or `/handoff-agent`. A remote
+not available there and offer the plain spawn. A remote
 worker on a herdr host works — keep the `ssh <host>` prefix on every herdr
 command below.
 

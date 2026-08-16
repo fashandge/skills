@@ -21,9 +21,9 @@ everything below:
 test "${HERDR_ENV:-}" = 1 && herdr pane current
 ```
 
-If that fails, say so and offer `/delegate-first` — a headless one-shot reviewer whose
-output you read back. Don't fall back to a polling loop or a detached tab you cannot
-wait on.
+If that fails, say so and offer a headless one-shot reviewer instead (`codex exec` /
+`claude -p` piped a review prompt, output read back and verified by you). Don't fall
+back to a polling loop or a detached tab you cannot wait on.
 
 ## Spawn and place
 

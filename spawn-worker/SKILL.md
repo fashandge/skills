@@ -1,6 +1,6 @@
 ---
 name: spawn-worker
-description: Spawn a coding agent (Claude Code, Codex, Kimi Code, or pi) in a new terminal tab — locally in the current herdr/cmux/tmux session, or on a remote box like oci-box — and walk away. No handoff protocol, no monitoring, no bookkeeping. This is the default way to hand work to another agent. Use when the user says "hand this off", "delegate this", "spawn a worker", "run this in another tab", "start an agent on this", "put a worker on it", "run it on the box", or "have codex/pi/kimi do this". An opt-in attended mode (herdr only) stays on call to answer the worker's questions via herdr's event-driven waits — use it when the user says "stay on call", "answer its questions", "unblock it if it gets stuck", or "watch for it getting blocked". Route to handoff-agent instead only when the user explicitly asks for the durable handoff protocol, a monitored review/accept loop, or coordination that must survive this session; route to delegate-first for a headless one-shot whose output you will read back and review yourself.
+description: Spawn a coding agent (Claude Code, Codex, Kimi Code, or pi) in a new terminal tab — locally in the current herdr/cmux/tmux session, or on a remote box like oci-box — and walk away. No handoff protocol, no monitoring, no bookkeeping. This is the default way to hand work to another agent. Use when the user says "hand this off", "delegate this", "spawn a worker", "run this in another tab", "start an agent on this", "put a worker on it", "run it on the box", or "have codex/pi/kimi do this". An opt-in attended mode (herdr only) stays on call to answer the worker's questions via herdr's event-driven waits — use it when the user says "stay on call", "answer its questions", "unblock it if it gets stuck", or "watch for it getting blocked". For a batch of related tasks fanned out across several workers, route to the orchestrate-workers skill instead.
 ---
 
 # Spawn a worker in a new tab
@@ -138,8 +138,7 @@ finished, asked, or hit a dialog; answer with `herdr agent prompt --wait`
 (backgrounded) and repeat until the task is done. Between wake-ups you end
 your turn and the session stays fully interactive — the user keeps talking to
 you as if no worker existed. No polling, no watcher process, no files —
-herdr's events and the worker's pane are the whole protocol, which is what
-keeps this leaner than `/handoff-agent`.
+herdr's events and the worker's pane are the whole protocol.
 
 Before attending a worker, read `references/attended-mode.md` — it owns the
 wait/classify/answer loop, the race and stall guards, and the escalation
@@ -147,10 +146,11 @@ rules (what you may answer yourself versus what goes to the user).
 
 ## 6. When this is the wrong tool
 
-Escalate only on an explicit request, and say which you are switching to:
-
-- **`/handoff-agent`** — the user wants the durable handoff protocol, a
-  monitored review/accept loop, mid-run steering through a lease, or a worker
-  that survives this session being compacted or lost.
-- **`/delegate-first`** — the user wants a headless one-shot whose answer you
-  read back and review yourself, with no tab at all.
+- **A batch of related tasks** across several workers — switch to
+  `/orchestrate-workers`, which fans out via this skill and owns the
+  split/route/review loop.
+- **A worker that must outlive this session** (durable protocol, monitored
+  review/accept loop, mid-run steering that survives compaction) — no live
+  skill covers that anymore; the retired `handoff-agent` protocol is in
+  `~/projects/unused_skills`. Say so plainly rather than improvising a
+  substitute.
