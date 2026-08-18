@@ -89,6 +89,13 @@ gate below reports at least 80% used:
 For Claude workers on Fable 5, the value the CLI accepts is `--model fable` —
 `fable-5` is rejected at startup ("selected model may not exist").
 
+**gemini** (Antigravity's `agy` CLI, Gemini 3.7 Flash at high effort — the
+script default, so `--agent gemini` alone is the whole spawn flag) sits outside
+this table on purpose: never route a task to it by difficulty. Use it only when
+the user explicitly asks for gemini workers, and then for the tasks they name —
+or the whole batch if that is what they asked. It needs no quota gate and is
+not a `→` fallback for any Claude route.
+
 Before spawning **any** Claude worker — Opus or Fable — run
 `claude-quota --check 80` as a standalone command. Every percentage it prints
 is quota *used*; exit 1 means at least one quota window is ≥80%. In that case,
