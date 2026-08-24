@@ -50,7 +50,7 @@ URLS = {
     "grok": "https://grok.com/",
     "claude": "https://claude.ai/new",
     "deepseek": "https://chat.deepseek.com/",
-    "kimi": "https://www.kimi.com/chat",
+    "kimi": "https://www.kimi.ai/",
 }
 
 DEFAULT_CHATBOTS = ["gemini", "chatgpt"]

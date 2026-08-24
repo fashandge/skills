@@ -11,7 +11,7 @@ Use this when you want to ask the same question to multiple AI chatbots and comp
 
 **Default**: gemini + chatgpt
 
-Kimi is asked on its **K3** model — the script selects K3 from the model picker (bottom-right of the input box) before sending, since the COW profile clone inherits whatever model was last used.
+Kimi is asked at **https://www.kimi.ai/** (not kimi.com, whose chat page stopped responding) on its **K3** model — the script selects K3 from the model picker (bottom-right of the input box) before sending, since the COW profile clone inherits whatever model was last used.
 
 ## Trigger phrases
 
