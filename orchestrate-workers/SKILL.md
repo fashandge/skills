@@ -80,14 +80,19 @@ gate below reports at least 80% used:
 |---|---|
 | Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | pi, MiniMax-M3, high effort (`--model minimax/MiniMax-M3 --effort high`) |
 | Straightforward self-contained coding task or fix | claude, opus, high effort → codex, gpt-5.6-terra, high effort |
-| Simple non-coding task needing some judgment (absorb an article, summarize news, research notes, write a wiki) | claude, opus, high effort → kimi, k3, max effort |
-| Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, Fable 5 (`--model fable`), high effort — always, regardless of gauged difficulty → kimi, k3, max effort |
-| Complicated and taste-heavy (research articles, investment thesis) | claude, Fable 5 (`--model fable`), high effort — if Fable quota is ≥85% used, kimi, k3, max effort |
+| Simple non-coding task needing some judgment (absorb an article, summarize news, research notes, write a wiki) | claude, opus, high effort → kimi, kimi-code/k3, max effort |
+| Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, Fable 5 (`--model fable`), high effort — always, regardless of gauged difficulty → kimi, kimi-code/k3, max effort |
+| Complicated and taste-heavy (research articles, investment thesis) | claude, Fable 5 (`--model fable`), high effort — if Fable quota is ≥85% used, kimi, kimi-code/k3, max effort |
 | Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
-| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable 5 high over opus workers) |
+| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi kimi-code/k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable 5 high over opus workers) |
 
 For Claude workers on Fable 5, the value the CLI accepts is `--model fable` —
 `fable-5` is rejected at startup ("selected model may not exist").
+
+For kimi workers, `kimi-code/k3` at max effort is already the spawn script's
+default, so `--agent kimi` alone is the whole spawn flag. If you do pass
+`--model`, it must be the full `kimi-code/k3` — bare `k3` is rejected at
+startup (`Model "k3" is not configured in config.toml`).
 
 **gemini** (Antigravity's `agy` CLI, Gemini 3.7 Flash at high effort — the
 script default, so `--agent gemini` alone is the whole spawn flag) sits outside
@@ -104,7 +109,7 @@ check must happen before each Claude spawn, not after the worker fails, and it
 must never be batched with another command.
 
 Fable taste-heavy routing has an earlier gate: any quota window at ≥85%
-(session, weekly, or Fable-scoped) flips it to kimi k3 max. Run
+(session, weekly, or Fable-scoped) flips it to kimi kimi-code/k3 max. Run
 `claude-quota --check 85` standalone for that decision too. Thus the 85% rule
 protects taste-heavy Fable work, while the 80% rule protects every remaining
 Claude route.
