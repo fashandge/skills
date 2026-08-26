@@ -80,14 +80,16 @@ gate below reports at least 80% used:
 |---|---|
 | Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | pi, MiniMax-M3, high effort (`--model minimax/MiniMax-M3 --effort high`) |
 | Straightforward self-contained coding task or fix | claude, opus, medium effort → codex, gpt-5.6-terra, high effort |
-| Simple non-coding task needing some judgment (absorb an article, summarize news, research notes, write a wiki) | claude, opus, medium effort → kimi, kimi-code/k3, max effort |
+| Simple non-coding task needing some judgment (absorb an article, summarize news, research notes, write a wiki) | claude, Opus 4.8 1M context at high effort (`--model 'claude-opus-4-8[1m]' --effort high`) → kimi, kimi-code/k3, max effort |
 | Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, Fable 5, high effort (`--model fable --effort high`) — always, regardless of gauged difficulty → kimi, kimi-code/k3, max effort |
 | Complicated and taste-heavy (research articles, investment thesis) | claude, Fable 5, high effort (`--model fable --effort high`) — if Fable quota is ≥85% used, kimi, kimi-code/k3, max effort |
 | Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
 | Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi kimi-code/k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable 5 high over opus workers) |
 
 For Claude workers, opus at medium effort is the spawn script's default, so
-the opus routes need no model/effort flags. On Fable 5, the value the CLI
+the bare-opus route needs no model/effort flags; the `claude-opus-4-8[1m]`
+route passes its model quoted, since the brackets are a glob to the shell.
+On Fable 5, the value the CLI
 accepts is `--model fable` — `fable-5` is rejected at startup ("selected model
 may not exist") — and `--effort high` must be passed explicitly, since the
 script's default effort is medium.
