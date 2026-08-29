@@ -1,6 +1,6 @@
 ---
 name: fetch-zhihu-posts
-description: Search Zhihu (知乎) and fetch whole questions — EVERY answer, not just the top few — into a folder as Markdown, with no LLM calls; a pure Python script does the work. Use when the user asks what Zhihu says about something, wants Chinese community opinion, real-world user reviews, or hands-on experience reports (实际体验 / 实测 / 使用体验) on a product, model, company or event, e.g. "summarize zhihu reviews of X", "search zhihu for X", "知乎上怎么评价 X", "what do Chinese users say about X". Also use to pull one specific question's full answer set from a URL or id, or to grab 知乎专栏 articles found alongside it. Search is two-phase: query variants are deduped into a candidate list you triage before fetching.
+description: Search Zhihu (知乎) and fetch whole questions — EVERY answer, not just the top few — into a folder as Markdown, with no LLM calls; a pure Python script does the work. Use when the user asks what Zhihu says about something, wants Chinese community opinion, real-world user reviews, or hands-on experience reports (实际体验 / 实测 / 使用体验) on a product, model, company or event, e.g. "summarize zhihu reviews of X", "search zhihu for X", "知乎上怎么评价 X", "what do Chinese users say about X". Also use to pull one specific question's full answer set from a URL or id, or to grab 知乎专栏 articles found alongside it. Search is two-phase — query variants are deduped into a candidate list you triage before fetching.
 allowed-tools: Bash, Read
 ---
 
