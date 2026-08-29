@@ -868,26 +868,73 @@ async def ask_kimi(page, question: str) -> str:
     return last_seen or (await extract_new_kimi_response(page, baseline_count)).strip()
 
 
-def build_gemini_summary_prompt(question: str, chatbots: list[str], results: dict[str, str]) -> str:
+# Judge preference for the synthesis step, strongest synthesizers first. The
+# picker walks this list and returns the first bot NOT in the queried set, so
+# the judge is a neutral outsider whenever one is available.
+SUMMARIZER_PREFERENCE = ["gemini", "claude", "chatgpt", "kimi", "grok", "deepseek"]
+
+
+def pick_summarizer(chatbots: list[str], override: str | None = None) -> str:
+    """Choose the synthesis judge.
+
+    A bot judging a set that includes its own response resolves disagreements in
+    its own favor and reuses its own structure (self-preference bias), so prefer
+    a bot outside the queried set. Only when every bot was queried does the judge
+    have to be a contestant — build_synthesis_prompt adds a debias instruction
+    for that case.
+    """
+    if override:
+        return override
+    for bot in SUMMARIZER_PREFERENCE:
+        if bot not in chatbots:
+            return bot
+    return SUMMARIZER_PREFERENCE[0]
+
+
+def build_synthesis_prompt(
+    question: str, chatbots: list[str], results: dict[str, str], summarizer: str
+) -> str:
     parts = [
         f'Below are responses from several AI chatbots to the question: "{question}"',
         "",
         "Synthesize them into ONE coherent, well-reasoned answer to the original question.",
         "This is the primary output the user wants — not a comparison digest. Treat the",
-        "responses as input research: reconcile agreements, resolve contradictions using",
-        "your own judgment, and fill gaps. Write it as a single authoritative answer with",
-        "clear structure (headings/paragraphs/bullets as appropriate).",
+        "responses as equal-weight input research and write a single authoritative answer",
+        "with clear structure (headings/paragraphs/bullets as appropriate). You may add",
+        "your own knowledge to fill gaps, but never at the cost of the requirements below.",
         "",
-        "Where the chatbots disagree or differ in emphasis in a way the user would care",
-        "about, fold that nuance into the answer itself — e.g. as a short 'Key differences',",
-        "'Points of contention', or 'Nuance' note within the relevant section — rather than",
-        "as a separate section-by-bot breakdown. Only include a comparison when it genuinely",
-        "clarifies a trade-off; keep it compact (e.g. a short bullet list or small table)",
-        "and only where the synthesis benefits from it. Skip it entirely for factual",
-        "questions where the bots agree.",
+        "Hard requirements — the synthesis is defective if it misses any of these:",
         "",
-        "Do not attribute points to specific chatbots (e.g. 'Gemini says...') unless a",
-        "specific source's framing is itself the point of the question.",
+        "1. COVERAGE. Before writing, identify what each response contributes that the",
+        "   others lack — a distinctive fact, number, caveat, cost, source, or step —",
+        "   and carry every such unique contribution into the answer unless it is wrong",
+        "   or trivial. Do not adopt any single response as the backbone: a synthesis",
+        "   that mirrors one response's structure and content while the others merely",
+        "   'agree' is a failure.",
+        "2. CONTRADICTIONS. Where responses disagree — including a claim one response",
+        "   endorses that another explicitly warns against — surface the disagreement",
+        "   briefly in the relevant section, state which position you adopt, and give",
+        "   the reason. Never resolve a disagreement silently. Keep these notes inline",
+        "   and compact, not a separate per-bot breakdown.",
+        "3. SOURCES. Preserve citations a response attaches to a claim — named",
+        "   institutions, URLs, standards. Do not flatten a sourced claim into an",
+        "   unsourced one.",
+        "",
+        "End with a short 'Coverage notes' section (2-5 bullets): any point you",
+        "deliberately dropped or downweighted and why, and any disagreement you",
+        "adjudicated. Attribution to specific chatbots is fine here; in the main body,",
+        "avoid it (e.g. no 'Gemini says...') unless a source's framing is itself the",
+        "point of the question.",
+    ]
+    if summarizer in chatbots:
+        parts += [
+            "",
+            f"One of the responses below is your own ({summarizer}). Treat it as just",
+            "another input with no special standing: apply the same skepticism to it as",
+            "to the others, and do not default to its structure or its side of any",
+            "disagreement.",
+        ]
+    parts += [
         "",
         "Here are the responses.",
         "",
@@ -918,6 +965,7 @@ async def run(
     headed: bool = True,
     keep_open: bool = True,
     out=None,
+    summarizer: str | None = None,
 ) -> int:
     if out is None:
         out = sys.stdout
@@ -954,7 +1002,7 @@ async def run(
 
         results = dict(await asyncio.gather(*(ask_one(bot) for bot in chatbots)))
 
-        # By default, only print the Gemini summary for multi-bot queries.
+        # By default, only print the synthesis for multi-bot queries.
         # --include-responses also prints individual chatbot answers.
         # If --skip-summary is set without --include-responses, force responses
         # on (otherwise nothing would be printed).
@@ -971,28 +1019,43 @@ async def run(
                 print(results[bot], file=out)
 
         if not skip_summary and len(chatbots) > 1:
-            gemini_page = pages.get("gemini")
-            if gemini_page is None:
-                # Gemini wasn't in the requested set; open a fresh tab for the summary.
-                gemini_page = await open_chatbot(ctx, "gemini")
+            judge = pick_summarizer(chatbots, summarizer)
+            # ALWAYS open a fresh tab for the synthesis, even when the judge
+            # already answered the question. Reusing that tab would send the
+            # synthesis prompt into the judge's own conversation — its own
+            # answer sitting in context as the previous turn — which makes it
+            # re-serve its own answer as the "synthesis".
+            try:
+                judge_page = await open_chatbot(ctx, judge)
+            except BaseException as e:  # noqa: BLE001 — synthesis is best-effort
+                judge_page = f"[failed to open {judge}: {type(e).__name__}: {e}]"
 
-            summary_prompt = build_gemini_summary_prompt(question, chatbots, results)
-            if isinstance(gemini_page, str):
-                summary = gemini_page  # open failed; surface the error string
+            synthesis_prompt = build_synthesis_prompt(
+                question, chatbots, results, judge
+            )
+            if isinstance(judge_page, str):
+                synthesis = judge_page  # open failed; surface the error string
             else:
                 try:
-                    summary = await asyncio.wait_for(
-                        ask_gemini(gemini_page, summary_prompt), timeout=timeout_seconds
+                    synthesis = await asyncio.wait_for(
+                        ASKERS[judge](judge_page, synthesis_prompt),
+                        timeout=timeout_seconds,
                     )
                 except asyncio.TimeoutError:
-                    summary = (
-                        f"[Timed out after {timeout_seconds}s waiting for gemini summary]"
+                    synthesis = (
+                        f"[Timed out after {timeout_seconds}s waiting for {judge} synthesis]"
                     )
-                except BaseException as e:  # noqa: BLE001 — summary is best-effort
-                    summary = f"[gemini summary failed: {type(e).__name__}: {e}]"
+                except BaseException as e:  # noqa: BLE001 — synthesis is best-effort
+                    synthesis = f"[{judge} synthesis failed: {type(e).__name__}: {e}]"
 
-            print("\n=== GEMINI SUMMARY ===", file=out)
-            print(summary, file=out)
+            provenance = (
+                f"[synthesized by {judge} — also a respondent; no neutral bot available]"
+                if judge in chatbots
+                else f"[synthesized by {judge} — not among the queried bots]"
+            )
+            print("\n=== SYNTHESIS ===", file=out)
+            print(provenance, file=out)
+            print(synthesis, file=out)
 
         if keep_open:
             # Hand Chrome + its temp profile to a detached watcher and leave the
@@ -1021,7 +1084,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--skip-summary",
         action="store_true",
-        help="Skip the final Gemini summary/comparison step",
+        help="Skip the final synthesis step",
+    )
+    parser.add_argument(
+        "--summarizer",
+        default=None,
+        help="Bot to write the final synthesis (gemini, chatgpt, grok, claude, deepseek, kimi). "
+        "Default: auto — the first of "
+        + ", ".join(SUMMARIZER_PREFERENCE)
+        + " NOT in the queried set, so the judge is a neutral outsider; only when "
+        "every bot was queried does a respondent judge (with a debias instruction).",
     )
     parser.add_argument(
         "--headless",
@@ -1038,7 +1110,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include-responses",
         action="store_true",
-        help="Also print individual chatbot responses (default: only print the Gemini summary)",
+        help="Also print individual chatbot responses (default: only print the synthesis)",
     )
     parser.add_argument(
         "--stdout",
@@ -1051,7 +1123,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--wiki",
         action="store_true",
-        help="Write the final synthesis (or single response) as a wiki note in ~/notes/wiki/Chatbot Queries/ and print only the note path",
+        help="Write all output to a temp file and print only its path; the calling "
+        "agent then delegates to the /wiki skill with that path (this script does "
+        "not write the wiki note itself)",
     )
     return parser
 
@@ -1063,6 +1137,14 @@ def main(argv: list[str] | None = None) -> int:
     chatbots = parse_chatbots(args.chatbots)
     if args.timeout_seconds <= 0:
         raise SystemExit("--timeout-seconds must be greater than 0")
+
+    summarizer = None
+    if args.summarizer:
+        summarizer = args.summarizer.strip().lower()
+        if summarizer not in VALID_CHATBOTS:
+            raise SystemExit(
+                f"Unknown summarizer '{summarizer}'. Valid options: gemini, chatgpt, grok, claude, deepseek, kimi"
+            )
 
     # Default: headed + keep the window open. --headless turns off both (a headless
     # window can't be closed by hand, so keeping it open would linger forever).
@@ -1092,6 +1174,7 @@ def main(argv: list[str] | None = None) -> int:
                 headed,
                 keep_open,
                 out=out,
+                summarizer=summarizer,
             )
         )
     finally:

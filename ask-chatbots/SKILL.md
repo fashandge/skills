@@ -21,14 +21,14 @@ Kimi is asked at **https://www.kimi.ai/** (not kimi.com, whose chat page stopped
 
 ## How it works
 
-Spawns its own Chrome via the `logged-in-chrome` project in COW (copy-on-write) mode — an instant APFS clone of your real Chrome profile, so every site is already signed in. Opens a tab per chatbot, sends the prompt, captures the full rendered response, optionally asks Gemini for a synthesis.
+Spawns its own Chrome via the `logged-in-chrome` project in COW (copy-on-write) mode — an instant APFS clone of your real Chrome profile, so every site is already signed in. Opens a tab per chatbot, sends the prompt, captures the full rendered response, then has a **judge bot synthesize** the answers in a fresh conversation. The judge is by default a bot **not in the queried set** (a respondent judging its own answer resolves disagreements in its own favor and reuses its own structure); the synthesis prompt requires carrying each response's unique contributions, surfacing contradictions with an explicit adjudication, preserving citations, and ending with a "Coverage notes" audit of what was dropped.
 
 ## Usage
 
 ```bash
 ML=/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python
 
-# Default: Gemini + ChatGPT, headed window left open, summary only
+# Default: Gemini + ChatGPT, headed window left open, synthesis only (judged by Claude — first bot not in the set)
 $ML ~/skills/ask-chatbots/scripts/ask_chatbots.py --question "la weather tomorrow"
 
 # All six chatbots, include individual responses
@@ -50,8 +50,9 @@ $ML ~/skills/ask-chatbots/scripts/ask_chatbots.py \
 | `--question` | *(required)* | Prompt sent to each chatbot |
 | `--chatbots` | `gemini,chatgpt` | Comma-separated list: `gemini,chatgpt,grok,claude,deepseek,kimi` |
 | `--timeout-seconds` | `300` | Per-chatbot wait cap |
-| `--skip-summary` | off | Skip the Gemini synthesis step |
-| `--include-responses` | off | Print per-bot responses alongside the summary |
+| `--skip-summary` | off | Skip the synthesis step |
+| `--summarizer` | auto | Judge bot for the synthesis. Auto = first of gemini, claude, chatgpt, kimi, grok, deepseek **not** in the queried set; a respondent judges only when every bot was queried (debias instruction added) |
+| `--include-responses` | off | Print per-bot responses alongside the synthesis |
 | `--headless` | off | No visible browser window |
 | `--no-keep-open` | off | Close browser after capture (default: leave it open) |
 | `--stdout` | off | Print output to stdout instead of a temp file |
@@ -68,7 +69,7 @@ Prints everything to stdout (same output, no temp file).
 ### `--wiki`
 Writes all output to a temp file (same as default). Prints **only the file path** — no content on stdout. The agent is responsible for:
 1. Delegating to the `/wiki` skill with a **slim pointer, not inlined content**: the question asked, the temp file path, and which section of the file to use as the body:
-   - **Multi-bot**: the `=== GEMINI SUMMARY ===` section
+   - **Multi-bot**: the `=== SYNTHESIS ===` section (its first line names the judge bot)
    - **Single-bot**: the `=== {BOT} FULL RESPONSE ===` section (or the whole file if it's the only content)
 
    `/wiki` reads the file itself. Do NOT paste the file content into the `/wiki` prompt — re-inlining it dilutes `/wiki`'s own instructions in its attention budget and produces worse articles (same rationale as `research-notes`' slim handoff).

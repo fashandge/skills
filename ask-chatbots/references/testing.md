@@ -22,24 +22,27 @@ Edge cases:
 The `ASKERS` dict is defined at module level and captures references to the real
 `ask_gemini`, `ask_chatgpt`, etc. at import time. Standard `@mock.patch.object`
 on `ask_chatbots.ask_gemini` patching the module attribute does NOT reach into
-the dict — the dict still holds the original reference.
+the dict — the dict still holds the original reference. Patch the dict entries
+directly.
 
-The `ask_gemini` function is also called directly (not via `ASKERS`) for the
-summary step inside `run()` (line ~838). That call resolves the module-level
-name at call time, so `@mock.patch.object` on `ask_chatbots.ask_gemini` does
-work for the summary step — but NOT for the initial bot queries through
-`ASKERS`.
-
-To mock correctly, patch BOTH:
+The synthesis step inside `run()` also goes through `ASKERS[judge]` — but the
+judge is chosen by `pick_summarizer()`, which by default returns the first bot
+NOT in the queried set (e.g. queried `gemini,chatgpt` → judge is `claude`). A
+multi-bot test that doesn't use `--skip-summary` must therefore ALSO patch the
+judge's `ASKERS` entry (or pin the judge with `--summarizer` to a bot it
+already mocks):
 
 ```python
-# The ask_gemini function is called directly for the summary step:
-ask_chatbots.ask_gemini = fg
-
-# ASKERS dict must also be patched for the initial queries:
+# Initial queries AND the synthesis step both resolve through ASKERS:
 ask_chatbots.ASKERS["gemini"] = fg
 ask_chatbots.ASKERS["chatgpt"] = fc
+ask_chatbots.ASKERS["claude"] = fj   # default judge for the gemini,chatgpt set
 ```
+
+`pick_summarizer(chatbots, override)` and `build_synthesis_prompt(...)` are pure
+functions — test judge selection and prompt content (COVERAGE / CONTRADICTIONS /
+SOURCES requirements, the self-debias paragraph when the judge is a respondent)
+without any browser mocking.
 
 Restore in `tearDown`:
 
