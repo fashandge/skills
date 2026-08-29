@@ -1,6 +1,6 @@
 ---
 name: fetch-reddit-posts
-description: Search Reddit for a topic, and fetch Reddit posts plus ALL their comments into a folder, with no LLM calls — a pure Python script does the work. Use when the user asks to search Reddit or find/summarize what Redditors say about something, e.g. "search reddit for X", "find reddit threads about X", "what does reddit say about X", "search r/Y for X", "summarize reddit reviews/opinions on X" — multiple query variants are deduped into a candidate list you triage before fetching. Also use to grab/scrape/download/pull/save posts (or posts + comments) from a subreddit or the logged-in home feed, e.g. "fetch the top 10 posts in r/X", "get the latest 20 posts and comments from r/Y", "pull every post from the last week in r/Z", or "fetch the top N from my Reddit home feed". Selection can be a search, top-N (all/year/month/week/day), most-recent-N, a time range (last N days/weeks/months), or the first-N-as-rendered timeline.
+description: Search Reddit for a topic, fetch Reddit posts plus ALL their comments into a folder (no LLM calls — a pure Python script does the work), then by default summarize the haul; say "fetch only" / "just fetch" to stop after the fetch. Use when the user asks to search Reddit or find/summarize what Redditors say about something, e.g. "search reddit for X", "find reddit threads about X", "what does reddit say about X", "search r/Y for X", "summarize reddit reviews/opinions on X" — multiple query variants are deduped into a candidate list you triage before fetching. Also use to grab/scrape/download/pull/save posts (or posts + comments) from a subreddit or the logged-in home feed, e.g. "fetch the top 10 posts in r/X", "get the latest 20 posts and comments from r/Y", "pull every post from the last week in r/Z", or "fetch the top N from my Reddit home feed". Selection can be a search, top-N (all/year/month/week/day), most-recent-N, a time range (last N days/weeks/months), or the first-N-as-rendered timeline.
 allowed-tools: Bash, Read
 ---
 
@@ -11,6 +11,9 @@ Python script does everything and **no LLM is involved in fetching**: it drives 
 logged-in Chrome, pulls Reddit's JSON from inside the page, and writes one
 Markdown file per post (body + fully-expanded nested comments) plus
 `index.md` / `index.json`.
+
+Fetching is the means, not the deliverable: by default a run ends with a written
+**summary** of the haul (see below), not "here are the files".
 
 ## Run it
 
@@ -87,8 +90,32 @@ posts in the personalized order you actually see when you open the page).
 
 The point is to keep content **on disk, out of the context window**. After running,
 report from the printed stdout summary or read only `candidates.md` / `index.md`
-— do **not** `cat` every post file in. Read individual post files only when the
-user wants analysis, and prefer the few that matter over dumping the whole folder.
+— do **not** `cat` every post file in.
+
+Reading for the summary is budgeted, not exhaustive: pick the posts that matter
+from `index.md` (score, comment counts, `--grep` hits), read the small files
+whole, and for a big thread read only the head — top-level comments come in
+Reddit's "Best" order (`--comment-sort confidence`, the default), so the first
+screens hold the highest-ranked threads, though replies nested under a long
+early thread push later top-level comments down. ~15–20KB per file is plenty;
+batch `head -c N` over several files into one scratch file and read that. For
+"which of these actually discuss X", run `--grep`/`--rescan` (see Gotchas)
+instead of reading files to find out.
 
 Default output is a fresh OS temp dir (path printed). Pass `--out <dir>` to write
 into the session scratchpad instead.
+
+## Summarize (the default deliverable)
+
+After fetching, write the summary — the user should not have to ask. **Opt-out**:
+if the user says "fetch only", "just fetch", "don't summarize", stop after the
+fetch and report the output directory plus the printed run summary.
+
+- **Verdict first.** Open with a direct verdict on the question actually asked,
+  then the evidence. Quotes stay verbatim.
+- **Attribute high-signal claims** to author (u/…), subreddit, score and date;
+  a comment-level claim gets the commenter and their points.
+- **Weight the comment tree over the post body.** The body is one author — often
+  a question, a link, or self-promotion; the tree is many users reacting, and
+  that is where the reviews live. Say which subreddit a consensus comes from: a
+  fan sub's verdict on its own subject is not a neutral sample.

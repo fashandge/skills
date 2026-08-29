@@ -1,11 +1,14 @@
 ---
 name: fetch-x-posts
-description: Fetch X/Twitter posts via the news project's xreach-based modules — search top or first N posts for a query (including from a specific account via from:handle), snapshot the logged-in home feed (For You / Following), or bulk-fetch a user's timeline. Use when user asks to "search X", "get top/first N tweets for a query", "search tweets from @handle", "snapshot my X home feed", "get following feed", "fetch user @handle tweets", "pull N posts from X", or wants real-world usage opinions from X posts.
+description: Fetch X/Twitter posts via the news project's xreach-based modules — search top or first N posts for a query (including from a specific account via from:handle), snapshot the logged-in home feed (For You / Following), or bulk-fetch a user's timeline — then by default summarize the haul; say "fetch only" / "just fetch" to stop after the fetch. Use when user asks to "search X", "get top/first N tweets for a query", "search tweets from @handle", "snapshot my X home feed", "get following feed", "fetch user @handle tweets", "pull N posts from X", or wants real-world usage opinions from X posts.
 ---
 
 # fetch-x-posts
 
 Unified interface over the `news` project's X fetchers (no scraping, no API tokens — uses `xreach` CLI which reads your browser cookies).
+
+Fetching is the means, not the deliverable: by default a run ends with a written
+**summary** of the haul (see below), not "here are the files".
 
 ## Modules covered
 
@@ -119,7 +122,11 @@ for p in posts_sorted[:10]:
     print(f"{p['likeCount']} likes | {p['createdAt']} | {p['text'][:200]}")
 PY
 ```
-- Only read full text of top relevant posts when user wants summary/analysis.
+- Reading for the summary is budgeted by selection, not truncation — posts are
+  tweet-sized, so rank and pick. Snapshots are **not** engagement-sorted (`top`
+  search keeps relevance rank, home feed keeps feed rank, `user_tweets` is
+  newest-first): sort by `likeCount`/`viewCount` with a parser like the one above,
+  and read full `text` (plus any `linked_articles`) for only the top slice.
 
 ## Gotchas
 
@@ -128,12 +135,30 @@ PY
 - Rate limits: transient failures (`TransientFetchError`) are auto-retried with exponential backoff. Don't spam with `--delay 0`.
 - Sanitization: search query dir sanitized: lowercased, non-alnum → `_`, truncated 80 chars. `NVDA news` → `nvda_news`.
 
-## When user asks for summary
+## Summarize (the default deliverable)
 
-1. Fetch with `--type top --count N --no-fetch-articles` for fastest relevant results.
-2. Parse JSONL, dedup by id if multiple queries, sort by `likeCount`/`viewCount`.
-3. Summarize findings with themes, not just list — include representative high-like quotes.
-4. Cite data location.
+After fetching, write the summary — the user should not have to ask. **Opt-out**:
+if the user says "fetch only", "just fetch", "don't summarize", stop after the
+fetch and report the data location plus the run's counts.
+
+- **Verdict first, themes not a list** — open with a direct verdict on the
+  question actually asked, then the evidence, with representative
+  high-engagement quotes verbatim. For opinion queries, `--type top --count N
+  --no-fetch-articles` is the right fetch; dedup by id across queries, then
+  select the slice per Token discipline above.
+- **In the haul's majority language** — the per-item `lang` field settles it (X
+  carries plenty of Chinese; a zh-dominated haul gets a Chinese summary, per the
+  global summarize-in-the-source-language rule). Quotes stay in their original
+  language.
+- **Attribute** to `@screenName`, like/view counts and date — some items carry
+  only user ids, so say the handle is missing rather than guess. The data has no
+  follower counts; engagement is the only popularity signal, don't invent one.
+- **Weight originals over amplification**: an `isRetweet` item is the *original*
+  author's words (`RT @…`-prefixed, possibly truncated) — credit that author,
+  not the retweeter; an `isQuote` item carries only the commenter's text (the
+  quoted tweet is not embedded); `isReply` items are conversation fragments —
+  reactions, not standalone takes.
+- End by citing the data location.
 
 ## References
 
