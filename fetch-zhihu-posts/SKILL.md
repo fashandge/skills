@@ -35,6 +35,16 @@ Canonical examples:
 **Run `-h` for the full, authoritative flag list** (`--max-answers`, `--min-votes`,
 `--order`, `--sort`, `--per-query`, `--no-articles`, `--headed`, …).
 
+## Where output goes
+
+Without `--out` a run writes to a fresh `$TMPDIR` directory that macOS clears on
+its own (files untouched for 3+ days) — the right default for a scratch fetch,
+and the script prints the path plus that caveat. **A run directory is not
+storage**: pass `--out DIR` when the results should survive, and if anything is
+worth keeping long-term, absorb it into `~/notes` rather than pointing at a temp
+path later. `--out` on an existing run directory also appends to it, which is
+what `--resume` and phase 2 rely on.
+
 ## Token discipline
 
 A popular question is 50+ answers and **~100KB of Markdown** — do not `cat` the

@@ -135,11 +135,22 @@ def demote_headings(md: str, by: int = 2) -> str:
 
 
 def new_out_dir(explicit: str | None) -> pathlib.Path:
+    """Resolve the output dir; default to a self-reaping temp dir.
+
+    Without --out the run lands in $TMPDIR, which macOS clears on its own
+    (`com.apple.bsd.dirhelper`, daily, files untouched for 3+ days). That is the
+    right default for a scratch fetch, but it means a run is NOT a place to keep
+    anything — hence the notice, so a caller coming back later is not surprised
+    by a directory that quietly evaporated. Deleting at exit would be wrong: the
+    files are the deliverable and are read after this process is gone.
+    """
     if explicit:
         p = pathlib.Path(explicit).expanduser()
-    else:
-        p = pathlib.Path(tempfile.mkdtemp(prefix="zhihu-"))
-    p.mkdir(parents=True, exist_ok=True)
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    p = pathlib.Path(tempfile.mkdtemp(prefix="zhihu-"))
+    print(f"note: writing to a temp dir the OS reaps after ~3 days ({p}).\n"
+          f"      pass --out DIR to keep the results.", flush=True)
     return p
 
 
@@ -436,7 +447,9 @@ def build_parser() -> argparse.ArgumentParser:
                         f"(default: votes)")
 
     o = ap.add_argument_group("output")
-    o.add_argument("--out", help="output dir (default: a fresh temp dir)")
+    o.add_argument("--out", help="output dir. Default: a fresh $TMPDIR dir, which "
+                                 "macOS reaps after ~3 days — pass this to keep the "
+                                 "results, or to add to an existing run")
     o.add_argument("--resume", action="store_true",
                    help="skip rows already in the run's index.jsonl")
     o.add_argument("--headed", action="store_true",
