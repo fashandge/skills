@@ -79,21 +79,21 @@ gate below reports at least 80% used:
 | Task shape | Worker |
 |---|---|
 | Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | pi, MiniMax-M3, high effort (`--model minimax/MiniMax-M3 --effort high`) |
-| Straightforward self-contained coding task or fix | claude, Fable, low effort — the script default, no flags → codex, gpt-5.6-terra, high effort |
+| Straightforward self-contained coding task or fix | claude, opus, high effort (`--model opus --effort high`) → codex, gpt-5.6-terra, high effort |
 | Simple non-coding task needing some judgment (absorb an article, summarize news, research notes, write a wiki) | claude, Fable, low effort — the script default, no flags → kimi, kimi-code/k3, max effort |
 | Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, Fable, high effort (`--model fable --effort high`) — always, regardless of gauged difficulty → kimi, kimi-code/k3, max effort |
 | Complicated and taste-heavy (research articles, investment thesis) | claude, Fable, high effort (`--model fable --effort high`) — if Fable quota is ≥85% used, kimi, kimi-code/k3, max effort |
 | Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
-| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi kimi-code/k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable high over Fable low-effort workers) |
+| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi kimi-code/k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable high over opus or Fable-low workers) |
 
 For Claude workers, Fable at low effort is the spawn script's default, so
-the Fable-low routes need no model/effort flags (`--model fable --effort low`
-is redundant), and the Fable-high routes pass `--effort high` explicitly. The
-model value the CLI accepts is `fable` — `fable-5` is rejected at startup
-("selected model may not exist"). No route in this table uses opus; if a user
-explicitly asks for an opus worker, the bare `opus` alias is the only Claude
-model the script launches with the Concise output style (`--settings
-'{"outputStyle": "Concise"}'`) — Fable workers keep the default style.
+the Fable-low route needs no model/effort flags (`--model fable --effort low`
+is redundant); the Fable-high routes pass `--effort high` explicitly, and the
+opus route passes both `--model opus --effort high`. The Fable model value the
+CLI accepts is `fable` — `fable-5` is rejected at startup ("selected model may
+not exist"). The script launches bare-`opus` workers with the Concise output
+style on its own (`--settings '{"outputStyle": "Concise"}'`) — Fable workers
+keep the default style.
 
 For kimi workers, `kimi-code/k3` at max effort is already the spawn script's
 default, so `--agent kimi` alone is the whole spawn flag. If you do pass
@@ -107,7 +107,7 @@ the user explicitly asks for gemini workers, and then for the tasks they name �
 or the whole batch if that is what they asked. It needs no quota gate and is
 not a `→` fallback for any Claude route.
 
-Before spawning **any** Claude worker — Fable at low or high effort — run
+Before spawning **any** Claude worker — opus or Fable — run
 `claude-quota --check 80` as a standalone command. Every percentage it prints
 is quota *used*; exit 1 means at least one quota window is ≥80%. In that case,
 do not attempt the Claude spawn: use the task's `→` fallback instead. This
