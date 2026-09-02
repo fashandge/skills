@@ -80,9 +80,9 @@ gate below reports at least 80% used:
 |---|---|
 | Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | pi, MiniMax-M3, high effort (`--model minimax/MiniMax-M3 --effort high`) |
 | Straightforward self-contained coding task or fix | claude, opus, high effort (`--model opus --effort high`) → codex, gpt-5.6-terra, high effort |
-| Simple non-coding task needing some judgment (absorb an article, summarize news, research notes, write a wiki) | claude, Fable, low effort — the script default, no flags → kimi, kimi-code/k3, max effort |
+| Simple non-coding task needing some judgment (absorb an article, summarize news, research notes, write a wiki, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z", and the like) | claude, Fable, low effort — the script default, no flags → kimi, kimi-code/k3, max effort |
 | Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, Fable, high effort (`--model fable --effort high`) — always, regardless of gauged difficulty → kimi, kimi-code/k3, max effort |
-| Complicated and taste-heavy (research articles, investment thesis) | claude, Fable, high effort (`--model fable --effort high`) — if Fable quota is ≥85% used, kimi, kimi-code/k3, max effort |
+| Complicated and taste-heavy — the worker must produce an original argument (writing a research article, an investment thesis). Reviewing or summarizing what others said is *not* this row, however much "research" the prompt says: it is the Fable-low row above | claude, Fable, high effort (`--model fable --effort high`) — if Fable quota is ≥85% used, kimi, kimi-code/k3, max effort |
 | Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
 | Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi kimi-code/k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable high over opus or Fable-low workers) |
 
@@ -135,6 +135,9 @@ orchestration itself creates:
 
 Unattended, route one tier up when you hesitate: there is no follow-up cycle
 to correct a worker that guessed wrong, so pay for the deeper model instead.
+Hesitate over the task's own difficulty, not its label: a social-media
+review/summary task is Fable-low by the table above, and "it says research"
+or "it might need taste" is not a reason to tier it up to Fable high.
 
 ## 3. Route each task to its project's workspace
 
