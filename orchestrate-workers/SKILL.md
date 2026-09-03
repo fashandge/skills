@@ -17,6 +17,8 @@ is stolen from every later round.
 Spawning mechanics and prompt hygiene belong to the **spawn-worker** skill
 (read it). This skill owns what spawn-worker deliberately doesn't:
 decomposition, routing, conflict coordination, and the review discipline.
+For a whole session of batches, the user opens with `/start-orchestrator`,
+which makes this skill the standing handler for every later prompt.
 
 ## Modes
 
