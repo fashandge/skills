@@ -212,9 +212,9 @@ There is no orchestrator waiting to commit on a worker's behalf, so a worker
 whose deliverable is a **change to the repo** — code, or a watchlist/portfolio
 edit — lands it itself. Append one sentence to its prompt:
 
-> When done, commit and push only the files you changed (the
-> `/update-docs-and-push-code` skill, if you have it); if the push is
-> rejected, `git pull --rebase` and push again.
+> When done, commit and push only the files you changed with the
+> `/update-docs-and-push-code` skill; if the push is rejected,
+> `git pull --rebase` and push again.
 
 Explicit-path staging is what keeps each commit to that worker's own files
 when several push from one checkout, and the rebase clause absorbs their
