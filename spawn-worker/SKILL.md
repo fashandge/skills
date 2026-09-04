@@ -122,7 +122,9 @@ is the herdr skill's territory: read it and use its event-driven waits
 loop. Its inside-herdr gate applies to the local session only; for a remote
 worker keep the `ssh <host>` prefix. cmux and tmux have no such API — and none
 of this changes the default posture above: absent a request to wait, spawn and
-walk away.
+walk away. (An orchestrator session is the one caller that keeps its own
+label→handle notes for such follow-ups — orchestrate-workers §9 — still
+in-session only, no file.)
 
 Closing a finished worker's tab is the user's call — this mode tracks nothing,
 so cleanup is manual by design: `herdr tab close <tab-id>`.

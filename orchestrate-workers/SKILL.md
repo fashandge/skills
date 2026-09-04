@@ -1,6 +1,6 @@
 ---
 name: orchestrate-workers
-description: Run a multi-task job as an orchestrator - split the work into tasks, gauge each task's difficulty, route each to its project's workspace, spawn workers on cheaper models in parallel, then either hand the tabs back and walk away (unattended, the default), or review every diff and close with a fresh-context strong-model review (attended). Use whenever the user asks to "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize this across workers/agents", or hands over a batch of related fixes/features - especially when the main session runs on an expensive model (Fable/Opus) and implementation should happen on cheaper workers. Use attended mode when the user says "attended", "review the work", "stay on call", "answer their questions", or asks you to commit the results. Not the auto-trigger for one delegated task (spawn-worker owns that), but once invoked always delegate — even a one-task or question-shaped prompt goes to a worker as-is, never answered in-session.
+description: Run a multi-task job as an orchestrator - split the work into tasks, gauge each task's difficulty, route each to its project's workspace, spawn workers on cheaper models in parallel, then either hand the tabs back and walk away (unattended, the default), or review every diff and close with a fresh-context strong-model review (attended). Use whenever the user asks to "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize this across workers/agents", or hands over a batch of related fixes/features - especially when the main session runs on an expensive model (Fable/Opus) and implementation should happen on cheaper workers. Use attended mode when the user says "attended", "review the work", "stay on call", "answer their questions", or asks you to commit the results. Not the auto-trigger for one delegated task (spawn-worker owns that), but once invoked always delegate — even a one-task or question-shaped prompt goes to a worker as-is, never answered in-session. A prompt that continues a task an open worker just did ("push the changes", "now also add X") goes to that worker as a follow-up prompt, not to a fresh spawn.
 ---
 
 # Orchestrate workers
@@ -33,7 +33,8 @@ which makes this skill the standing handler for every later prompt.
 Pick attended only when the user asks for it (the triggers in the
 description, or a `/orchestrate-workers attended …` invocation) — reviewing
 and committing on the workers' behalf is what earns its cost. Everything in
-§1–§4 applies to both modes, and matters *more* unattended: a bad split there
+§1–§4 — and the follow-up rule, §9 — applies to both modes, and matters
+*more* unattended: a bad split there
 has no review pass to catch it.
 
 ## 1. Plan before spawning
@@ -49,6 +50,16 @@ has no review pass to catch it.
   what gets delegated. Handle a prompt inline only when it is about this
   session itself (steering a batch already running, reporting on workers you
   spawned).
+- **A continuation goes to the worker it continues.** When the prompt picks
+  up where a task you already delegated left off — "push the changes", "now
+  also add AAPL", "the test it added fails, fix it" — and that worker's tab
+  is still open, send it as a follow-up prompt to that worker (§9) instead of
+  spawning a fresh one. The open worker already holds the context and the
+  pending edits; a fresh worker in the same checkout has to rediscover both
+  and, mid-batch, would step on them (§4). Spawn fresh only when the worker
+  is gone or blocked, when the follow-up needs a stronger tier than the open
+  worker has (§2 still applies — a harder task is a new task), or on
+  cmux/tmux, where there is no prompt API.
 - **Split only when the split buys something.** Tasks exist to run in
   parallel; a division that yields dependent pieces, or pieces one worker
   would have done anyway, costs coordination and buys nothing. If the job is
@@ -208,8 +219,9 @@ answer it. The gate needs herdr's event wait; on cmux/tmux there is no wait
 API, so fall back to §4's fold-or-drop instead of waving.
 
 **Never wait on the last wave.** Once the final wave is spawned there is
-nothing left to gate — spawning it ends the run. Drop any retained handles;
-a single-wave run is just this rule applied immediately.
+nothing left to gate — spawning it ends the run. Keep the label→handle
+mapping (it routes a later follow-up, §9) but stop waiting on it; a
+single-wave run is just this rule applied immediately.
 
 Report once the final wave is spawned, then stop: the per-task split with
 each task's file set (grouped by wave if there were waves), and one line per
@@ -265,3 +277,34 @@ believing it), then commit its surviving fixes.
 Push once the batch is coherent, close out the plan doc if there is one, and
 report per task: what landed (commit), what was rejected/reworked and why, what
 was report-only. Leave worker tabs for the user to close (spawn-worker's rule).
+
+## 9. Follow-ups: prompt an open worker instead of spawning (both modes)
+
+§1's continuation rule decides *when*; this section is the *how*, and the
+mechanics are the herdr skill's (read it). Herdr-only — on cmux/tmux there
+is no prompt API, so spawn fresh as before.
+
+- **Know your workers.** The label → handle → task mapping in each batch's
+  report is the routing table. Keep it in this session's own notes across
+  batches — never a file or registry, spawn-worker's rule — for the whole
+  session when `/start-orchestrator` is on. If compaction lost it,
+  `herdr agent list` recovers live agents by `cwd` and `terminal_title` (the
+  agent's auto-title usually names the task).
+- **Check it can take the prompt.** `herdr agent get <handle>`: `idle`,
+  `done`, or `working` can — `working` queues the prompt behind the current
+  turn (Claude Code and Codex both do this), which is what "push the changes"
+  usually wants anyway. `blocked` cannot: herdr rejects the submit with
+  `agent_blocked`. Do not spawn a fresh worker into a blocked worker's
+  half-done edits either — report the block and its tab to the user. An
+  error means the worker is gone: spawn fresh, and if the new task depends on
+  what the old worker did, say so in the prompt in one sentence.
+- **Send it in the user's words.** spawn-worker §1's prompt discipline is
+  unchanged, and the worker already has the context, so a follow-up needs
+  even less added than a spawn prompt. Unattended:
+  `herdr agent prompt <handle> "<prompt>"` and walk away — no `--wait`, no
+  reading the pane afterwards. Attended:
+  `herdr agent prompt <handle> "<prompt>" --wait --timeout 3600000`
+  backgrounded, then §6's review cycle as for any other round.
+- **Report it like a spawn.** One line — label, "follow-up", tab — so the
+  user still knows where the work went. §4's fences still apply when other
+  workers are running in that checkout.

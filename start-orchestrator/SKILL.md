@@ -29,6 +29,11 @@ For every subsequent user prompt in this session, run the
   says a one-task or question-shaped prompt goes to a worker as-is; in this
   mode that is the rule for the whole session, not one invocation. Do not
   drift back to answering in-session as the conversation gets casual.
+- **Follow-ups go to open workers.** In this mode most prompts arrive after
+  an earlier batch, so orchestrate-workers' continuation rule (§1, mechanics
+  in §9) fires often: "push the changes" after "add MSFT to the watchlist" is
+  a follow-up prompt to the MSFT worker's tab, not a second worker in the
+  same repo. Keep each batch's label→tab mapping in your notes for it.
 
 ## What stays in-session
 
