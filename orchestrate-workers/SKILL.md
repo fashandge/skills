@@ -82,21 +82,18 @@ gate below reports at least 80% used:
 |---|---|
 | Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | pi, MiniMax-M3, high effort (`--model minimax/MiniMax-M3 --effort high`) |
 | Straightforward self-contained coding task or fix | claude, opus, high effort (`--model opus --effort high`) → codex, gpt-5.6-terra, high effort |
-| Simple non-coding task needing some judgment (absorb an article, summarize news, write a wiki, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z", and the like) | claude, Fable 5 1M context, medium effort (`--model 'claude-fable-5[1m]' --effort medium`) — a different, older model than plain `fable`, see below → kimi, kimi-code/k3, max effort |
+| Simple non-coding task needing some judgment (absorb an article, summarize news, write a wiki, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z", and the like) | claude, Fable, low effort — the script default, no flags → kimi, kimi-code/k3, max effort |
 | Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, Fable, medium effort (`--model fable --effort medium`) — always, regardless of gauged difficulty → kimi, kimi-code/k3, max effort |
-| Complicated and taste-heavy — the worker must produce an original argument (writing a research article, an investment thesis) or research the user's own notes vault (`/research-notes`, even when the answer is largely a synthesis of what the notes say). Social-media and news review/summary is *not* this row: it is the Fable-5[1m] row above | claude, Fable, medium effort (`--model fable --effort medium`) — if Fable quota is ≥85% used, kimi, kimi-code/k3, max effort |
+| Complicated and taste-heavy — the worker must produce an original argument (writing a research article, an investment thesis) or research the user's own notes vault (`/research-notes`, even when the answer is largely a synthesis of what the notes say). Social-media and news review/summary is *not* this row: it is the Fable-low row above | claude, Fable, medium effort (`--model fable --effort medium`) — if Fable quota is ≥85% used, kimi, kimi-code/k3, max effort |
 | Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
-| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi kimi-code/k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus or Fable-5[1m] workers) |
+| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi kimi-code/k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus or Fable-low workers) |
 
-For Claude workers, the spawn script's default is `fable` at low effort, so
-the Fable-medium routes (skill edits, taste-heavy) pass only
-`--effort medium`, and the opus route passes both `--model opus --effort high`.
-Two distinct Fable models exist: plain `fable` now resolves to Fable 5.1,
-while `claude-fable-5[1m]` is the older Fable 5 with a 1M-token context —
-the simple non-coding route uses the latter and must pass both
-`--model 'claude-fable-5[1m]' --effort medium` (quote the brackets — zsh
-treats them as a glob). `fable-5` is rejected at startup ("selected model may
-not exist"). The script launches bare-`opus` workers with the Concise output
+For Claude workers, Fable at low effort is the spawn script's default, so
+the Fable-low route needs no model/effort flags (`--model fable --effort low`
+is redundant); the Fable-medium routes pass `--effort medium` explicitly, and the
+opus route passes both `--model opus --effort high`. The Fable model value the
+CLI accepts is `fable` (currently Fable 5.1) — `fable-5` is rejected at startup
+("selected model may not exist"). The script launches bare-`opus` workers with the Concise output
 style on its own (`--settings '{"outputStyle": "Concise"}'`) — Fable workers
 keep the default style.
 
@@ -141,7 +138,7 @@ orchestration itself creates:
 Unattended, route one tier up when you hesitate: there is no follow-up cycle
 to correct a worker that guessed wrong, so pay for the deeper model instead.
 Hesitate over the task's own difficulty, not its label: a social-media
-review/summary task stays on Fable-5[1m] medium as the table says.
+review/summary task stays on Fable low as the table says.
 
 ## 3. Route each task to its project's workspace
 
