@@ -210,11 +210,18 @@ no "you may ask" sentence, no answering, no reading diffs.
 
 There is no orchestrator waiting to commit on a worker's behalf, so a worker
 whose deliverable is a **change to the repo** — code, or a watchlist/portfolio
-edit — lands it itself. Append one sentence to its prompt:
+edit — lands it itself. Append one sentence to its prompt. The plain form
+is the default — a watchlist/portfolio edit, a data change, a small fix:
 
-> When done, commit and push only the files you changed with the
-> `/update-docs-and-push-code` skill; if the push is rejected,
-> `git pull --rebase` and push again.
+> When done, commit and push only the files you changed; if the push is
+> rejected, `git pull --rebase` and push again.
+
+Use the docs-syncing form only when the change is one docs could describe —
+new or changed behavior, an interface, a design decision:
+
+> When done, commit and push only the files you changed, running the
+> `/update-docs-and-push-code` skill so the docs stay in sync; if the push
+> is rejected, `git pull --rebase` and push again.
 
 Explicit-path staging is what keeps each commit to that worker's own files
 when several push from one checkout, and the rebase clause absorbs their
