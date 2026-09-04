@@ -145,6 +145,9 @@ orchestration itself creates:
   so a worker that asks is a wasted worker)
 - the mechanism, acceptance criteria, and expected review artifact — only for
   genuinely error-prone tasks (identity/history rewrites, safety-critical SQL)
+- unattended only: the commit-and-push sentence (§5) when the task's
+  deliverable is a change to the repo — code, or a watchlist/portfolio edit —
+  and never for summary, research, or analysis work
 
 Unattended, route one tier up when you hesitate: there is no follow-up cycle
 to correct a worker that guessed wrong, so pay for the deeper model instead.
@@ -203,10 +206,22 @@ the common case, means every task at once. If the split collapses to one
 task, this reduces to plain spawn-worker: spawn it, report the tab, stop.
 
 Workers go out in spawn-worker's plain default mode — never attended mode:
-no "you may ask" sentence, no answering, no reading diffs. Say nothing about
-commits — there is no orchestrator waiting to commit on the worker's behalf —
-unless the task itself calls for one, in which case the prompt scopes it to
-that worker's own files (never `git add -A`, never push).
+no "you may ask" sentence, no answering, no reading diffs.
+
+There is no orchestrator waiting to commit on a worker's behalf, so a worker
+whose deliverable is a **change to the repo** — code, or a watchlist/portfolio
+edit — lands it itself. Append one sentence to its prompt:
+
+> When done, commit and push only the files you changed (the
+> `/update-docs-and-push-code` skill, if you have it); if the push is
+> rejected, `git pull --rebase` and push again.
+
+Explicit-path staging is what keeps each commit to that worker's own files
+when several push from one checkout, and the rebase clause absorbs their
+push ordering. Never `git add -A` in any prompt. A worker whose deliverable
+is an **answer** — a summary, research, analysis, a wiki note — gets no
+commit sentence at all: nothing it produces belongs in git. When a task is
+both (a scan whose result is a watchlist edit), the repo change wins.
 
 When the split has genuine dependencies (§4), spawn in **waves**: each wave
 a set of mutually independent tasks, each later wave building on the one
