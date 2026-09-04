@@ -211,13 +211,15 @@ no "you may ask" sentence, no answering, no reading diffs.
 There is no orchestrator waiting to commit on a worker's behalf, so a worker
 whose deliverable is a **change to the repo** — code, or a watchlist/portfolio
 edit — lands it itself. Append one sentence to its prompt. The plain form
-is the default — a watchlist/portfolio edit, a data change, a small fix:
+is the default — a watchlist/portfolio edit, a data change, a small fix, a
+global skill (`~/skills`) or dotfiles change, none of which has docs to sync:
 
 > When done, commit and push only the files you changed; if the push is
 > rejected, `git pull --rebase` and push again.
 
 Use the docs-syncing form only when the change is one docs could describe —
-new or changed behavior, an interface, a design decision:
+new or changed behavior, an interface, a design decision, a project-local
+skill (`skills/` in a repo, whose docs may reference it):
 
 > When done, commit and push only the files you changed, running the
 > `/update-docs-and-push-code` skill so the docs stay in sync; if the push
