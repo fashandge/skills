@@ -97,7 +97,7 @@ gate below reports at least 80% used:
 | Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, Fable, medium effort (`--model fable --effort medium`) — always, regardless of gauged difficulty → kimi, kimi-code/k3, max effort |
 | Complicated and taste-heavy — the worker must produce an original argument (writing a research article, an investment thesis) or research the user's own notes vault (`/research-notes`, even when the answer is largely a synthesis of what the notes say). Social-media and news review/summary is *not* this row: it is the Fable-low row above | claude, Fable, medium effort (`--model fable --effort medium`) — if Fable quota is ≥85% used, kimi, kimi-code/k3, max effort |
 | Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
-| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator (kimi kimi-code/k3 max, codex gpt-5.6-sol high); a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus or Fable-low workers) |
+| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator — kimi kimi-code/k3 max first, codex gpt-5.6-sol high only when kimi is the implementers' family or unavailable; a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus or Fable-low workers) |
 
 For Claude workers, Fable at low effort is the spawn script's default, so
 the Fable-low route needs no model/effort flags (`--model fable --effort low`
