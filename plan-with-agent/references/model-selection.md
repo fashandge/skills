@@ -20,7 +20,7 @@ Consumed by the `plan-with-agent`, `review-with-agent`, and `skill-review-with-a
 | This session's model | Default reviewer |
 |---|---|
 | Fable | `gpt-6-astra` (strongest cross-vendor peer; nothing stronger exists) |
-| Opus | `gpt-6-astra` |
+| Opus | `gpt-5.6-sol` |
 | `gpt-6-astra` | `claude-fable-5` |
 | `gpt-5.6-sol` | `claude-fable-5` |
 | `gpt-5.6-terra` | `claude-opus-4-8` |
