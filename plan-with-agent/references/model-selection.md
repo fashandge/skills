@@ -35,6 +35,12 @@ If the session model is missing from the table, compare its documented capabilit
 
 A user-specified effort wins. Deep passes benefit from fresh whole-problem reasoning; follow-up rounds verify a shrinking delta and normally do not need maximum effort.
 
+## Observed reviewer tendencies
+
+- Codex reviewers (`gpt-6-astra` at high effort, 2026-09-10) over-engineer and get into
+  unnecessary detail when the brief is open. Findings are sound, but later rounds need the
+  majors-only scoping in the shared herdr reference to stay useful.
+
 ## Availability and fallback
 
 Before a long run, confirm the required provider binary exists and that the chosen model is locally configured or recognized by that provider. `spawn_worker.sh` passes the model string through to the agent, so a successful spawn is not proof the model exists — a bad name surfaces as a pane that dies or sits at an error, which `herdr agent get` reports as `idle` with nothing done.

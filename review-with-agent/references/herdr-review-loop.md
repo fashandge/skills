@@ -85,13 +85,30 @@ If blocked, read the pane, answer the dialog with `herdr agent send-keys` or by 
 the user, and only then wait again. A review you never noticed was blocked reads exactly
 like a review that found nothing.
 
+## Keeping findings substantive
+
+Round 1 prompts ask for a short list of substantive findings over an exhaustive one, and
+say that re-architecture and added features are out of scope unless a real defect requires
+them. An open brief invites the reviewer to fill the space: Codex reviewers in particular
+(`gpt-6-astra` observed 2026-09-10) over-engineer and drift into detail when nothing bounds
+them, and a long list of nits buries the two findings that matter.
+
+**From round 2 onward, ask for blocker and major findings only** — no minors, no nits, no
+new features or restructuring — framed as "what would make this produce a wrong result".
+Later rounds verify a shrinking delta; an unconstrained reviewer fills the space with
+detail instead. The constraint costs nothing in substance: in the run above, round 2 under
+it still surfaced three valid majors. Lift it only when the user asks for an exhaustive
+pass.
+
 ## Next round
 
-The reviewer still has its context, so the follow-up is short:
+The reviewer still has its context, so the follow-up is short — and, per the section
+above, scoped to blockers and majors:
 
 ```bash
 herdr agent prompt <handle> "<what you changed, what you rejected and why,
-what to re-review>" --wait --timeout 1200000
+what to re-review — blocker and major findings only, no minors, nits, features
+or restructuring>" --wait --timeout 1200000
 ```
 
 `agent prompt --wait` submits and waits in one call. If the prompt produces no lifecycle

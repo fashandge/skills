@@ -71,8 +71,10 @@ simplification opportunities. Judge the change against its stated intent —
 flag scope creep. Verify assumptions from any design docs against the code.
 
 Report findings, correctness first, each with a severity
-(blocker|major|minor|nit) and file:line. Say so explicitly if you find
-nothing. Do not change any code.
+(blocker|major|minor|nit) and file:line. Prefer a short list of substantive
+findings over an exhaustive list of small ones; do not propose
+re-architecture or new features unless a real defect requires it. Say so
+explicitly if you find nothing. Do not change any code.
 ```
 
 Spawn with that prompt, then wait and read, per the shared reference.
@@ -81,7 +83,8 @@ Spawn with that prompt, then wait and read, per the shared reference.
 
 Follow the shared reference's round protocol — verify each finding against the actual
 code path before acting on it, fix blockers and majors, record every finding's
-disposition, and push back when the reviewer is wrong. Code adds one rule: re-run the
+disposition, and push back when the reviewer is wrong. Follow-up rounds ask for blocker
+and major findings only (the shared reference's "Keeping findings substantive" section). Code adds one rule: re-run the
 relevant tests after every change.
 
 With multiple reviewers, combine before addressing: group findings that make the same

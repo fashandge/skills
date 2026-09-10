@@ -137,7 +137,9 @@ genuinely new argument): <digest of prior findings + dispositions, or "none">
 
 Review for: correctness vs the requirement, feasibility against the actual
 code, missing steps / edge cases / risks, sequencing, testability and
-verification, scope creep.
+verification, scope creep. Prefer a short list of substantive findings over
+an exhaustive list of small ones; do not propose re-architecture or added
+scope unless a real defect requires it.
 
 Output format — first line exactly:
 VERDICT: APPROVE | REVISE

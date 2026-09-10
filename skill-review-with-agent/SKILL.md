@@ -67,6 +67,11 @@ tested empirically with evals, not review.
 Prior rounds (do not re-raise items marked REJECTED unless you have a
 genuinely new argument): <digest of prior findings + dispositions, or "none">
 
+Focus on what would make a cold agent produce a wrong result or a wrong
+artifact. Prefer a short list of substantive findings over an exhaustive
+list of small ones; do not propose re-architecture or added features unless
+a real defect requires it.
+
 Review the skill and find any issues. Output format — first line exactly:
 VERDICT: APPROVE | REVISE
 Then each finding on its own bullet:
@@ -79,7 +84,7 @@ Verdict rubric:
 - REVISE if one or more blocker or major findings remain.
 ```
 
-Then address the round per the shared reference's round protocol, verifying each finding against the actual conventions and delegated-to docs it appeals to — a confident wrong finding rewrites a correct skill. Log each round as a `## Round N` section in the review log (reviewer model in the header): verdict, findings, and per-finding disposition. The shared reference's cap, stop, and escalation rules apply; re-review with an updated digest.
+Then address the round per the shared reference's round protocol, verifying each finding against the actual conventions and delegated-to docs it appeals to — a confident wrong finding rewrites a correct skill. Follow-up rounds ask for blocker and major findings only (the shared reference's "Keeping findings substantive" section). Log each round as a `## Round N` section in the review log (reviewer model in the header): verdict, findings, and per-finding disposition. The shared reference's cap, stop, and escalation rules apply; re-review with an updated digest.
 
 ## Flow 3 — alternating review-and-fix
 
