@@ -93,11 +93,11 @@ gate below reports at least 80% used:
 |---|---|
 | Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | pi, MiniMax-M3, high effort (`--model minimax/MiniMax-M3 --effort high`) |
 | Straightforward self-contained coding task or fix | claude, opus, high effort (`--model opus --effort high`) → codex, gpt-5.6-terra, high effort |
-| Simple non-coding task needing some judgment (absorb an article, summarize news, write a wiki, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z", and the like) | claude, Fable, low effort — the script default, no flags → kimi, kimi-code/k3, max effort |
-| Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, Fable, medium effort (`--model fable --effort medium`) — always, regardless of gauged difficulty → kimi, kimi-code/k3, max effort |
-| Complicated and taste-heavy — the worker must produce an original argument (writing a research article, an investment thesis) or research the user's own notes vault (`/research-notes`, even when the answer is largely a synthesis of what the notes say). Social-media and news review/summary is *not* this row: it is the Fable-low row above | claude, Fable, medium effort (`--model fable --effort medium`) — if Fable quota is ≥85% used, kimi, kimi-code/k3, max effort |
+| Simple non-coding task needing some judgment (absorb an article, summarize news, write a wiki, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z", and the like) | claude, Fable, low effort — the script default, no flags → codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`) |
+| Skill creation or edits — global (`~/skills`) or project-local (`skills/`) | claude, Fable, medium effort (`--model fable --effort medium`) — always, regardless of gauged difficulty → codex, gpt-6-astra, high effort |
+| Complicated and taste-heavy — the worker must produce an original argument (writing a research article, an investment thesis) or research the user's own notes vault (`/research-notes`, even when the answer is largely a synthesis of what the notes say). Social-media and news review/summary is *not* this row: it is the Fable-low row above | claude, Fable, medium effort (`--model fable --effort medium`) — if Fable quota is ≥85% used, codex, gpt-6-astra, high effort |
 | Complicated coding (nuanced, multi-file, or history-rewriting) | codex, gpt-5.6-sol, high effort |
-| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator — kimi kimi-code/k3 max first, codex gpt-5.6-sol high only when kimi is the implementers' family or unavailable; a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus or Fable-low workers) |
+| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator — codex gpt-6-astra high when the implementers were Claude or pi, claude Fable medium when they were codex; a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus or Fable-low workers) |
 
 For Claude workers, Fable at low effort is the spawn script's default, so
 the Fable-low route needs no model/effort flags (`--model fable --effort low`
@@ -108,10 +108,10 @@ CLI accepts is `fable` (currently Fable 5.1) — `fable-5` is rejected at startu
 style on its own (`--settings '{"outputStyle": "Concise"}'`) — Fable workers
 keep the default style.
 
-For kimi workers, `kimi-code/k3` at max effort is already the spawn script's
-default, so `--agent kimi` alone is the whole spawn flag. If you do pass
-`--model`, it must be the full `kimi-code/k3` — bare `k3` is rejected at
-startup (`Model "k3" is not configured in config.toml`).
+For the codex fallback routes, pass `--agent codex --model gpt-6-astra --effort high`
+explicitly rather than relying on the spawn script's codex default. Kimi is no longer
+available (no subscription); every route that used to fall back to kimi now falls back
+to astra.
 
 **gemini** (Antigravity's `agy` CLI, Gemini 3.7 Flash at high effort — the
 script default, so `--agent gemini` alone is the whole spawn flag) sits outside
@@ -128,7 +128,7 @@ check must happen before each Claude spawn, not after the worker fails, and it
 must never be batched with another command.
 
 Fable taste-heavy routing has an earlier gate: any quota window at ≥85%
-(session, weekly, or Fable-scoped) flips it to kimi kimi-code/k3 max. Run
+(session, weekly, or Fable-scoped) flips it to codex gpt-6-astra high. Run
 `claude-quota --check 85` standalone for that decision too. Thus the 85% rule
 protects taste-heavy Fable work, while the 80% rule protects every remaining
 Claude route.
