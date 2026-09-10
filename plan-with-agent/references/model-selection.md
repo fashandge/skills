@@ -11,7 +11,7 @@ Consumed by the `plan-with-agent`, `review-with-agent`, and `skill-review-with-a
   and sol over-engineer and drift into detail on an open brief (observed 2026-09-10); their
   findings are sound, so scope their later rounds to majors per the shared herdr reference
   rather than avoiding them.
-- Claude: `claude-fable-5` (Fable) > `claude-opus-4-8` (Opus)
+- Claude: `fable` > `opus` (the Claude CLI aliases, so the roster does not need touching when a version bumps)
 - Cross-vendor working calibration: Fable at medium–high ≈ astra at high; Fable ≈ sol at
   high effort with Fable ahead; Opus ≈ terra at xhigh.
 
@@ -21,12 +21,12 @@ Consumed by the `plan-with-agent`, `review-with-agent`, and `skill-review-with-a
 |---|---|
 | Fable | `gpt-6-astra` (strongest cross-vendor peer; nothing stronger exists) |
 | Opus | `gpt-5.6-sol` |
-| `gpt-6-astra` | `claude-fable-5` |
-| `gpt-5.6-sol` | `claude-fable-5` |
-| `gpt-5.6-terra` | `claude-opus-4-8` |
-| `gpt-5.6-luna` | `claude-opus-4-8` |
+| `gpt-6-astra` | `fable` |
+| `gpt-5.6-sol` | `fable` |
+| `gpt-5.6-terra` | `opus` |
+| `gpt-5.6-luna` | `opus` |
 | Sonnet or Haiku | `gpt-5.6-terra` |
-| Non-Claude, non-GPT vendors | calibrate first; if uncertain, `claude-fable-5` |
+| Non-Claude, non-GPT vendors | calibrate first; if uncertain, `fable` |
 
 These mappings apply to the first review round in `review-with-agent` and `skill-review-with-agent` flow 1, and to review rounds in plan-with-agent flows 1 and 2. Keep the same reviewer model for follow-up rounds, but lower effort as described below. Two counterpart calls intentionally use peers instead: flow 2's independent draft, where competitive alternatives matter more than reviewer authority, and flow 3's direct-edit turns, where mutual verifiability matters more than maximum strength.
 
@@ -39,8 +39,8 @@ If the session model is missing from the table, compare its documented capabilit
   rounds is what keeps them short, not a lower effort).
 - `gpt-5.6-terra`: `xhigh` for deep passes; `high` for follow-up rounds.
 - `gpt-5.6-sol`: `xhigh` for deep passes — an independent draft (plan-with-agent flow 2), the first review round of a new artifact, a genuinely hard requirement; `high` for follow-up rounds.
-- `claude-fable-5`: use the same deep-pass versus follow-up rule as sol.
-- `claude-opus-4-8`: `high` for deep passes; `medium` for follow-up rounds.
+- `fable`: use the same deep-pass versus follow-up rule as sol.
+- `opus`: `high` for deep passes; `medium` for follow-up rounds.
 
 A user-specified effort wins. Deep passes benefit from fresh whole-problem reasoning; follow-up rounds verify a shrinking delta and normally do not need maximum effort.
 
