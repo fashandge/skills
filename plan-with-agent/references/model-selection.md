@@ -34,8 +34,9 @@ If the session model is missing from the table, compare its documented capabilit
 
 ## Effort mapping
 
-- `gpt-6-astra`: `high` for deep passes (that is already Fable-class; `xhigh` buys detail,
-  not substance); `medium` for follow-up rounds.
+- `gpt-6-astra`: `high` for deep passes and follow-up rounds alike (that is already
+  Fable-class; `xhigh` buys detail, not substance, and the majors-only scoping of later
+  rounds is what keeps them short, not a lower effort).
 - `gpt-5.6-terra`: `xhigh` for deep passes; `high` for follow-up rounds.
 - `gpt-5.6-sol`: `xhigh` for deep passes — an independent draft (plan-with-agent flow 2), the first review round of a new artifact, a genuinely hard requirement; `high` for follow-up rounds.
 - `claude-fable-5`: use the same deep-pass versus follow-up rule as sol.
