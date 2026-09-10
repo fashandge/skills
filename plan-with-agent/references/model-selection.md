@@ -1,23 +1,29 @@
 # Reviewer Model Selection
 
-Roster updated: 2026-07-13
+Roster updated: 2026-09-10
 
 Consumed by the `plan-with-agent`, `review-with-agent`, and `skill-review-with-agent` skills. Treat this roster as maintenance data, not a timeless ranking. Preserve the selection principles in the consuming SKILL.md when model lineups change: never self-review, honor explicit user choices subject to that exclusion, and default first-pass reviews to a cross-vendor reviewer one capability tier stronger when available. When the session already uses a top-tier model or no stronger cross-vendor model is available, use the strongest cross-vendor peer.
 
 ## Current tier calibration
 
-- Codex: `gpt-5.6-sol` > `gpt-5.6-terra` > `gpt-5.6-luna`
+- Codex: `gpt-6-astra` > `gpt-5.6-sol` > `gpt-5.6-terra` > `gpt-5.6-luna`. Astra is the top
+  of the gpt-6 family (no siblings yet) and stronger than every gpt-5.6 model. It
+  over-engineers and drifts into detail on an open brief (observed 2026-09-10); its findings
+  are sound, so scope its later rounds to majors per the shared herdr reference rather than
+  avoiding it.
 - Claude: `claude-fable-5` (Fable) > `claude-opus-4-8` (Opus)
-- Cross-vendor working calibration: Fable ≈ sol at high effort; Opus ≈ terra at xhigh.
+- Cross-vendor working calibration: Fable at medium–high ≈ astra at high; Fable ≈ sol at
+  high effort with Fable ahead; Opus ≈ terra at xhigh.
 
 ## Default first-pass reviewer mapping
 
 | This session's model | Default reviewer |
 |---|---|
-| Fable | `gpt-5.6-sol` |
-| Opus | `gpt-5.6-sol` |
+| Fable | `gpt-6-astra` (strongest cross-vendor peer; nothing stronger exists) |
+| Opus | `gpt-6-astra` |
+| `gpt-6-astra` | `claude-fable-5` |
 | `gpt-5.6-sol` | `claude-fable-5` |
-| `gpt-5.6-terra` | `claude-fable-5` |
+| `gpt-5.6-terra` | `claude-opus-4-8` |
 | `gpt-5.6-luna` | `claude-opus-4-8` |
 | Sonnet or Haiku | `gpt-5.6-terra` |
 | Non-Claude, non-GPT vendors | calibrate first; if uncertain, `claude-fable-5` |
@@ -28,18 +34,14 @@ If the session model is missing from the table, compare its documented capabilit
 
 ## Effort mapping
 
+- `gpt-6-astra`: `high` for deep passes (that is already Fable-class; `xhigh` buys detail,
+  not substance); `medium` for follow-up rounds.
 - `gpt-5.6-terra`: `xhigh` for deep passes; `high` for follow-up rounds.
 - `gpt-5.6-sol`: `xhigh` for deep passes — an independent draft (plan-with-agent flow 2), the first review round of a new artifact, a genuinely hard requirement; `high` for follow-up rounds.
 - `claude-fable-5`: use the same deep-pass versus follow-up rule as sol.
 - `claude-opus-4-8`: `high` for deep passes; `medium` for follow-up rounds.
 
 A user-specified effort wins. Deep passes benefit from fresh whole-problem reasoning; follow-up rounds verify a shrinking delta and normally do not need maximum effort.
-
-## Observed reviewer tendencies
-
-- Codex reviewers (`gpt-6-astra` at high effort, 2026-09-10) over-engineer and get into
-  unnecessary detail when the brief is open. Findings are sound, but later rounds need the
-  majors-only scoping in the shared herdr reference to stay useful.
 
 ## Availability and fallback
 
