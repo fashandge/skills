@@ -1,6 +1,6 @@
 ---
 name: review-with-agent
-description: Have one or more other agents (Codex, Claude, pi, kimi) adversarially review code changes in a live herdr pane, then verify and address their findings and repeat the review-address cycle until approval or the round cap. Use when the user explicitly asks for a second agent or second model to review code, e.g. "have codex review this", "get claude to review my diff", "second-model review of these changes", "review this with codex and fix what it finds", "have two agents review this". Do not auto-trigger for ordinary code-review requests that don't ask for a second agent — the harness's own code-review skill covers those. For reviewing a plan/design doc instead of code, use plan-with-agent; for reviewing a skill, use skill-review-with-agent.
+description: Have one or more other agents (Codex, Claude, pi) adversarially review code changes in a live herdr pane, then verify and address their findings and repeat the review-address cycle until approval or the round cap. Use when the user explicitly asks for a second agent or second model to review code, e.g. "have codex review this", "get claude to review my diff", "second-model review of these changes", "review this with codex and fix what it finds", "have two agents review this". Do not auto-trigger for ordinary code-review requests that don't ask for a second agent — the harness's own code-review skill covers those. For reviewing a plan/design doc instead of code, use plan-with-agent; for reviewing a skill, use skill-review-with-agent.
 ---
 
 # Review with Agent
