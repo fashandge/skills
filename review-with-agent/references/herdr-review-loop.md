@@ -90,8 +90,8 @@ like a review that found nothing.
 Round 1 prompts ask for a short list of substantive findings over an exhaustive one, and
 say that re-architecture and added features are out of scope unless a real defect requires
 them. An open brief invites the reviewer to fill the space: Codex reviewers in particular
-(`gpt-6-astra` observed 2026-09-10) over-engineer and drift into detail when nothing bounds
-them, and a long list of nits buries the two findings that matter.
+(`gpt-6-astra` and `gpt-5.6-sol`, observed 2026-09-10) over-engineer and drift into detail
+when nothing bounds them, and a long list of nits buries the two findings that matter.
 
 **From round 2 onward, ask for blocker and major findings only** — no minors, no nits, no
 new features or restructuring — framed as "what would make this produce a wrong result".

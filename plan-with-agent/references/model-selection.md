@@ -7,10 +7,10 @@ Consumed by the `plan-with-agent`, `review-with-agent`, and `skill-review-with-a
 ## Current tier calibration
 
 - Codex: `gpt-6-astra` > `gpt-5.6-sol` > `gpt-5.6-terra` > `gpt-5.6-luna`. Astra is the top
-  of the gpt-6 family (no siblings yet) and stronger than every gpt-5.6 model. It
-  over-engineers and drifts into detail on an open brief (observed 2026-09-10); its findings
-  are sound, so scope its later rounds to majors per the shared herdr reference rather than
-  avoiding it.
+  of the gpt-6 family (no siblings yet) and stronger than every gpt-5.6 model. Both astra
+  and sol over-engineer and drift into detail on an open brief (observed 2026-09-10); their
+  findings are sound, so scope their later rounds to majors per the shared herdr reference
+  rather than avoiding them.
 - Claude: `claude-fable-5` (Fable) > `claude-opus-4-8` (Opus)
 - Cross-vendor working calibration: Fable at medium–high ≈ astra at high; Fable ≈ sol at
   high effort with Fable ahead; Opus ≈ terra at xhigh.
