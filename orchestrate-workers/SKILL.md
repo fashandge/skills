@@ -92,15 +92,15 @@ what's installed). Quota fallbacks use the route-specific thresholds below:
 |---|---|---|
 | Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | pi, MiniMax-M3, high effort (`--model minimax/MiniMax-M3 --effort high`) | none |
 | Straightforward self-contained coding task or fix — most coding lands here | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-5.6-terra, xhigh effort, when Claude's overall session or weekly quota is ≥95% used |
-| Judgment and writing, not coding — **low effort** for simple tasks with some judgment (absorb an article, summarize news, write a wiki, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z"); **medium effort** for skill creation or edits (global `~/skills` or project-local `skills/`, always, regardless of gauged difficulty) and for taste-heavy work where the worker must produce an original argument (a research article, an investment thesis) or research the user's own notes vault (`/research-notes`, even when the answer is largely a synthesis). Social-media and news summaries are low, not medium | claude, Fable — low is the script default, no flags; medium passes `--effort medium` | **Fable-low (simple judgment)**: claude, opus, medium effort (`--model opus --effort medium`) — no additional quota check; **Fable-medium routes**: codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`). Either fallback applies only when Fable's model-scoped quota is ≥95% used |
+| Simple judgment and writing, not coding (absorb an article, summarize news, write a wiki, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z") | claude, opus, medium effort (`--model opus --effort medium`) | none; no quota check |
+| Skill creation or edits (global `~/skills` or project-local `skills/`, always, regardless of gauged difficulty), taste-heavy work producing an original argument (a research article, an investment thesis), or research into the user's own notes vault (`/research-notes`, even when largely synthesis) | claude, Fable, medium effort (`--effort medium`) | codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`) when Fable's model-scoped quota is ≥95% used |
 | Complicated coding (nuanced, multi-file, or history-rewriting) — genuinely hard only; astra is expensive, so most coding stays on the opus row above | codex, gpt-6-astra, low effort (`--agent codex --model gpt-6-astra --effort low`) | none |
-| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator — codex gpt-6-astra high when the implementers were Claude or pi, claude Fable medium when they were codex; a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus or Fable-low workers) | none |
+| Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator — codex gpt-6-astra high when the implementers were Claude or pi, claude Fable medium when they were codex; a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus workers) | none |
 
 For Claude workers, Fable at low effort is the spawn script's default, so
-the Fable-low route needs no model/effort flags (`--model fable --effort low`
-is redundant); the Fable-medium routes pass `--effort medium` explicitly, the
-opus coding route passes both `--model opus --effort high`, and the opus
-fallback for simple judgment work passes `--model opus --effort medium`. The Fable model value the
+Fable-medium routes pass `--effort medium` explicitly. The opus coding route
+passes `--model opus --effort high`, and simple judgment/writing passes
+`--model opus --effort medium`. The Fable model value the
 CLI accepts is `fable` (currently Fable 5.1) — `fable-5` is rejected at startup
 ("selected model may not exist"). The script launches bare-`opus` workers with the Concise output
 style on its own (`--settings '{"outputStyle": "Concise"}'`) — Fable workers
@@ -109,9 +109,7 @@ keep the default style.
 For the codex fallback routes, pass `--agent codex --model gpt-5.6-terra --effort xhigh`
 for the opus coding route and `--agent codex --model gpt-6-astra --effort high` for the
 Fable-medium judgment/writing route explicitly rather than relying on the spawn script's
-codex default. Simple judgment work (the Fable-low route) falls back directly to
-opus at medium effort without an additional quota check or a quota-based codex
-fallback. Kimi is no longer available (no subscription); every route that used
+codex default. Kimi is no longer available (no subscription); every route that used
 to fall back to kimi now uses the codex fallback specified in the table.
 
 **gemini** (Antigravity's `agy` CLI, Gemini 3.7 Flash at high effort — the
@@ -135,8 +133,8 @@ quotas for this route. Do not use `--check` for Fable: it checks every window.
 If no numeric Fable quota is returned, report the check as unavailable rather
 than substituting a shared quota or treating the missing value as zero.
 
-The **opus-medium fallback for simple judgment/writing skips quota checks**:
-once Fable's model-scoped 95% gate trips, spawn opus medium directly.
+The **opus-medium route for simple judgment/writing skips quota checks**
+and has no fallback: spawn opus medium directly.
 
 Every percentage is quota *used*. When a gate trips, use the row's fallback
 instead of spawning its primary model. Run each quota command standalone before
@@ -161,7 +159,7 @@ orchestration itself creates:
 Unattended, route one tier up when you hesitate: there is no follow-up cycle
 to correct a worker that guessed wrong, so pay for the deeper model instead.
 Hesitate over the task's own difficulty, not its label: a social-media
-review/summary task stays on Fable low as the table says.
+review/summary task stays on opus medium as the table says.
 
 ## 3. Route each task to its project's workspace
 
