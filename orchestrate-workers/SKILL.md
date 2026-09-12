@@ -86,14 +86,13 @@ has no review pass to catch it.
 ## 2. Route by difficulty
 
 Gauge each task and pick the worker tier (defaults that have worked; adjust to
-what's installed). A `→` fallback applies when the mandatory Claude quota
-gate below reports at least 80% used:
+what's installed). Quota fallbacks use the route-specific thresholds below:
 
 | Task shape | Worker | Fallback |
 |---|---|---|
 | Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | pi, MiniMax-M3, high effort (`--model minimax/MiniMax-M3 --effort high`) | none |
-| Straightforward self-contained coding task or fix — most coding lands here | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-5.6-terra, xhigh effort, when any Claude quota window is ≥80% used |
-| Judgment and writing, not coding — **low effort** for simple tasks with some judgment (absorb an article, summarize news, write a wiki, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z"); **medium effort** for skill creation or edits (global `~/skills` or project-local `skills/`, always, regardless of gauged difficulty) and for taste-heavy work where the worker must produce an original argument (a research article, an investment thesis) or research the user's own notes vault (`/research-notes`, even when the answer is largely a synthesis). Social-media and news summaries are low, not medium | claude, Fable — low is the script default, no flags; medium passes `--effort medium` | **Fable-low (simple judgment)**: claude, opus, medium effort (`--model opus --effort medium`) — and only if opus is gated too, codex, gpt-6-astra, high effort; **Fable-medium routes**: codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`). Either fallback applies only when any Claude quota window is ≥90% used |
+| Straightforward self-contained coding task or fix — most coding lands here | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-5.6-terra, xhigh effort, when any Claude quota window is ≥95% used |
+| Judgment and writing, not coding — **low effort** for simple tasks with some judgment (absorb an article, summarize news, write a wiki, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z"); **medium effort** for skill creation or edits (global `~/skills` or project-local `skills/`, always, regardless of gauged difficulty) and for taste-heavy work where the worker must produce an original argument (a research article, an investment thesis) or research the user's own notes vault (`/research-notes`, even when the answer is largely a synthesis). Social-media and news summaries are low, not medium | claude, Fable — low is the script default, no flags; medium passes `--effort medium` | **Fable-low (simple judgment)**: claude, opus, medium effort (`--model opus --effort medium`) — no additional quota check; **Fable-medium routes**: codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`). Either fallback applies only when any Claude quota window is ≥90% used |
 | Complicated coding (nuanced, multi-file, or history-rewriting) — genuinely hard only; astra is expensive, so most coding stays on the opus row above | codex, gpt-6-astra, low effort (`--agent codex --model gpt-6-astra --effort low`) | none |
 | Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator — codex gpt-6-astra high when the implementers were Claude or pi, claude Fable medium when they were codex; a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus or Fable-low workers) | none |
 
@@ -110,9 +109,9 @@ keep the default style.
 For the codex fallback routes, pass `--agent codex --model gpt-5.6-terra --effort xhigh`
 for the opus coding route and `--agent codex --model gpt-6-astra --effort high` for the
 Fable-medium judgment/writing route explicitly rather than relying on the spawn script's
-codex default. Simple judgment work (the Fable-low route) leaves Claude only when
-opus is gated as well: its first fallback is opus at medium effort, and codex
-gpt-6-astra high is the second. Kimi is no longer available (no subscription); every route that used
+codex default. Simple judgment work (the Fable-low route) falls back directly to
+opus at medium effort without an additional quota check or a quota-based codex
+fallback. Kimi is no longer available (no subscription); every route that used
 to fall back to kimi now uses the codex fallback specified in the table.
 
 **gemini** (Antigravity's `agy` CLI, Gemini 3.7 Flash at high effort — the
@@ -122,18 +121,16 @@ the user explicitly asks for gemini workers, and then for the tasks they name �
 or the whole batch if that is what they asked. It needs no quota gate and is
 not a `→` fallback for any Claude route.
 
-Two quota gates, one per Claude route. Before an **opus** spawn run
-`claude-quota --check 80`; before a **Fable** spawn run `claude-quota --check 90`.
-Each is a standalone command; every percentage it prints is quota *used*, and
-exit 1 means at least one window (session, weekly, or model-scoped) is at or
-above the threshold. In that case do not attempt the Claude spawn: use the row's
-fallback instead — and when that fallback is itself a Claude route (simple
-judgment work falling back from Fable to opus medium), run that route's own
-gate, `claude-quota --check 80`, before spawning it; only if that trips too
-does the task go to codex. The check happens before each Claude spawn, not after a worker
-fails, and is never batched with another command. Fable's later gate is
-deliberate: judgment and writing is what Fable is reserved for, so it keeps its
-quota until later than the coding route does.
+Before each **opus-high coding** spawn run `claude-quota --check 95`; before
+each **Fable** spawn run `claude-quota --check 90`. The **opus-medium fallback
+for simple judgment/writing skips quota checks**: once Fable's 90% gate trips,
+spawn opus medium directly.
+
+Each quota check is a standalone command; every percentage it prints is quota
+*used*, and exit 1 means at least one window (session, weekly, or model-scoped)
+is at or above the threshold. When a check trips, use the row's fallback
+instead of spawning its primary model. Check before spawning, not after a
+worker fails, and never batch the check with another command.
 
 Prompt sizing is spawn-worker §1's rule, unchanged: thin by default — the
 task in the user's own words, nothing added. On top of it, add only what
