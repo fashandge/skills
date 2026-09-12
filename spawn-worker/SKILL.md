@@ -63,8 +63,11 @@ user's place.
 EOF
 ```
 
-On a remote box, the worker lands in that host's own herdr server (the prompt
-file here shows the point-at-an-existing-spec form; `-` works remotely too):
+For remote workers, first read [Remote workers](references/remote-workers.md).
+It owns OCI startup and connecting the remote session to the current Herdr
+window. Prefer that same-window view when running inside local Herdr; the
+worker still runs in the remote host's own server and checkout. After that
+preparation (the prompt file below is local; `-` works remotely too):
 
 ```bash
 ~/projects/agents/scripts/spawn_worker.sh <label> <plan.md> \
@@ -91,12 +94,15 @@ the remote one every worker on that host piles into one default workspace.
 split ratio.
 
 One JSON line comes back with the `handle` (a herdr pane ID like `w5:p9`, a cmux
-surface UUID, or a tmux session name) and the `backend`.
+surface UUID, or a tmux session name) and the `backend`. Remote results also
+include `host`; retain it with the handle and the remote session (`default`
+for the current launcher). Identical pane IDs can exist on different servers.
 
 ## 3. Report, then stop
 
 Tell the user in one line what was spawned and where — the label, the agent, and
-the tab. Then move on to whatever else they asked for.
+the tab; remotely include machine/session and workspace so they can find it
+in the same window. Then move on to whatever else they asked for.
 
 Do not wait for it, do not poll it, do not open a watcher, and do not start
 checking its output on your own initiative. The whole point of this mode is that
@@ -111,7 +117,9 @@ herdr agent list
 herdr agent read <pane-or-agent-name> --source recent-unwrapped --lines 120
 ```
 
-Prefix with `ssh <host>` for a remote one (`ssh oci-box herdr agent list`). For
+Prefix with `ssh <host>` for a remote one (`ssh oci-box herdr agent list`),
+even when it is visible in the same window: UI selection does not retarget
+the local CLI. Use the host/session paired with the returned handle. For
 tmux, `tmux capture-pane -pt <session>`; for a cmux surface,
 `cmux read-screen --surface <uuid> --scrollback`.
 

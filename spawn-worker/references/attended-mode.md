@@ -24,8 +24,10 @@ test "${HERDR_ENV:-}" = 1
 Lifecycle waits are herdr-only; cmux and tmux cannot signal "the worker
 stopped". If the backend would resolve to cmux or tmux, say attended mode is
 not available there and offer the plain spawn. A remote
-worker on a herdr host works — keep the `ssh <host>` prefix on every herdr
-command below.
+worker on a herdr host works — follow [remote preparation](remote-workers.md)
+first and keep `(host, session, handle)` together. Keep the `ssh <host>`
+prefix on every herdr command below, including when the worker is visible
+in the same local window. The local CLI remains bound to its own server.
 
 ## The one prompt addition
 

@@ -1,6 +1,6 @@
 ---
 name: orchestrate-workers
-description: Run a multi-task job as an orchestrator - split the work into tasks, gauge each task's difficulty, route each to its project's workspace, spawn workers on cheaper models in parallel, then either hand the tabs back and walk away (unattended, the default), or review every diff and close with a fresh-context strong-model review (attended). Use whenever the user asks to "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize this across workers/agents", or hands over a batch of related fixes/features - especially when the main session runs on an expensive model (Fable/Opus) and implementation should happen on cheaper workers. Use attended mode when the user says "attended", "review the work", "stay on call", "answer their questions", or asks you to commit the results. Not the auto-trigger for one delegated task (spawn-worker owns that), but once invoked always delegate — even a one-task or question-shaped prompt goes to a worker as-is, never answered in-session. A prompt that continues a task an open worker just did ("push the changes", "now also add X") goes to that worker as a follow-up prompt, not to a fresh spawn.
+description: Orchestrate a batch of tasks — split work, route by difficulty and project, and spawn workers in parallel. Unattended by default — report tabs and walk away. Attended mode reviews every diff and ends with a fresh-context strong-model review. Use for "orchestrate this", "act as orchestrator", "split this into tasks and assign to workers", "parallelize across agents", or a batch of related fixes/features. Use attended mode for "attended", "review the work", "stay on call", "answer their questions", or a request to commit the results. One delegated task normally routes to spawn-worker, but once this skill is invoked always delegate — even one-task or question-shaped prompts go to a worker, never answered in-session. Continue an open worker's task ("push the changes", "now also add X") through a follow-up prompt instead of a fresh spawn.
 ---
 
 # Orchestrate workers
@@ -175,9 +175,13 @@ waits work unchanged across workspaces: herdr handles are global within one
 herdr server.
 
 Workers on a remote box route the same way — same match rule, same labels —
-with the placement details in the routing doc's remote section. Handles live
-in the box's herdr server, so every wave gate and attended wait on one takes
-an `ssh <host>` prefix. Route there only when the user asks for the box, and
+with the placement details in the routing doc's remote section. Follow
+spawn-worker's remote preparation once per host before the first wave: wake
+OCI and wait for SSH, then reuse/enable/add the matching saved machine so
+remote tabs appear in the same local Herdr window. Handles still live in
+the box's herdr server: retain `(host, session, handle)` and use `ssh <host>`
+for every remote wave gate, attended wait, read, and follow-up. Route there
+only when the user asks for the box, and
 never for a task whose result has to land in the Mac's working tree: a
 remote worker edits the box's checkout, so attended review (§6) becomes
 reading the diff and committing over ssh.
@@ -316,19 +320,24 @@ mechanics are the herdr skill's (read it). Herdr-only — on cmux/tmux there
 is no prompt API, so spawn fresh as before.
 
 - **Know your workers.** The label → handle → task mapping in each batch's
-  report is the routing table. Keep it in this session's own notes across
+  report is the routing table; remote entries also need host and session.
+  Keep it in this session's own notes across
   batches — never a file or registry, spawn-worker's rule — for the whole
   session when `/start-orchestrator` is on. If compaction lost it,
   `herdr agent list` recovers live agents by `cwd` and `terminal_title` (the
-  agent's auto-title usually names the task).
+  agent's auto-title usually names the task). Recover remote agents with the
+  same command over SSH on each known host/session; the local CLI list is
+  not the UI's combined machine list.
 - **Check it can take the prompt.** `herdr agent get <handle>`: `idle`,
   `done`, or `working` can — `working` queues the prompt behind the current
   turn (Claude Code and Codex both do this), which is what "push the changes"
   usually wants anyway. `blocked` cannot: herdr rejects the submit with
   `agent_blocked`. Do not spawn a fresh worker into a blocked worker's
-  half-done edits either — report the block and its tab to the user. An
-  error means the worker is gone: spawn fresh, and if the new task depends on
-  what the old worker did, say so in the prompt in one sentence.
+  half-done edits either — report the block and its tab to the user. A
+  confirmed missing agent means the worker is gone: spawn fresh, and if the
+  new task depends on what the old worker did, say so in one sentence.
+  An SSH or server connection error does not establish that the worker is
+  gone; restore connectivity and inspect it before spawning a replacement.
 - **Send it in the user's words.** spawn-worker §1's prompt discipline is
   unchanged, and the worker already has the context, so a follow-up needs
   even less added than a spawn prompt. Unattended:

@@ -28,6 +28,11 @@ dashboard show quick-screen scores" edits market-pulse. (Tasks about note
 
 ## On a remote box
 
+Before any remote inspection or spawn, follow spawn-worker's
+[remote preparation](../../spawn-worker/references/remote-workers.md), once
+per host per batch. It owns `box up`, SSH readiness, and the saved-machine
+profile that exposes the remote default session in the same Herdr window.
+
 Same three steps, same labels — only where the worker lands changes: the
 box's copy of the project as the worker cwd (`/home/opc/projects/<name>` on
 oci-box; `~/skills`, `~/dotfiles` and the `~/notes` vault sit at its home
@@ -35,6 +40,10 @@ directory, as on the Mac), and the label on `--remote-workspace`, the remote
 counterpart of `--workspace-label` (mechanics in spawn-worker §2). A task
 matching no project keeps that flag's default workspace, which collects the
 host's stray workers.
+
+The machine profile's session must match the launcher (`default` currently);
+workspace labels do not select sessions. Keep host/session with every handle
+for wave waits and follow-ups, even though the UI presents machines together.
 
 oci-box carries a checkout of every project in the inventory below, each its
 own clone rather than a view of the Mac's tree — confirm with

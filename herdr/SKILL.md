@@ -1,19 +1,19 @@
 ---
 name: herdr
-description: "Control Herdr, a terminal multiplexer for coding agents. Use only when the user explicitly mentions Herdr or asks to use Herdr to inspect or control panes, tabs, workspaces, commands, or another agent. Do not use merely because a task could benefit from a background terminal, delegation, or parallel work. Requires HERDR_ENV=1."
+description: "Control Herdr, a terminal multiplexer for coding agents. Use only when the user explicitly mentions Herdr or asks to use Herdr to inspect or control panes, tabs, workspaces, commands, or another agent. Do not use merely because a task could benefit from a background terminal, delegation, or parallel work. Local control requires HERDR_ENV=1; explicit remote automation uses SSH."
 ---
 
 # Herdr
 
 Herdr organizes terminals into workspaces, tabs, and panes, recognizes coding agents running inside panes, and exposes the current session through the `herdr` CLI.
 
-Before issuing any control command, verify that this agent is running inside a Herdr-managed pane:
+Before issuing a local control command, verify that this agent is running inside a Herdr-managed pane:
 
 ```bash
 test "${HERDR_ENV:-}" = 1
 ```
 
-If the check fails, say that you are not running inside Herdr and stop. Do not inspect or control the focused Herdr session from outside Herdr.
+If the check fails, say that you are not running inside Herdr and stop local control. Do not inspect or control the focused Herdr session from outside Herdr. Explicit SSH automation against a requested remote host/session is allowed without this local gate.
 
 When the check passes, the `herdr` binary in `PATH` talks to the current session. Use it to inspect neighboring work, create terminal layout, start agents and commands, read output, and wait for state changes.
 
@@ -37,6 +37,7 @@ herdr terminal
 herdr notification
 herdr integration
 herdr session
+herdr machine
 ```
 
 Do not run bare `herdr` for discovery; it launches or attaches the TUI. Do not probe a mutating nested command by omitting arguments. Commands such as `herdr workspace create` are valid with defaults and will execute.
@@ -44,6 +45,31 @@ Do not run bare `herdr` for discovery; it launches or attaches the TUI. Do not p
 Most control commands return JSON. Read identifiers and state from those responses instead of predicting them.
 
 ## Understand layout, panes, and agents
+
+For remote workers in the same window, Herdr 0.9.0 supports saved SSH
+machines. `herdr machine list --json` returns profile IDs, SSH targets,
+sessions, and enabled state. Reuse the matching target/session; enable a
+disabled profile with `herdr machine enable <profile-id>`, or add a missing
+one with `herdr machine add <ssh-target> --label <label>` (default session).
+Use `--remote-session <name>` on `machine add` only for a named session.
+Added/enabled machines connect in existing local windows without stealing
+selection. Do not repeatedly add the same machine; duplicate profiles are
+possible. For OCI worker startup and launcher session limits, read
+[spawn-worker's remote preparation](../spawn-worker/references/remote-workers.md).
+
+Machines keep independent servers. Pane IDs and agent names can collide
+across machines/sessions, and selecting a machine in the UI does not retarget
+commands in an existing pane. Run remote automation via SSH against the
+intended session, keeping host/session with every ID. A dimmed remote pane
+is cached state, not evidence of a live worker. The inside-Herdr gate above
+protects local control; explicit SSH commands to a requested remote worker
+do not require the Mac caller to be in Herdr.
+
+`machine add` prepares the remote installation and server. Installation or
+incompatible-server replacement may require interactive approval; replacing
+a server stops its panes. Background reconnects do not resolve these prompts.
+Follow Herdr's reported setup action if a machine needs Attention; do not
+restart servers merely because version numbers differ.
 
 Choose the primitive that matches the job:
 
