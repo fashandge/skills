@@ -21,11 +21,10 @@ Use when the user asks to:
 
 ## Research Workflow
 
-This workflow has **three retrieval modes**:
+This workflow has **two retrieval modes**:
 
 1. **Default mode: index + search.** Use two parallel data sources: index browsing and keyword search. Run them concurrently (read section indices in parallel with search queries), then merge results in the union step.
 2. **Search-only mode: skip index.** If the user explicitly asks to skip the index, avoid index browsing, use only `notes-search`, and say in the final answer that index coverage was intentionally skipped.
-3. **Agent-engine mode: delegate retrieval to the AI agent search engine.** If the user explicitly asks to use the agent engine, skip index browsing and skip the multi-query FTS5 sweep. Instead, make a single call to `notes-search search "<topic>" --engine agent --json` and treat its results as the full candidate set. See **Track C** below.
 
 - **Index browsing** gives complete coverage of relevant folders and catches notes that use different vocabulary than any search query. It also provides note-type metadata and one-line summaries for quick relevance assessment without reading the full note.
 - **Keyword search** catches notes scattered across OTHER folders that index browsing wouldn't surface, and provides per-query rankings plus a DB-backed one-line `summary` field (when one exists) for reranking.
@@ -40,15 +39,6 @@ Use **search-only mode** when the user's prompt contains instructions such as:
 - "use the search engine only"
 
 When using search-only mode, compensate by running a broader query sweep than usual: add extra synonyms, title variants, bilingual terms, ticker/company variants when relevant, and sub-concepts. Search results include a `summary` field when a DB-backed note summary exists, so use that field to judge whether the topic is the note's primary subject instead of relying only on search rank, title, and snippets. For top-N requests, still apply the final top-N cap only after the `search-multi` fusion and the Step 1 shortlist filter.
-
-Use **agent-engine mode** when the user's prompt contains instructions such as:
-- "use the agent engine"
-- "use the AI agent search engine"
-- "use --engine agent"
-- "use agent search"
-- "delegate the search to the agent engine"
-
-In agent-engine mode, the agent engine has already done its own multi-query retrieval and ranking internally, so do **not** read the index and do **not** run any additional `notes-search` queries (FTS5 or QMD). See **Track C**, which points to `references/agent-engine-mode.md` for the full guidance.
 
 ### Output Destinations
 
@@ -234,21 +224,11 @@ Run `notes-search search-multi --help` and `notes-search search --help` for the 
 - **Check `per_query` totals in the JSON output.** Each query reports `total` matches vs `returned`. If a highly relevant query shows `total` far above `returned` (e.g., 30 returned of 104), re-run with a larger `--per-query-limit` or split it into narrower variants instead of silently losing candidates.
 - For large-scale research, raise both: `--per-query-limit 100 --limit 150` or higher for a broad candidate pool
 
-### Track C: Agent-Engine Retrieval (agent-engine mode only)
-
-**When agent-engine mode triggers, read `references/agent-engine-mode.md` and follow it** — it owns the full invocation guidance (`--limit` semantics, backend variants, worked example). The core invariants:
-
-- Make exactly one call — `notes-search search "<research topic>" --engine agent --json` (add `--limit N` for top-N asks; here it IS the final cap) — and skip Tracks A and B entirely.
-- Treat the returned ranked list as the final candidate set: no union, no reranking, no extra FTS5/QMD queries. Every returned note is the Step 2 reading list (see Step 2's no-drop rule).
-- Proceed directly to Step 2 → Step 3 → Step 4, and in the synthesis note that retrieval was delegated to the agent engine with index browsing and FTS5/QMD sweeps intentionally skipped.
-
 ## Shared Pipeline
 
-After retrieval, all modes converge on these steps. Agent-engine mode skips Step 1 (its list is already ranked and final).
+After retrieval, both modes converge on these steps.
 
 ### Step 1: Union, Deduplicate, and Rerank
-
-This step applies only to **default mode** and **search-only mode**.
 
 You now have candidates from one or two sources:
 - **Default mode:** index browsing (Track A) and keyword search (Track B)
@@ -279,7 +259,7 @@ Candidates are **unioned**, not intersected — a note appearing in *any* enable
 
 For small sets, read all notes directly. For large sets, batch by file size to stay within context limits.
 
-**Read what was selected — don't drop candidates by filename prior.** When the candidate set was chosen by Step 1 (default/search-only) or by the agent engine (Track C), every note on the list earned its slot. Do not skip notes mid-Step-2 based on filename, folder, or guessed redundancy ("looks like a clipping", "the analytical notes probably already cover this"). If the total is large, batch by `wc -c` and read across multiple batches — that is what batching is for. The only acceptable skip reason is a concrete observation made *after* reading: byte-identical duplicate, empty file, etc. This rule is especially load-bearing in **agent-engine mode**, where dropping notes by prior amounts to reranking the agent's output — which Track C forbids.
+**Read what was selected — don't drop candidates by filename prior.** Every note selected in Step 1 earned its slot. Do not skip notes mid-Step-2 based on filename, folder, or guessed redundancy ("looks like a clipping", "the analytical notes probably already cover this"). If the total is large, batch by `wc -c` and read across multiple batches — that is what batching is for. The only acceptable skip reason is a concrete observation made *after* reading: byte-identical duplicate, empty file, etc.
 
 **1. Estimate sizes** of candidate notes:
 
@@ -312,7 +292,7 @@ After gathering information (directly or via batch summaries):
 4. Support with specific evidence from notes — cite note titles when making claims
 5. Report coverage breadth (e.g., "Based on 45 notes across 3 batches from your vault...")
 6. Highlight any gaps or areas with limited coverage
-7. If search-only mode was used, mention that index browsing was intentionally skipped. If agent-engine mode was used, mention that retrieval was delegated to the `--engine agent` search and that index browsing plus FTS5/QMD sweeps were intentionally skipped.
+7. If search-only mode was used, mention that index browsing was intentionally skipped.
 8. Unless console-only mode is active (see **Output Destinations**), proceed to Step 4 to persist the wiki
 
 ### Step 4: Persist as Wiki (Default)
@@ -372,10 +352,6 @@ Same as top-N, scaled: index budget = N = 100; run `notes-search search-multi "i
 ### Search-only: "Find the top 10 notes about CPU stock investment, skip index"
 
 Do not read `root_index.md` or section indices. Run a broader-than-usual sweep — one `search-multi` call with the top-N example's queries plus extra variants like `"QCOM CPU"`, `"AI CPU"` — with `--json --limit 30`. Filter the fused shortlist for generic/cross-sector notes, verify sub-concept coverage, read, synthesize. In the final answer include: "Search-only mode used; index browsing was intentionally skipped, so notes that use unusual vocabulary may be undercovered."
-
-### Agent-engine: "Find the top 10 notes about CPU stock investment, use the agent engine"
-
-Read `references/agent-engine-mode.md` and follow its worked example: one `--engine agent --json --limit 10` call, then read every returned note in Step 2 and synthesize.
 
 ### Output destination examples
 
