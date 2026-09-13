@@ -1,6 +1,6 @@
 ---
 name: spawn-worker
-description: Spawn a coding agent (Claude Code, Codex, pi, or Gemini via Antigravity) in a new terminal tab — locally in the current herdr/cmux/tmux session, or on a remote box like oci-box — and walk away. No handoff protocol, no monitoring, no bookkeeping. This is the default way to hand work to another agent. Use when the user says "hand this off", "delegate this", "spawn a worker", "run this in another tab", "start an agent on this", "put a worker on it", "run it on the box", or "have codex/pi/gemini do this". An opt-in attended mode (herdr only) stays on call to answer the worker's questions via herdr's event-driven waits — use it when the user says "stay on call", "answer its questions", "unblock it if it gets stuck", or "watch for it getting blocked". For a batch of related tasks fanned out across several workers, route to the orchestrate-workers skill instead.
+description: Spawn a coding agent (Claude Code, Codex, DeepSeek Harness, pi, or Gemini via Antigravity) in a new terminal tab — locally in the current herdr/cmux/tmux session, or on a remote box like oci-box — and walk away. No handoff protocol, no monitoring, no bookkeeping. This is the default way to hand work to another agent. Use when the user says "hand this off", "delegate this", "spawn a worker", "run this in another tab", "start an agent on this", "put a worker on it", "run it on the box", or "have codex/dsh/deepseek/pi/gemini do this". An opt-in attended mode (herdr only) stays on call to answer the worker's questions via herdr's event-driven waits — use it when the user says "stay on call", "answer its questions", "unblock it if it gets stuck", or "watch for it getting blocked". For a batch of related tasks fanned out across several workers, route to the orchestrate-workers skill instead.
 ---
 
 # Spawn a worker in a new tab
@@ -74,9 +74,14 @@ preparation (the prompt file below is local; `-` works remotely too):
   --agent pi --remote-host oci-box --remote-cwd /home/opc/projects/<repo>
 ```
 
-Pick **pi** for very easy tasks without much judgment (simple script changes,
-moving files) and bulk mechanical sweeps, and avoid it when the task turns on
-judgment. Run it on MiniMax-M3 at high effort — pass
+Pick **DeepSeek Harness** (`--agent dsh`) for very easy tasks without much
+judgment (simple script changes, moving files) and bulk mechanical sweeps.
+It launches `dsh --profile dsh-tui` with the task as its startup prompt; the
+installed profile owns model, effort, and permissions, so omit those overrides.
+The executable and configured profile must exist on the worker host. Under
+orchestrate-workers, its routing table also uses dsh as a straightforward-coding
+fallback. If dsh is unavailable for a trivial task, use **pi** on MiniMax-M3 at
+high effort — pass
 `--model minimax/MiniMax-M3 --effort high`, since the script's pi default is
 still DeepSeek V4 Flash. **gemini** (Antigravity's `agy` CLI; the script's
 default of Gemini 3.7 Flash at high effort is right, so no model/effort flags
