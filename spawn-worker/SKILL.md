@@ -74,13 +74,17 @@ preparation (the prompt file below is local; `-` works remotely too):
   --agent pi --remote-host oci-box --remote-cwd /home/opc/projects/<repo>
 ```
 
-Pick **DeepSeek Harness** (`--agent dsh`) for very easy tasks without much
+Pick **DeepSeek Harness** (`--agent dsh --model DeepSeek-V41-Flash --effort high`)
+for very easy tasks without much
 judgment (simple script changes, moving files) and bulk mechanical sweeps.
-It launches `dsh --profile dsh-tui` with the task as its startup prompt; the
-installed profile owns model, effort, and permissions, so omit those overrides.
+It launches `dsh --profile dsh-tui` with the task as its startup prompt and a
+private model/effort overlay that preserves the profile's other settings.
+The launcher maps DeepSeek-V41-Flash to `deepseek-official/deepseek-flash`
+and xhigh effort to DeepSeek's native `max`. Omit permission overrides; the
+profile owns those settings.
 The executable and configured profile must exist on the worker host. Under
-orchestrate-workers, its routing table also uses dsh as a straightforward-coding
-fallback. If dsh is unavailable for a trivial task, use **pi** on MiniMax-M3 at
+orchestrate-workers, dsh at xhigh is the straightforward-coding fallback
+after Codex Terra xhigh is unavailable. If dsh is unavailable for a trivial task, use **pi** on MiniMax-M3 at
 high effort — pass
 `--model minimax/MiniMax-M3 --effort high`, since the script's pi default is
 still DeepSeek V4 Flash. **gemini** (Antigravity's `agy` CLI; the script's
