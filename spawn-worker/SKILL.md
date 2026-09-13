@@ -80,10 +80,10 @@ judgment (simple script changes, moving files) and bulk mechanical sweeps.
 It launches `dsh --profile dsh-tui` with the task as its startup prompt and a
 private model/effort overlay that preserves the profile's other settings.
 The launcher maps DeepSeek-V41-Flash to `deepseek-official/deepseek-flash`
-and xhigh effort to DeepSeek's native `max`. Omit permission overrides; the
+and accepts DeepSeek's native effort names: off, low, high, max. Omit permission overrides; the
 profile owns those settings.
 The executable and configured profile must exist on the worker host. Under
-orchestrate-workers, dsh at xhigh is the straightforward-coding fallback
+orchestrate-workers, dsh at max is the straightforward-coding fallback
 after Codex Terra xhigh is unavailable. If dsh is unavailable for a trivial task, use **pi** on MiniMax-M3 at
 high effort — pass
 `--model minimax/MiniMax-M3 --effort high`, since the script's pi default is

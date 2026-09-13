@@ -91,7 +91,7 @@ what's installed). Quota fallbacks use the route-specific thresholds below:
 | Task shape | Worker | Fallback |
 |---|---|---|
 | Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | DeepSeek Harness, DeepSeek-V41-Flash, high effort (`--agent dsh --model DeepSeek-V41-Flash --effort high`) | pi, MiniMax-M3, high effort (`--agent pi --model minimax/MiniMax-M3 --effort high`) if dsh is unavailable |
-| Straightforward self-contained coding task or fix — most coding lands here | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-5.6-terra, xhigh effort when Claude's overall session or weekly quota is ≥95% used; then DeepSeek Harness, DeepSeek-V41-Flash, xhigh effort (`--agent dsh --model DeepSeek-V41-Flash --effort xhigh`) if terra is unavailable |
+| Straightforward self-contained coding task or fix — most coding lands here | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-5.6-terra, xhigh effort when Claude's overall session or weekly quota is ≥95% used; then DeepSeek Harness, DeepSeek-V41-Flash, max effort (`--agent dsh --model DeepSeek-V41-Flash --effort max`) if terra is unavailable |
 | Simple judgment and writing, not coding (absorb an article, summarize news, write a wiki, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z") | claude, opus, medium effort (`--model opus --effort medium`) | none; no quota check |
 | Skill creation or edits (global `~/skills` or project-local `skills/`, always, regardless of gauged difficulty), taste-heavy work producing an original argument (a research article, an investment thesis), or research into the user's own notes vault (`/research-notes`, even when largely synthesis) | claude, Fable, medium effort (`--effort medium`) | codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`) when Fable's model-scoped quota is ≥95% used |
 | Complicated coding (nuanced, multi-file, or history-rewriting) — genuinely hard only; astra is expensive, so most coding stays on the opus row above | codex, gpt-6-astra, low effort (`--agent codex --model gpt-6-astra --effort low`) | none |
@@ -99,8 +99,8 @@ what's installed). Quota fallbacks use the route-specific thresholds below:
 
 **DeepSeek Harness** uses spawn-worker's `--agent dsh`, which launches the
 installed `dsh-tui` profile with a separate model/effort overlay per worker.
-Use DeepSeek-V41-Flash at high for trivial tasks and xhigh for the coding
-fallback; the launcher maps xhigh to DeepSeek's native `max` effort. Omit
+Use DeepSeek-V41-Flash at high for trivial tasks and max for the coding
+fallback. These are DeepSeek's native effort names. Omit
 permission flags: the profile still owns those settings. Trivial tasks need
 no Claude quota check. Unavailable means the selected worker cannot run
 because its executable/profile is missing, quota is exhausted, or a known
@@ -135,7 +135,7 @@ not a `→` fallback for any Claude route.
 Before each **opus-high coding** spawn run `claude-quota --json`. In `limits`,
 select only unscoped entries (`scope` is null) whose `kind` is `session` or
 `weekly_all`. Fall back to terra xhigh if either overall quota's `percent` is
-≥95; use DeepSeek-V41-Flash xhigh via dsh if terra is unavailable. Ignore all model-scoped quotas,
+≥95; use DeepSeek-V41-Flash max via dsh if terra is unavailable. Ignore all model-scoped quotas,
 including Fable's. Do not use `--check`:
 it checks every window. If an overall quota is missing or nonnumeric, report
 it as unavailable rather than substituting a model quota or treating it as zero.
