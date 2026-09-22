@@ -86,7 +86,7 @@ and accepts DeepSeek's native effort names: off, low, high, max. Omit permission
 profile owns those settings.
 The executable and configured profile must exist on the worker host. Under
 orchestrate-workers, dsh at max is the straightforward-coding fallback
-after Codex Terra xhigh is unavailable. If dsh is unavailable for a trivial task, use **pi** on MiniMax-M3 at
+after Codex Sol medium is unavailable. If dsh is unavailable for a trivial task, use **pi** on MiniMax-M3 at
 high effort — pass
 `--model minimax/MiniMax-M3 --effort high`, since the script's pi default is
 still DeepSeek V4 Flash. **gemini** (Antigravity's `agy` CLI; the script's

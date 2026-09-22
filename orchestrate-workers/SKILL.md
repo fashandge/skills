@@ -91,7 +91,7 @@ what's installed). Quota fallbacks use the route-specific thresholds below:
 | Task shape | Worker | Fallback |
 |---|---|---|
 | Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | codex, gpt-6-luna, xhigh effort (`--agent codex --model gpt-6-luna --effort xhigh`) | DeepSeek Harness, DeepSeek-V41-Flash, high effort (`--agent dsh --model DeepSeek-V41-Flash --effort high`) when codex is unavailable; then pi, MiniMax-M3, high effort (`--agent pi --model minimax/MiniMax-M3 --effort high`) if dsh is unavailable |
-| Straightforward self-contained coding task or fix — most coding lands here | claude, opus, medium effort (`--model opus --effort medium`) | codex, gpt-5.6-terra, xhigh effort when Claude's overall session or weekly quota is ≥95% used; then DeepSeek Harness, DeepSeek-V41-Flash, max effort (`--agent dsh --model DeepSeek-V41-Flash --effort max`) if terra is unavailable |
+| Straightforward self-contained coding task or fix — most coding lands here | claude, opus, medium effort (`--model opus --effort medium`) | codex, gpt-6-sol, medium effort (`--agent codex --model gpt-6-sol --effort medium`) when Claude's overall session or weekly quota is ≥95% used; then DeepSeek Harness, DeepSeek-V41-Flash, max effort (`--agent dsh --model DeepSeek-V41-Flash --effort max`) if sol is unavailable |
 | Genuinely hard coding (nuanced, multi-file, or history-rewriting) — hard only; most coding stays on the opus-medium row above | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-6-astra, low effort (`--agent codex --model gpt-6-astra --effort low`) when Claude's overall session or weekly quota is ≥95% used or opus is unavailable |
 | Simple judgment or summary, not coding and not wiki writing (summarize news, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z") | claude, opus, medium effort (`--model opus --effort medium`) | none; no quota check |
 | Writing wiki notes (`/wiki`, "write a wiki on X") or absorbing a note or article into the wiki (`/absorb`, "absorb this", "promote this raw note") | claude, opus, high effort (`--model opus --effort high`) | none; no quota check |
@@ -122,7 +122,7 @@ style on its own (`--settings '{"outputStyle": "Concise"}'`) — Fable workers
 keep the default style.
 
 For the codex routes, pass `--agent codex --model gpt-6-luna --effort xhigh`
-for the trivial-task route, `--agent codex --model gpt-5.6-terra --effort xhigh`
+for the trivial-task route, `--agent codex --model gpt-6-sol --effort medium`
 for the opus-medium coding fallback, `--agent codex --model gpt-6-astra --effort low` for
 the opus-high hard-coding route, and `--agent codex --model gpt-6-astra --effort high` for the
 Fable-medium judgment/writing route explicitly rather than relying on the spawn script's
@@ -138,8 +138,8 @@ not a `→` fallback for any Claude route.
 
 Before each **opus coding** spawn (medium or high) run `claude-quota --json`. In `limits`,
 select only unscoped entries (`scope` is null) whose `kind` is `session` or
-`weekly_all`. If either overall quota's `percent` is ≥95, fall back to terra
-xhigh for the opus-medium row (then DeepSeek-V41-Flash max via dsh if terra is
+`weekly_all`. If either overall quota's `percent` is ≥95, fall back to sol
+medium for the opus-medium row (then DeepSeek-V41-Flash max via dsh if sol is
 unavailable) or astra low for the opus-high hard-coding row. Ignore all
 model-scoped quotas, including Fable's. Do not use `--check`:
 it checks every window. If an overall quota is missing or nonnumeric, report
