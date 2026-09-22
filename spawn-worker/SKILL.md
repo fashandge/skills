@@ -74,9 +74,11 @@ preparation (the prompt file below is local; `-` works remotely too):
   --agent pi --remote-host oci-box --remote-cwd /home/opc/projects/<repo>
 ```
 
-Pick **DeepSeek Harness** (`--agent dsh --model DeepSeek-V41-Flash --effort high`)
+Pick **codex** on Luna (`--agent codex --model gpt-5.6-luna --effort xhigh`)
 for very easy tasks without much
 judgment (simple script changes, moving files) and bulk mechanical sweeps.
+**DeepSeek Harness** (`--agent dsh --model DeepSeek-V41-Flash --effort high`)
+is the trivial-task fallback when codex is unavailable.
 It launches `dsh --profile dsh-tui` with the task as its startup prompt and a
 private model/effort overlay that preserves the profile's other settings.
 The launcher maps DeepSeek-V41-Flash to `deepseek-official/deepseek-flash`
