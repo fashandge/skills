@@ -90,7 +90,7 @@ what's installed). Quota fallbacks use the route-specific thresholds below:
 
 | Task shape | Worker | Fallback |
 |---|---|---|
-| Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | codex, gpt-5.6-luna, xhigh effort (`--agent codex --model gpt-5.6-luna --effort xhigh`) | DeepSeek Harness, DeepSeek-V41-Flash, high effort (`--agent dsh --model DeepSeek-V41-Flash --effort high`) when codex is unavailable; then pi, MiniMax-M3, high effort (`--agent pi --model minimax/MiniMax-M3 --effort high`) if dsh is unavailable |
+| Very easy task without much judgment (simple script changes, moving files) or bulk mechanical sweeps | codex, gpt-6-luna, xhigh effort (`--agent codex --model gpt-6-luna --effort xhigh`) | DeepSeek Harness, DeepSeek-V41-Flash, high effort (`--agent dsh --model DeepSeek-V41-Flash --effort high`) when codex is unavailable; then pi, MiniMax-M3, high effort (`--agent pi --model minimax/MiniMax-M3 --effort high`) if dsh is unavailable |
 | Straightforward self-contained coding task or fix — most coding lands here | claude, opus, medium effort (`--model opus --effort medium`) | codex, gpt-5.6-terra, xhigh effort when Claude's overall session or weekly quota is ≥95% used; then DeepSeek Harness, DeepSeek-V41-Flash, max effort (`--agent dsh --model DeepSeek-V41-Flash --effort max`) if terra is unavailable |
 | Genuinely hard coding (nuanced, multi-file, or history-rewriting) — hard only; most coding stays on the opus-medium row above | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-6-astra, low effort (`--agent codex --model gpt-6-astra --effort low`) when Claude's overall session or weekly quota is ≥95% used or opus is unavailable |
 | Simple judgment or summary, not coding and not wiki writing (summarize news, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z") | claude, opus, medium effort (`--model opus --effort medium`) | none; no quota check |
@@ -121,7 +121,7 @@ CLI accepts is `fable` (currently Fable 5.1) — `fable-5` is rejected at startu
 style on its own (`--settings '{"outputStyle": "Concise"}'`) — Fable workers
 keep the default style.
 
-For the codex routes, pass `--agent codex --model gpt-5.6-luna --effort xhigh`
+For the codex routes, pass `--agent codex --model gpt-6-luna --effort xhigh`
 for the trivial-task route, `--agent codex --model gpt-5.6-terra --effort xhigh`
 for the opus-medium coding fallback, `--agent codex --model gpt-6-astra --effort low` for
 the opus-high hard-coding route, and `--agent codex --model gpt-6-astra --effort high` for the

@@ -74,7 +74,7 @@ preparation (the prompt file below is local; `-` works remotely too):
   --agent pi --remote-host oci-box --remote-cwd /home/opc/projects/<repo>
 ```
 
-Pick **codex** on Luna (`--agent codex --model gpt-5.6-luna --effort xhigh`)
+Pick **codex** on Luna (`--agent codex --model gpt-6-luna --effort xhigh`)
 for very easy tasks without much
 judgment (simple script changes, moving files) and bulk mechanical sweeps.
 **DeepSeek Harness** (`--agent dsh --model DeepSeek-V41-Flash --effort high`)
