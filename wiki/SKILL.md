@@ -11,14 +11,6 @@ Generate structured wiki articles in the user's Obsidian vault at `~/notes/wiki/
 
 > **Obsidian syntax**: This skill's defaults stay conservative — frontmatter, wikilinks, tables, plain prose. For richer Obsidian-specific syntax (callouts, embeds, block IDs, highlights, footnotes, Mermaid), consult the `obsidian-markdown` skill as a reference. Reach for **callouts** (`> [!abstract]`, `> [!note]`, `> [!warning]`) when the Overview block or a key-insight call-out would read better than a plain blockquote, and for **section embeds** (`![[Note Name#Heading]]`) when surfacing a source paragraph verbatim is clearer than paraphrasing it.
 
-## When to Use This Skill
-
-Trigger when user:
-- Says "write a wiki", "create a wiki", "generate a wiki"
-- Asks to turn a conversation or discussion into a wiki article
-- Says "/wiki" followed by a topic or description
-- Wants to document learnings, insights, or synthesized knowledge from the current session
-
 ## Step 1: Determine Content
 
 The user provides a description of what to generate. This is typically based on **previous discussions in the current session** — synthesizing answers, insights, and references that have already been explored.
@@ -27,7 +19,7 @@ The user provides a description of what to generate. This is typically based on 
 - Review the current conversation for relevant answers, analysis, and references
 - If the user mentions specific notes (via `@filename` or `<current_note>`), read those files
 - If backlinks or source documents are referenced, read them for additional context
-- Calling skills (e.g. `ask-chatbots`, `research-notes`) may hand over a temp-file path as the body source, and/or a coverage caveat to include — read the file yourself rather than expecting inlined content, and carry any caveat into the overview or body
+- Calling skills may hand over a temp-file path as the body source (`ask-chatbots`), a list of source notes already read with their paths (`research-notes`), and/or a coverage caveat — read the file yourself rather than expecting inlined content, cite every handed-over note in `## References`, and carry any caveat into the overview or body
 
 ## Step 2: Check the Vault — Merge Target in wiki, Source Notes in raw
 
@@ -51,13 +43,13 @@ Then split the returned candidates by path and judge each group yourself:
 - Cite every raw note actually used in `## References` with the `source:` annotation prefix (Step 3e).
 - A raw hit that is only tangential can be linked as a plain see-also reference or dropped — but a raw note on the *same question* as the article must never go unlinked.
 
-Skip this step only when the check was already done by the caller (e.g. the `/absorb` skill states it routed and deduped already — there the raw source is the input itself).
+Skip the retrieval when the caller already ran it: `/absorb` states it routed and deduped (the raw source is the input itself); `/research-notes` hands over the list of notes it read, so judge the `wiki/` entries in that list for merge-over-create and cite the `raw/` entries, rather than searching again.
 
 ## Step 2a: Choose Folder Location
 
 The wiki goes under `~/notes/wiki/`. If the caller already routed a target folder (e.g. the `/absorb` skill passes the folder it chose in its own routing step), use that folder and skip rules 1–2 below — re-deriving it would second-guess a decision the caller owns. Otherwise follow these rules **in order**:
 
-1. **Route via the generated wiki index first** — read `~/notes/index/wiki/root_index.md`. It opens with a **Section Tree** (each section linked with its assigned-note count), followed by one block per section with a `Description` — curated from the folder's `Overview of <Folder>` note where one exists (authoritative, states boundaries), otherwise generated (a hint). Pick the section whose Description fits the topic, **preferring the deepest section that fits**, and respect stated boundaries (e.g., market investing → `Investment/`, but taxes/benefits → `Life/`). **The Section Tree is coarser than the real folder tree**: small folder subtrees (≤20 notes) don't get their own section — their notes are listed in the nearest ancestor section — so the deepest section may be shallower than the deepest existing folder. Before finalizing, open the chosen section's index under `~/notes/index/wiki/section_indices/` and scan its notes' `Path`s and `Subsections:` line: if an existing deeper subfolder fits the topic better, place the note there instead of the section's own folder.
+1. **Route via the generated wiki index first** — read `~/notes/index/wiki/root_index.md`; its preamble explains how sections map to folders. Pick the **deepest section whose `Description` fits** and respect the boundaries those descriptions state (e.g., market investing → `Investment/`, but taxes/benefits → `Life/`). Sections are coarser than folders, so before finalizing open the chosen section's index under `~/notes/index/wiki/section_indices/` and scan its notes' `Path`s and `Subsections:` line: if an existing deeper subfolder fits better, place the note there.
 
 2. **Fall back to listing folders** when the index is missing or ambiguous:
    ```bash
@@ -97,9 +89,7 @@ The title, filename, and `# H1` heading must all be **identical**.
 /usr/bin/find -L ~/notes/ -name "<Title>.md"
 ```
 
-Two traps make the exact form load-bearing, and each guard covers one:
-- `~/notes` is a symlink: without `-L` (or the trailing slash on `~/notes/`), `find` returns zero hits for every filename, silently turning this check into an always-pass.
-- Environments with the rtk hook rewrite a bare `find` into `rtk find`, which does not support `-L` and ignores it — re-creating the always-pass. The absolute path `/usr/bin/find` bypasses the rewrite.
+Use this exact form: `~/notes` is a symlink, and plain `find` without `-L` (or the trailing slash) returns zero hits for every filename, silently turning the check into an always-pass. The absolute path keeps the call from being rewritten by any shell alias or hook.
 
 If this returns a hit, add a qualifier to the title and re-check.
 
@@ -140,7 +130,7 @@ tags:
 For tag consistency, check what sibling articles in the chosen folder already use before inventing new tags:
 
 ```bash
-awk '/^tags:/{f=1;next} /^---/{f=0} f&&/^  - /' "<chosen folder>"/*.md | sort | uniq -c | sort -rn
+awk '/^tags:/{f=1;next} /^---/{f=0} f&&/^  - /' "<chosen folder>"/*.md 2>/dev/null | sort | uniq -c | sort -rn
 ```
 
 ### 3b. Title and Overview
@@ -241,7 +231,7 @@ Before finishing, verify:
 
 - [ ] Checked the vault (both trees) first: wiki hits judged for merge-over-create, raw hits on the same topic read and cited as `source:` references
 - [ ] **Title = filename = H1** — all three are identical
-- [ ] Title is globally unique (verified with `/usr/bin/find -L ~/notes/ -name "<Title>.md"` — the absolute path, `-L`, and trailing slash are all required, see above), concrete, and contains no `/`, `\`, `#`, `^`, `[`, `]`, `|`, `:` characters
+- [ ] Title is globally unique (verified with the exact `find` command in Step 2b), concrete, and contains no `/`, `\`, `#`, `^`, `[`, `]`, `|`, `:` characters
 - [ ] Overview section answers "what is this, why does it exist?"
 - [ ] Table of contents uses `[[#Heading Text]]` with exact heading matches, and heading text is unique document-wide
 - [ ] No quotes or special characters in heading text that could break links
