@@ -26,13 +26,12 @@ When in doubt, run a candidate query with `--limit 5` and skim the top results: 
 
 Build a query list from the kept terms — each query is a separate AND expression. Start with the broadest single-term queries (priorities 1–2), add 2-term combinations only if a single-term query returns too much, then run the whole plan through one `search-multi` call (it dedupes by filepath and rank-fuses with RRF server-side).
 
-**Example query plan for "光通信" (optical communications):**
+**Example query plan for "光通信产业趋势" (optical communications industry trends) — an industry topic, so no ticker queries:**
 
 ```bash
 notes-search search-multi \
   "光通信" "光互连" "optical communications" "silicon photonics" "硅光" "CPO" \
   "光通信 CPO" "硅光 InP" "CPO CW laser" "光模块 1.6T" \
-  "LITE" "TSEM PH18" \
   --json --limit 30
 ```
 

@@ -1,6 +1,6 @@
 # FTS5 Search Syntax for `notes-search`
 
-Use this reference only when a research prompt asks for explicit search-query constraints that are easier to express with FTS5 syntax. In most research tasks, keep using multiple ordinary `notes-search search "..."` queries, then union, dedupe, and rerank. Implementation details live in `~/projects/notes/search`.
+Use this reference only when a research prompt asks for explicit search-query constraints that are easier to express with FTS5 syntax. In most research tasks, keep using the ordinary multi-query `notes-search search-multi` sweep, then filter and rerank the fused list. Implementation details live in `~/projects/notes/search`.
 
 ## When to Use Advanced FTS5
 

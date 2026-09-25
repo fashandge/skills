@@ -1,3 +1,5 @@
+> **Historical record (2026-05).** These rounds predate `search-multi`/RRF fusion, the summary-field ranking, and the dual-tree index; the "principle N" and "--limit" references below describe an older SKILL.md. Kept for the regression lessons (ticker queries, thesis-specificity ranking, diversity criteria all regressed). Judge the current skill with `tests/README.md`, not this file.
+
 # research-notes SKILL.md Iteration Plan
 
 ## Round 1
