@@ -95,7 +95,8 @@ what's installed). Quota fallbacks use the route-specific thresholds below:
 | Genuinely hard coding (nuanced, multi-file, or history-rewriting) — hard only; most coding stays on the opus-medium row above | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-6-astra, low effort (`--agent codex --model gpt-6-astra --effort low`) when Claude's overall session or weekly quota is ≥95% used or opus is unavailable |
 | Simple judgment or summary, not coding and not wiki writing (summarize news, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z") | claude, opus, medium effort (`--model opus --effort medium`) | none; no quota check |
 | Writing wiki notes (`/wiki`, "write a wiki on X") or absorbing a note or article into the wiki (`/absorb`, "absorb this", "promote this raw note") | claude, opus, high effort (`--model opus --effort high`) | none; no quota check |
-| Skill creation or edits (global `~/skills` or project-local `skills/`, always, regardless of gauged difficulty), taste-heavy work producing an original argument (a research article, an investment thesis), or research into the user's own notes vault (`/research-notes`, even when largely synthesis) | claude, Fable, medium effort (`--effort medium`) | codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`) when Fable's model-scoped quota is ≥95% used |
+| Taste-heavy or judgment-heavy work producing an original argument (a research article, an investment thesis), or research into the user's own notes vault (`/research-notes`, even when largely synthesis) | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`) when Claude's overall session or weekly quota is ≥95% used or opus is unavailable |
+| Skill creation or edits (global `~/skills` or project-local `skills/`, always, regardless of gauged difficulty) | claude, Fable, medium effort (`--effort medium`) | codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`) when Fable's model-scoped quota is ≥95% used |
 | Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator — codex gpt-6-astra high when the implementers were Claude, pi, or DeepSeek, claude Fable medium when they were codex; a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus workers) | none |
 
 **DeepSeek Harness** uses spawn-worker's `--agent dsh`, which launches the
@@ -112,10 +113,10 @@ The dedicated skill-editing, wiki/absorb, and judgment/research rows still
 take precedence over the trivial-task row.
 
 For Claude workers, Fable at low effort is the spawn script's default, so
-every route here passes flags explicitly: Fable-medium routes pass
+every route here passes flags explicitly: the Fable-medium skill-editing route passes
 `--effort medium`; the opus rows pass `--model opus --effort medium`
 (straightforward coding, simple judgment/summary) or `--model opus --effort high`
-(hard coding, wiki writing, absorb). The Fable model value the
+(hard coding, taste/judgment-heavy writing, vault research, wiki writing, absorb). The Fable model value the
 CLI accepts is `fable` (currently Fable 5.1) — `fable-5` is rejected at startup
 ("selected model may not exist"). The script launches bare-`opus` workers with the Concise output
 style on its own (`--settings '{"outputStyle": "Concise"}'`) — Fable workers
@@ -125,7 +126,7 @@ For the codex routes, pass `--agent codex --model gpt-6-luna --effort xhigh`
 for the trivial-task route, `--agent codex --model gpt-6-sol --effort medium`
 for the opus-medium coding fallback, `--agent codex --model gpt-6-astra --effort low` for
 the opus-high hard-coding route, and `--agent codex --model gpt-6-astra --effort high` for the
-Fable-medium judgment/writing route explicitly rather than relying on the spawn script's
+opus-high taste/judgment route and the Fable-medium skill-editing route explicitly rather than relying on the spawn script's
 codex default. Kimi is no longer available (no subscription); use only the
 fallbacks specified in the table.
 
@@ -136,16 +137,18 @@ the user explicitly asks for gemini workers, and then for the tasks they name �
 or the whole batch if that is what they asked. It needs no quota gate and is
 not a `→` fallback for any Claude route.
 
-Before each **opus coding** spawn (medium or high) run `claude-quota --json`. In `limits`,
+Before each **opus coding** spawn (medium or high) and each **opus-high
+taste/judgment** spawn run `claude-quota --json`. In `limits`,
 select only unscoped entries (`scope` is null) whose `kind` is `session` or
 `weekly_all`. If either overall quota's `percent` is ≥95, fall back to sol
 medium for the opus-medium row (then DeepSeek-V41-Flash max via dsh if sol is
-unavailable) or astra low for the opus-high hard-coding row. Ignore all
+unavailable), astra low for the opus-high hard-coding row, or astra high for
+the opus-high taste/judgment row. Ignore all
 model-scoped quotas, including Fable's. Do not use `--check`:
 it checks every window. If an overall quota is missing or nonnumeric, report
 it as unavailable rather than substituting a model quota or treating it as zero.
 
-Before each **Fable** spawn run `claude-quota --json`. In `limits`, select only
+Before each **Fable** (skill-editing) spawn run `claude-quota --json`. In `limits`, select only
 entries whose `scope.model.display_name` is `Fable` and fall back to astra high
 if any selected entry's `percent` is ≥95. Ignore shared session/weekly windows
 and other models' quotas for this route. Do not use `--check` for Fable: it
