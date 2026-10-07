@@ -106,6 +106,13 @@ projects are grouped so the confusable ones sit next to each other.
 - **browser** — logged-in Chrome automation over the Chrome DevTools
   Protocol; the fetch layer other projects use for bot-hardened sites.
   Keywords: CDP, logged_in_chrome, real-browser scraping.
+- **solarized-web** — Chrome extension (Manifest V3) that recolors every web
+  page to Solarized Light in OKLab: in-place stylesheet rewriting, dark-site
+  inversion, Atkinson Hyperlegible font, per-site exclusions. Route here only
+  for changes to the extension itself; giving another project's UI a
+  Solarized theme edits that project (e.g. market-pulse).
+  Keywords: extension, content.js, colors.js, popup, recolor, excluded
+  sites, screenshot_sites.py.
 - **skills** (`~/skills`) — global agent skills, one `<name>/SKILL.md` per
   folder, symlinked as `~/.claude/skills` and `~/.codex/skills`. Global
   skills only: a project-level skill (a `skills/<name>/` folder inside a
