@@ -93,7 +93,15 @@ projects are grouped so the confusable ones sit next to each other.
   stock analysis, which belongs to stock_picker. Keywords: notes-search,
   index, vault search engine, organize inbox.
 - **clipping** — web-clipping CLI: URL → markdown with YAML frontmatter.
-  Keywords: clip.py, normalize.
+  Route here only for the command-line clipper; anything about the browser
+  extension goes to obsidian-clipper. Keywords: clip.py, normalize.
+- **obsidian-clipper** — personal fork of the Obsidian Web Clipper browser
+  extension (TypeScript, webpack; Chrome/Firefox/Safari): local-vault-folder
+  saves, "clip selection" context menu, auto-save on open, X/Twitter post
+  extractor, templates. Route here for any task about the Web Clipper
+  extension — its popup, settings, templates, or how a page clips when saved
+  from the browser. Keywords: Web Clipper, extension, popup, local vault
+  folder, x-post-extractor, content.ts, background.ts, upstream rebase.
 - **startups** — research and ideation writing workspace on startups and
   business models; analysis and notes, not software.
 
