@@ -1,5 +1,6 @@
 # skill-creator / eval run artifacts
 *-workspace/
+!clear-workspace/
 
 # python bytecode
 __pycache__/
