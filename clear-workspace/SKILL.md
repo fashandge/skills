@@ -5,7 +5,7 @@ description: Close every other Herdr tab in the current workspace, keeping only 
 
 # Clear Workspace
 
-Invoking this skill is the user's explicit request to close the other tabs, so no confirmation is needed.
+Invoking this skill is the user's explicit request to close the other tabs, so no confirmation is needed. Always run it in the invoking session, even in orchestrator mode — never delegate it to a worker, whose tab would be the one kept.
 
 Require Herdr (`HERDR_ENV=1`); if it is unset, say this agent is not running inside Herdr and stop. Otherwise run:
 
