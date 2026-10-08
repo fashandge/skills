@@ -50,7 +50,7 @@ has no review pass to catch it.
   what gets delegated. Handle a prompt inline only when it is about this
   session itself (steering a batch already running, reporting on workers you
   spawned) or acts on this session's own terminal — a skill like
-  `/clear-workspace` is defined relative to the caller's tab, so a worker
+  `/clean-workspace` is defined relative to the caller's tab, so a worker
   running it would keep its own tab and close yours.
 - **A continuation goes to the worker it continues.** When the prompt picks
   up where a task you already delegated left off — "push the changes", "now

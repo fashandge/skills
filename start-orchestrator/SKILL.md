@@ -41,7 +41,8 @@ The mode stays on through all of these:
 
 - prompts about this session itself — steering a batch already running,
   reporting on workers you spawned, an attended review round in progress,
-  or a skill that acts on this session's own tab such as `/clear-workspace`.
+  or a skill that acts on this session's own tab or workspace such as
+  `/clean-workspace` or `/close-workspaces`.
   orchestrate-workers already carves these out; nothing new here.
 - prompts that opt out for one turn: "answer this yourself", "directly:",
   "no workers for this one", or any equivalent "unless specified otherwise"
