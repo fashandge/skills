@@ -1,13 +1,14 @@
 ---
 name: close-others
-description: Close every other Herdr workspace and every other tab in the current workspace, leaving only the tab this agent runs in — a shorthand for running close-workspaces then clean-workspace. Use when the user invokes "/close-others" or asks to close everything except this tab in Herdr.
+description: Close every other Herdr workspace and every other tab here, keeping only this agent's tab. Use for "/close-others" or "close everything except this tab in Herdr".
 ---
 
-# Close Others
+Run this yourself, now, without confirming; never delegate it to a worker, whose tab would be the one kept. Report its output.
 
-Invoking this skill is the user's explicit request for both sub-skills, so no confirmation is needed. Run it in the invoking session, never a worker.
-
-1. Follow the `close-workspaces` skill.
-2. Then follow the `clean-workspace` skill.
-
-If the first step stops because Herdr is unavailable, skip the second. Report what each step closed in one combined summary.
+```bash
+[ "$HERDR_ENV" = 1 ] || { echo "not running inside Herdr"; exit 0; }
+herdr workspace list | jq -r --arg me "$HERDR_WORKSPACE_ID" '.result.workspaces[] | select(.workspace_id != $me) | "\(.workspace_id)\t\(.label)"' \
+  | while IFS=$'\t' read -r w l; do herdr workspace close "$w" && echo "closed workspace $w ($l)"; done
+herdr tab list --workspace "$HERDR_WORKSPACE_ID" | jq -r --arg me "$HERDR_TAB_ID" '.result.tabs[].tab_id | select(. != $me)' \
+  | while read -r t; do herdr tab close "$t" && echo "closed tab $t"; done
+```
