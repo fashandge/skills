@@ -1,0 +1,87 @@
+---
+name: signal-digest-review
+description: Daily quality review of the previous day's signal-digest runs during a hill-climbing period. Reads each run's report, shortlist, discarded log and pick log, scores the picks against the user's two goals (investment return with controlled risk; AI technology and industry trends for learning and startup ideas), hunts for misses, spot-checks one claim, checks pipeline health, and writes a short scorecard plus at most one improvement suggestion to a running list. Use when the user asks to "review yesterday's digest", "score the signal digest", "how did the digest do", or when the signal-digest-review LaunchAgent runs it unattended. Does not edit the signal-digest skill; changes are batched by the user.
+---
+
+# signal-digest-review
+
+A reviewer of the `signal-digest` skill's daily output. The digest's goal is
+in `~/skills/signal-digest/SKILL.md` under "Goal"; read that section first and
+judge against it, not against your own taste. The point of the review period
+(about 10 days) is to learn whether the skill finds the vital few items and
+where it fails, so the user can change it in batches with evidence.
+
+## Inputs
+
+The runner (`news.src.signal_digest.review_daily`) names the date and the run
+directories to review, each with `report.md`, `shortlist.md`, `discarded.md`,
+`manifest.json` and `scored.jsonl`. Read, in this order and nothing else in bulk:
+
+1. `report.md` of each run.
+2. The first 30 items of each `shortlist.md` and the first 10 lines of each
+   `discarded.md`, looking for anything that beats a pick.
+3. `manifest.json` for source errors, counts, and the picks.
+4. `~/projects/news/data/signal_digest/reviews/feedback.md` if it exists: the
+   user's own marks on earlier picks (`[x]` useful, `[-]` not). Their judgment
+   outranks yours; when a mark disagrees with your score, say so and defer.
+5. Earlier scorecards in `reviews/` only to check whether a finding repeats.
+
+Open an item's full content through its `ref` or URL only when a decision
+turns on it. One web search per report for the spot-check, no more.
+
+## Checklist
+
+Answer every point in one or two sentences, with the item linked.
+
+1. **Picks vs goal.** For each pick: would the user regret not knowing this?
+   Did it bear on a holding or premise, or change what is possible or what it
+   costs? A sentiment reading or a benchmark bump scores low.
+2. **Misses.** The best unpicked item in the shortlist top 30 and discarded top
+   10, and whether it should have beaten a pick. Items on a holding count double.
+3. **Repeats and developments.** For any pick marked as a development of an
+   earlier story, was the "what changed" real, or a new voice on known facts?
+4. **Spot-check.** One factual claim per report, against a primary source. Say
+   confirmed, reframed or wrong.
+5. **Format.** Word count against the 800/1,200 budget, TL;DR standing alone,
+   link labels naming the real source, Near misses naming the best unpicked
+   investing item when Investing had fewer than two picks.
+6. **Pipeline health.** Source errors, stale brief or X Today, AI-news items
+   with no body, retweets still ending in "…", and the Jev rank and
+   `keep_reason` of each pick (from `scored.jsonl`; a pick below the keep line
+   is a filter miss worth noting).
+7. **One suggestion at most.** The single change with the best evidence from
+   this day, appended to `reviews/suggestions.md` as one line with the date and
+   the evidence link. If the day shows nothing new, append nothing.
+
+## Output
+
+Write `~/projects/news/data/signal_digest/reviews/<YYYY-MM-DD>.md`:
+
+```markdown
+# Digest review — <date> (runs: <ids>)
+
+Score: Investing <0-2> · AI <0-2> · Misses <0-2> · Format <0-2> · Pipeline <0-2> → <total>/10
+
+## Picks
+- <run id> · <pick title> — <score and one-sentence why> ([source](<link>))
+
+## Misses
+- <item> — <why it should have beaten a pick, or "none found">
+
+## Spot-check
+- <claim> — confirmed / reframed / wrong ([primary](<link>))
+
+## Pipeline
+- <errors, stale sources, stubs, Jev ranks of picks>
+
+## Suggestion
+<one line, or "none today">
+```
+
+Scores: 2 = met the goal, 1 = partly, 0 = failed; `Misses` 2 means none found.
+Under 300 words. Also append the day's picks to `reviews/feedback.md` as
+`- [ ] <date> <run id> · <title> (<link>)` when they are not there yet, so the
+user can mark them. Do not edit `~/skills/signal-digest/SKILL.md` or the
+pipeline; the user applies changes in batches on about day 5 and day 10.
+
+In chat, reply with the score line and the suggestion, plus the file path.
