@@ -1,6 +1,6 @@
 ---
 name: signal-digest
-description: Power-law digest of the user's information feeds — collect X For You + Following, the Reddit home feed and the AI-news daily brief (or any JSONL list of items), prefilter cheaply with TypeSafe's Jev scoring model, then pick the vital few items that carry most of the value for investing (return with controlled risk), important AI technology advances and industry trends, startup ideas and big general concepts, and write a short report of key takeaways. Use whenever the user asks for "my digest", "what matters in my feeds today", "filter my feeds", "the most important posts across X/Reddit/AI news", "apply the power law to my feeds", "signal vs noise from my sources", or wants a cross-source summary of their feeds rather than one feed — even if they don't name this skill. For a single X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
+description: Power-law digest of the user's information feeds — by default X For You + Following, the Reddit home feed and the AI-news daily brief, or any inputs the user names instead (e.g. "the latest 50 posts in my vault", a notes folder, a JSONL list, an X search or subreddit fetched first) — prefilter cheaply with TypeSafe's Jev scoring model, then pick the vital few items that carry most of the value for investing (return with controlled risk), important AI technology advances and industry trends, startup ideas and big general concepts, and write a short report of key takeaways. Use whenever the user asks for "my digest", "what matters in my feeds today", "filter my feeds", "the most important posts across X/Reddit/AI news", "apply the power law to my feeds", "signal vs noise from my sources", wants a cross-source summary of their feeds rather than one feed, or asks to "digest" / "find what matters in" any set of posts or notes — even if they don't name this skill. To just fetch or summarize one X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
 ---
 
 # signal-digest
@@ -25,7 +25,7 @@ them in three stages, each cheaper per item than the next one is:
 cd ~/projects && /opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python -m news.src.signal_digest.run run
 ```
 
-That collects all four default sources (`x_for_you`, `x_following`,
+With no arguments it collects all four default sources (`x_for_you`, `x_following`,
 `reddit_home`, `ai_news`), filters with Jev, and prints one JSON object with
 `run_dir`, per-source counts and errors, and the `shortlist` path. It takes a few
 minutes because X article enrichment and Reddit drive a browser. Run it with
@@ -34,9 +34,6 @@ minutes because X article enrichment and Reddit drive a browser. Run it with
 Other invocations you will need:
 
 ```bash
-# a subset of sources, or extra items from any JSONL/JSON list (generic sources)
-… run --sources x_for_you,ai_news --input ~/feeds/hn.jsonl:hn
-
 # skip Jev and pass every item through (small hauls, or Jev down / no key)
 … run --filter none
 
@@ -47,6 +44,34 @@ Other invocations you will need:
 `-h` on the module and on each subcommand is the authority on flags (counts,
 thresholds such as `--min-keep` and `--max-keep`, `--profile`, model). Don't
 restate them here.
+
+## Choose the inputs
+
+Use the default feeds only when the user names no inputs. When they do name
+some, digest exactly those. `--input TARGET[:NAME]` takes anything as its own source and is
+repeatable. Giving it drops the default feeds unless you also pass
+`--sources default` (or a list such as `--sources x_for_you,ai_news`).
+`--input-limit N` keeps the newest N per input.
+
+| The user asks for | Run |
+|---|---|
+| nothing specific ("my digest") | `run` |
+| some of the built-in feeds | `run --sources x_following,ai_news` |
+| "the latest 50 posts in my vault" | `run --input ~/notes/raw/:vault --input-limit 50` |
+| a vault folder, a note, or a glob | `--input ~/notes/wiki/AI/:ai_wiki`, `--input '~/notes/raw/**/*NVDA*.md:nvda'` |
+| notes picked by topic or meaning | find them with `/research-notes`, write their paths one per line to a scratch file, then `--input @paths.txt:topic` |
+| an X search, an account, or a subreddit | fetch first with `fetch-x-posts` / `fetch-reddit-posts` ("fetch only"), then `--input` the JSONL or the output folder |
+| any other list (RSS export, HN, a CSV turned into JSONL) | write JSONL with `title`, `text`, `url`, `author`, `created_at` and `--input` it |
+| their feeds plus something else | `run --sources default --input …` |
+
+In the vault, "posts" means clippings and ad hoc notes in `raw/`. `wiki/` holds
+curated notes, and the root also holds generated `index/` notes, so don't point
+at the whole vault for "latest posts". Each document becomes one item (title
+from frontmatter or the first heading, a `summary` field leads the text, `ref` is
+the note's absolute path). The newest are chosen by file modification time.
+Small hauls (a dozen items or fewer) don't need the prefilter, so add
+`--filter none`. Name the inputs in the report's verdict line whenever they are
+not the default feeds.
 
 **Failure handling.** One broken source doesn't stop the run. It shows up in
 `collect.sources.<name>.error`; report it and carry on with the rest. If the
@@ -66,7 +91,8 @@ the output is not today, say how old the brief is.
 Read `shortlist.md` (the survivors, with signals and text up to 1,500
 characters) and nothing else in bulk. It is ordered by Jev value, then VERIFY,
 UNCERTAIN and UNSCORED items. For an item you might pick, open its full content
-through `ref`: a `raw/…md` Reddit post, or a line of the raw X JSONL. Skim the
+through `ref`: a `raw/…md` Reddit post, a line of the raw X JSONL, or the
+absolute path of a note or document input. Skim the
 top of `discarded.md` once per run as a recall check, and pull back anything the
 filter wrongly dropped.
 
@@ -143,14 +169,17 @@ Write `report.md` into the run directory with this structure:
 
 ## Investing
 ### <Takeaway as a claim>
-What it says (source, author, date, engagement) · which holding or premise it bears on (for or against) · what it changes or why it changes nothing · verification result with link.
+Source: [<author>, <source>, <date>](<link>) · also: [<other source>](<link>)
+What it says (engagement) · which holding or premise it bears on (for or against) · what it changes or why it changes nothing · verification result with link.
 
 ## Big ideas
 ### <Concept name>
-The idea in one sentence · the forms it takes (including ones from this haul) · why it's worth holding onto.
+Source: [<author>, <source>, <date>](<link>)
+The idea in one sentence · the forms it takes (including ones from this haul, each linked) · why it's worth holding onto.
 
 ## AI advances, trends & ideas
 ### <Takeaway>
+Source: [<author>, <source>, <date>](<link>)
 …
 
 ## Dropped
@@ -158,6 +187,15 @@ The idea in one sentence · the forms it takes (including ones from this haul) �
 
 Sources: <links>
 ```
+
+**Every pick gets a clickable `Source:` line** right under its heading, and it
+uses the links shown on that item's `links:` line in `shortlist.md`. That line
+holds the post URL and, for a vault note or other local document, an
+`obsidian://` or `file://` link that opens it. Link the note itself, and its
+original URL too when it has one. Give every item you folded into a pick
+(`also_in`, supporting evidence) its own link. Copy links from the shortlist
+rather than building them by hand, and never link a URL you didn't see. When an
+item has no link (`links: none`), say so and cite it by author and date.
 
 The reader is a strong engineer, not a finance specialist. Expand jargon on first
 use, give every figure its source and date, and label fiscal years. **Write the
