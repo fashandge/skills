@@ -1,6 +1,6 @@
 ---
 name: signal-digest
-description: Power-law digest of the user's information feeds — by default X For You + Following, the Reddit home feed and the AI-news daily brief, or any inputs the user names instead (e.g. "the latest 50 posts in my vault", a notes folder, a JSONL list, an X search or subreddit fetched first) — prefilter cheaply with TypeSafe's Jev scoring model, then pick the vital few items that carry most of the value for investing (return with controlled risk), important AI technology advances and industry trends, startup ideas and big general concepts, and write a short report of key takeaways. Use whenever the user asks for "my digest", "what matters in my feeds today", "filter my feeds", "the most important posts across X/Reddit/AI news", "apply the power law to my feeds", "signal vs noise from my sources", wants a cross-source summary of their feeds rather than one feed, or asks to "digest" / "find what matters in" any set of posts or notes — even if they don't name this skill. To just fetch or summarize one X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
+description: Power-law digest of the user's information feeds — by default X For You + Following, the Reddit home feed, the AI-news daily brief and X's "Today's News" stories, or any inputs the user names instead (e.g. "the latest 50 posts in my vault", a notes folder, a JSONL list, an X search or subreddit fetched first) — prefilter cheaply with TypeSafe's Jev scoring model, then pick the vital few items that carry most of the value for investing (return with controlled risk), important AI technology advances and industry trends, startup ideas and big general concepts, and write a short report of key takeaways. Use whenever the user asks for "my digest", "what matters in my feeds today", "filter my feeds", "the most important posts across X/Reddit/AI news", "apply the power law to my feeds", "signal vs noise from my sources", wants a cross-source summary of their feeds rather than one feed, or asks to "digest" / "find what matters in" any set of posts or notes — even if they don't name this skill. To just fetch or summarize one X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
 ---
 
 # signal-digest
@@ -25,8 +25,8 @@ them in three stages, each cheaper per item than the next one is:
 cd ~/projects && /opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python -m news.src.signal_digest.run run
 ```
 
-With no arguments it collects all four default sources (`x_for_you`, `x_following`,
-`reddit_home`, `ai_news`), filters with Jev, and prints one JSON object with
+With no arguments it collects all five default sources (`x_for_you`, `x_following`,
+`reddit_home`, `ai_news`, `x_today`), filters with Jev, and prints one JSON object with
 `run_dir`, per-source counts and errors, and the `shortlist` path. It takes a few
 minutes because X article enrichment and Reddit drive a browser. Run it with
 `run_in_background` and wait for the notification.
@@ -107,7 +107,10 @@ TYPESAFE_API_KEY=...` to `~/.config/secrets.env`). Tell the user, then re-run
 project's stored session; if it has expired, refresh it with `python
 ~/projects/browser/src/refresh_state.py reddit.com`. The AI-news source reads the
 newest brief written by the 8am `zhihu-ai-news` LaunchAgent. If `brief_date` in
-the output is not today, say how old the brief is.
+the output is not today, say how old the brief is. The X Today source reads the
+newest "Today's News" widget stories saved by the 9am `x-today-news` LaunchAgent
+(Grok-written summaries of X discussion — treat them as leads, not sources); if
+`fetched` (YYYYMMDD_HHMM) in its source entry is not today, say so.
 
 ## Read selectively (token discipline)
 
