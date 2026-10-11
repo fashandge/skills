@@ -10,6 +10,20 @@ Unified interface over the `news` project's X fetchers (no scraping, no API toke
 Fetching is the means, not the deliverable: by default a run ends with a written
 **summary** of the haul (see below), not "here are the files".
 
+## Step 0 — prune stale data (every run, before fetching)
+
+Start every invocation by deleting non-timeline data older than 7 days:
+
+```bash
+/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python ~/skills/fetch-x-posts/prune_old_data.py
+```
+
+It removes `x_search/<query>/` folders whose newest file is >7 days old and
+`x_home_feed/*/home_*.jsonl` snapshots >7 days old, and never touches
+`user_tweets/` (account timelines are a resumable cache). It prints a JSON report
+(`removed_dir_count`, `removed_file_count`); `--dry-run` previews, `--days N`
+changes the window. Don't skip it on "fetch only" runs.
+
 ## Modules covered
 
 | Task | Module | Auth | Data location |
