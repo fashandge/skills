@@ -108,7 +108,7 @@ project's stored session; if it has expired, refresh it with `python
 ~/projects/browser/src/refresh_state.py reddit.com`. The AI-news source reads the
 newest brief written by the 8am `zhihu-ai-news` LaunchAgent. If `brief_date` in
 the output is not today, say how old the brief is. The X Today source reads the
-newest "Today's News" widget stories saved by the 9am `x-today-news` LaunchAgent
+newest "Today's News" widget stories saved by the 8:50am `x-today-news` LaunchAgent
 (Grok-written summaries of X discussion — treat them as leads, not sources); if
 `fetched` (YYYYMMDD_HHMM) in its source entry is not today, say so.
 
