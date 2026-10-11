@@ -1,23 +1,48 @@
 ---
 name: signal-digest
-description: Power-law digest of the user's information feeds — by default X For You + Following, the Reddit home feed, the AI-news daily brief and X's "Today's News" stories, or any inputs the user names instead (e.g. "the latest 50 posts in my vault", a notes folder, a JSONL list, an X search or subreddit fetched first) — prefilter cheaply with TypeSafe's Jev scoring model, then pick the vital few items that carry most of the value for investing (return with controlled risk), important AI technology advances and industry trends, startup ideas and big general concepts, and write a short report of key takeaways. Use whenever the user asks for "my digest", "what matters in my feeds today", "filter my feeds", "the most important posts across X/Reddit/AI news", "apply the power law to my feeds", "signal vs noise from my sources", wants a cross-source summary of their feeds rather than one feed, or asks to "digest" / "find what matters in" any set of posts or notes — even if they don't name this skill. To just fetch or summarize one X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
+description: Power-law digest of the user's information feeds for two goals — investment return with controlled risk, and keeping up with AI technology and industry trends for learning and startup ideas. Digests the default feeds (X For You + Following, the Reddit home feed, the AI-news daily brief, X's "Today's News") or any inputs the user names instead (a notes folder, a JSONL list, an X search or subreddit fetched first). A script collects and prefilters with TypeSafe's Jev; the agent then picks the vital few (at most three a day), verifies them and writes a short report. Use whenever the user asks for "my digest", "what matters in my feeds today", "filter my feeds", "signal vs noise from my sources", "apply the power law to my feeds", wants a cross-source summary of their feeds rather than one feed, or asks to "digest" / "find what matters in" any set of posts or notes, even without naming this skill. To just fetch or summarize one X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
 ---
 
 # signal-digest
 
-Most of the value in a day's feeds sits in a handful of items. This skill finds
-them in three stages, each cheaper per item than the next one is:
+## Goal
 
-1. **Collect** (script, no LLM): every source is fetched and normalized to one
-   item schema in a run directory.
+The feeds deliver well over a hundred new items a day. A few of them carry most
+of the value for the user's two goals:
+
+1. **Investing**: maximize investment return with controlled risk. The portfolio
+   is concentrated in AI infrastructure (`reader.holdings`), and the user's
+   Portfolio Premise Register (`reader.premises`) states what the positions
+   assume.
+2. **AI**: keep up with AI technology and industry trends, to learn and to find
+   startup ideas.
+
+The job is to find those few items and nothing else. The test for every item is
+"would the user regret not knowing this?" Three things follow:
+
+- **Zero picks on a goal is a normal day.** Most days have no investing pick at
+  all. Filling a slot with a weak item costs more than leaving it empty, because
+  the user stops trusting that a pick means something.
+- **Value is relative to what the user already knows.** A story reported in an
+  earlier digest is worth nothing today as a recap. But stories that keep
+  developing over several days are often the important ones, so a development
+  is a pick: report what is new and what it changes, not the story so far. A
+  development means the new fact changes what the story means for the user (a
+  premise, a decision, what is now possible); a new voice commenting on the same
+  facts is not one.
+- **The report is read in two minutes.** The TL;DR must stand alone.
+
+## How it works
+
+1. **Collect** (script, no LLM): every source is fetched and normalized into one
+   run directory.
 2. **Prefilter** (script, Jev): each item is scored on about ten atomic questions
-   (relevance to holdings and premises, new information, sourcing, generality,
-   durability, …) and combined in code. Jev costs about $0.04 per million input tokens, so a full run is
-   about one cent. This stage is **recall-first**: it only discards items that are
-   confidently promotional or confidently low-value. It always passes items Jev was unsure
-   about (it is weaker on Chinese) and possible tail-risk claims.
-3. **Pick and digest** (you): read the shortlist, choose the vital few, verify,
-   and write the report. The judgment lives here; the scores are a guide.
+   and combined in code. This stage is recall-first and cheap (about one cent a
+   run). It discards only confident ads and confident junk, and always passes
+   items Jev was unsure about (it is weaker on Chinese).
+3. **Pick and write** (you): read the shortlist, choose the vital few, verify,
+   write the report, log the picks. The judgment lives here; Jev's scores are a
+   prior, not a verdict.
 
 ## Run
 
@@ -25,278 +50,234 @@ them in three stages, each cheaper per item than the next one is:
 cd ~/projects && /opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python -m news.src.signal_digest.run run
 ```
 
-With no arguments it collects all five default sources (`x_for_you`, `x_following`,
-`reddit_home`, `ai_news`, `x_today`), filters with Jev, and prints one JSON object with
-`run_dir`, per-source counts and errors, and the `shortlist` path. It takes a few
-minutes because X article enrichment and Reddit drive a browser. Run it with
-`run_in_background` and wait for the notification.
-
-Other invocations you will need:
+With no arguments it collects the five default sources, filters with Jev, and
+prints one JSON object with `run_dir`, per-source counts and errors, and the
+`shortlist` path. It takes a few minutes (X and Reddit drive a browser), so run
+it with `run_in_background` and wait for the notification. `-h` on the module
+and on each subcommand is the authority on flags; don't restate them here.
 
 ```bash
-# skip Jev and pass every item through (small hauls, or Jev down / no key)
-… run --filter none
-
-# re-filter an existing run without re-fetching (after tuning, or to switch filters)
-… filter --run-dir latest --filter none
+… run --filter none                         # small hauls, or Jev down / no key
+… filter --run-dir latest --filter none     # re-filter an existing run, no re-fetch
 ```
 
-`-h` on the module and on each subcommand is the authority on flags (counts,
-thresholds such as `--min-keep` and `--max-keep`, `--profile`, model). Don't
-restate them here.
+### Reruns on the same day
 
-## Reruns on the same day
+Every run gets its own directory (`YYYYMMDD_HHMM`), and nothing is overwritten.
+`--same-day` decides what a run does with today's earlier runs that had the same
+inputs:
 
-Each run gets its own directory named by its start time (`YYYYMMDD_HHMM`, with
-`_2` appended for a second run in the same minute), and nothing in an earlier
-run is overwritten, so every run's report stays. `--same-day` decides what a run
-does with today's earlier runs that had the same inputs (the same built-in
-sources and `--input` targets). "Today" is the local calendar date.
+- "my digest", or a rerun with no qualifier: `union` (the default), the day's
+  best-of as of now. Items already reported today are marked
+  `PICKED EARLIER TODAY`; keep one only if it is still among the vital few, with
+  "(earlier today)" on its heading and TL;DR bullet, and list new picks first.
+- "anything new since earlier?": `--same-day new`, only items no earlier run
+  today collected. `nothing_new: true` means every item was already seen; say so
+  and stop. Otherwise "nothing new worth your time" is a good answer.
+- "a fresh digest", or after retuning the filter: `--same-day fresh`.
 
-| The user asks for | Mode |
-|---|---|
-| "my digest", or a rerun with no qualifier | `union` (the default): select from this fetch plus everything today's earlier runs collected, so the report is the day's best-of as of now |
-| "anything new since earlier?" | `--same-day new`: only items no earlier run today collected |
-| "a fresh digest", or a rerun after retuning the filter | `--same-day fresh`: ignore earlier runs |
+### Other inputs
 
-Union and new reuse the Jev answers of earlier runs, so only items not seen
-before cost anything. In `new` mode, `nothing_new: true` means every fetched
-item was already collected. Say so and stop. Otherwise, report only what clears
-the bar; "nothing new worth your time" is a good answer, and filling the caps
-with weak items is not.
+Use the default feeds only when the user names no inputs; when they do, digest
+exactly those. `--input TARGET[:NAME]` is repeatable and drops the default feeds
+unless you also pass `--sources default`.
 
-`run` deletes runs dated more than 7 days ago before it starts. Their item counts
-are kept in `seen_counts.json`, so `stats` pick rates stay correct.
+- some built-in feeds only: `run --sources x_following,ai_news`
+- "the latest 50 posts in my vault": `run --input ~/notes/raw/:vault --input-limit 50`
+  (`raw/` holds clippings and ad hoc notes; `wiki/` is curated; don't point at the whole vault)
+- a folder, a note, or a glob: `--input ~/notes/wiki/AI/:ai_wiki`, `--input '~/notes/raw/**/*NVDA*.md:nvda'`
+- notes chosen by topic: find them with `/research-notes`, write the paths one per
+  line to a scratch file, then `--input @paths.txt:topic`
+- an X search, an account, or a subreddit: fetch first with `fetch-x-posts` /
+  `fetch-reddit-posts` ("fetch only"), then `--input` the JSONL or the folder
+- any other list: JSONL with `title`, `text`, `url`, `author`, `created_at`
 
-## Choose the inputs
+A dozen items or fewer don't need the prefilter; add `--filter none`. Name the
+inputs on the report's `Inputs:` line whenever they are not the default feeds.
 
-Use the default feeds only when the user names no inputs. When they do name
-some, digest exactly those. `--input TARGET[:NAME]` takes anything as its own source and is
-repeatable. Giving it drops the default feeds unless you also pass
-`--sources default` (or a list such as `--sources x_for_you,ai_news`).
-`--input-limit N` keeps the newest N per input.
+**Failures.** One broken source doesn't stop the run; it appears in
+`collect.sources.<name>.error`. Report it and carry on. A missing
+`TYPESAFE_API_KEY` returns `ok: false` with the fix; tell the user and re-run
+`filter --run-dir <id> --filter none`. If Reddit's session has expired, refresh
+it with `python ~/projects/browser/src/refresh_state.py reddit.com`. If the AI
+news `brief_date` or X Today's `fetched` is not today, say how old it is.
 
-| The user asks for | Run |
-|---|---|
-| nothing specific ("my digest") | `run` |
-| some of the built-in feeds | `run --sources x_following,ai_news` |
-| "the latest 50 posts in my vault" | `run --input ~/notes/raw/:vault --input-limit 50` |
-| a vault folder, a note, or a glob | `--input ~/notes/wiki/AI/:ai_wiki`, `--input '~/notes/raw/**/*NVDA*.md:nvda'` |
-| notes picked by topic or meaning | find them with `/research-notes`, write their paths one per line to a scratch file, then `--input @paths.txt:topic` |
-| an X search, an account, or a subreddit | fetch first with `fetch-x-posts` / `fetch-reddit-posts` ("fetch only"), then `--input` the JSONL or the output folder |
-| any other list (RSS export, HN, a CSV turned into JSONL) | write JSONL with `title`, `text`, `url`, `author`, `created_at` and `--input` it |
-| their feeds plus something else | `run --sources default --input …` |
+## Read selectively
 
-In the vault, "posts" means clippings and ad hoc notes in `raw/`. `wiki/` holds
-curated notes, and the root also holds generated `index/` notes, so don't point
-at the whole vault for "latest posts". Each document becomes one item (title
-from frontmatter or the first heading, a `summary` field leads the text, `ref` is
-the note's absolute path). The newest are chosen by file modification time.
-Small hauls (a dozen items or fewer) don't need the prefilter, so add
-`--filter none`. Name the inputs on the report's `Inputs:` line whenever they are
-not the default feeds.
+Read `shortlist.md` and nothing else in bulk. Its top holds, in order: what was
+picked on earlier days this week, a "Top investing candidates" index (the
+overall ranking is by `max(invest, learn)`, which buries investing items under
+learn-track items), then the survivors ordered by Jev value, with VERIFY,
+UNCERTAIN and UNSCORED items last. Then:
 
-**Failure handling.** One broken source doesn't stop the run. It shows up in
-`collect.sources.<name>.error`; report it and carry on with the rest. If the
-filter step fails, items are already saved. A missing `TYPESAFE_API_KEY` returns
-`ok: false` with the fix (create a key at console.typesafe.ai and add `export
-TYPESAFE_API_KEY=...` to `~/.config/secrets.env`). Tell the user, then re-run
-`filter --run-dir <id> --filter none` so the digest still happens.
-
-**Auth.** X uses Chrome cookies through `xreach`. Reddit uses the browser
-project's stored session; if it has expired, refresh it with `python
-~/projects/browser/src/refresh_state.py reddit.com`. The AI-news source reads the
-newest brief written by the 8am `zhihu-ai-news` LaunchAgent. If `brief_date` in
-the output is not today, say how old the brief is. The X Today source reads the
-newest "Today's News" widget stories saved by the 8:50am `x-today-news` LaunchAgent
-(Grok-written summaries of X discussion — treat them as leads, not sources); if
-`fetched` (YYYYMMDD_HHMM) in its source entry is not today, say so.
-
-## Read selectively (token discipline)
-
-Read `shortlist.md` (the survivors, with signals and text up to 1,500
-characters) and nothing else in bulk. It is ordered by Jev value, then VERIFY,
-UNCERTAIN and UNSCORED items. For an item you might pick, open its full content
-through `ref`: a `raw/…md` Reddit post, a line of the raw X JSONL, or the
-absolute path of a note or document input. Skim the
-top of `discarded.md` once per run as a recall check, and pull back anything the
-filter wrongly dropped.
+- **Skim the top of `discarded.md`** once per run. The filter is recall-first but
+  not perfect; it has dropped real picks as "promo" (a question-style Reddit post,
+  a clickbait-styled Chinese headline). Pull back anything wrongly dropped.
+- **Open the full content of anything you might pick** through its `ref` (a
+  `raw/…md` Reddit post, a line of the raw X JSONL, a note's absolute path).
+- **AI-news items carry the whole article.** Jev scored its first 2,500
+  characters and the shortlist shows 1,500; the full text is in the item's
+  `ref` (`raw/ai_news/NN.md`). An item with no `ref` and a one-sentence text
+  came from an older brief (snippet only) or a failed body fetch; open the
+  Zhihu URL before picking or dismissing it.
+- **Quote tweets and retweets now arrive whole.** A retweet carries the full
+  retweeted text, and a quote tweet ends with `[Quoting @author: …]`, one level
+  deep. When that block is missing on a `quote` item, or a retweet still ends in
+  "…", the lookup failed: open the URL before dismissing it when the author or a
+  holding's ticker matters ("That's why I'm invested in $COHR" says nothing on
+  its own).
+- Items marked `PICKED <date>`, and stories in the "Picked on earlier days" list,
+  were already reported. A development in one of them is a pick (developing
+  stories tend to matter most); lead the entry with what is new and link the
+  earlier pick's source once. A restatement without a new fact is not a pick,
+  and neither is another commentator's take on facts already reported. A story
+  picked on two earlier days needs its first sentence to say what changed.
 
 ## Pick the vital few
 
-Treat Jev's `value` as a prior, not a verdict. Pick **at most 5 items for
-Investing and at most 3 for each other track, and fewer or zero when the day is
-thin for that track**. Investing gets more room because a missed signal on a
-holding costs money, while a missed idea can be picked up later. The cap is what
-makes this a power-law digest rather than a survey: an item past the cap means
-one of the others isn't vital, so cut it or fold it into another item as
-supporting evidence. When nothing in a track clears the bar, write "nothing today"
-under its heading rather than promoting a weak item. Each pick goes in exactly
-one track; an item is filed under Investing only if it bears on a holding or on
-a premise that actually exists in `reader.premises`. Don't invent premises. The
-tracks:
+**At most three picks a day across both goals, and usually one or two.** Lead with
+the single most valuable. An item past the cap means one of the others isn't
+vital: cut it, or fold it into another pick as one linked sentence of supporting
+evidence. Collapse the same story told by several sources into one pick.
 
-- **Investing** (return with controlled risk). The test is whether this could
-  change a decision: a position, a valuation input, or a premise in the user's
-  Portfolio Premise Register (`reader.premises` in `profile.json`). Weight
-  evidence *against* a premise above confirmation: feeds tuned to engagement
-  serve bullish takes on what the user already owns, and losses compound
-  asymmetrically. A crowd of bullish posts on a holding is a sentiment
-  reading, not news. Say so, and compare against the user's latest valuation
-  when one exists (`~/projects/stock_picker/data/valuations/<TICKER>/`).
-- **AI advances, trends and startup ideas.** Three kinds of item belong here:
-  - an important AI technology advance: a new capability, a new method or
-    architecture, or a step change in efficiency or cost. Say what it does, how
-    it works at a level a strong engineer can follow, and what it enables or
-    threatens;
-  - a durable shift in how the AI industry works;
-  - an unmet need that a product could fill.
+**Investing.** A pick must pass one of two tests:
 
-  How long the point stays useful matters more than how new it is. An advance
-  earns a pick when it changes what is possible or what it costs, not when it is
-  a benchmark bump.
+- *A specific new fact that bears on a holding or on a premise that actually
+  exists in `reader.premises`* (don't invent premises). Evidence against a premise
+  outranks confirmation: feeds tuned to engagement serve bullish takes on what
+  the user already owns, and losses compound asymmetrically. A confirmation
+  still earns a pick when the fact is new, but it gets a short entry: the fact,
+  the premise, for or against, done. "No position change" means no long analysis.
+- *A sentiment cluster on holdings paired with a measured market signal that is
+  itself unusual* (an implied-volatility extreme, a positioning extreme, a known
+  event window). A crowd of bullish posts alone is a sentiment reading, not a
+  pick; it gets one line under Near misses. When you add market data by lookup,
+  say so; the feed didn't supply it.
 
-- **Big ideas.** A concept that explains many things at once or recurs in many
-  forms is worth more than many facts, because grasping it unlocks the rest.
-  Examples: bounded rationality, supply bottlenecks and where the overflow goes,
-  economies of scale, feedback loops, the way agents change who captures value.
-  For each, name the concept, state it in one sentence, and list the different
-  forms it takes. Include the forms visible elsewhere in this same haul; that
-  cross-linking is the payoff, and it is why this track comes last in the report.
+Compare against the user's latest valuation when one exists:
+`~/projects/stock_picker/data/valuations/<TICKER>/<date>.md` is the base model
+and the authoritative figure; the `.whatif.md` beside it is a scenario file,
+cite it only as such. Quote every figure with its file name and date.
 
-Posts by people who run major AI, chip, cloud or internet companies, and faithful
-reports of their words, are primary sources on strategy. They are often the
-earliest public signal of where the industry is heading, so read them closely.
-The prefilter boosts them; the list and per-person weights live in
-`src/signal_digest/leaders.py`, and the signals line shows `leader xN` when the
-boost applied. Still judge by content, not by name. A prolific poster such as
-Elon Musk mostly produces jokes, politics and reposts, which count for nothing;
-his posts earn a pick only when they say something specific about his
-companies' AI, chips or compute plans.
+**AI.** Three kinds of item qualify: an advance that changes what is possible or
+what it costs (say what it does, how it works at a level a strong engineer can
+follow, and what it enables or threatens; a benchmark bump doesn't qualify); a
+durable shift in how the industry works; an unmet need a product could fill.
+How long the point stays useful matters more than how new it is. When a pick is
+best understood as a general concept (a bottleneck and where the overflow goes,
+a feedback loop, payoff asymmetry), write it up that way: name the concept in one
+sentence and link the forms it takes in this haul. That is a way of writing a
+pick, not a separate quota.
 
-High engagement measures what the crowd already knows. Use it as context, never
-as the reason to pick. Collapse the same story told by several sources into one
-pick, and note the sources (`also_in`).
+**Primary sources.** Posts by people who run major AI, chip, cloud or internet
+companies, and faithful reports of their words, are primary sources on strategy
+and often the earliest public signal. The prefilter boosts them (list and
+weights in `src/signal_digest/leaders.py`; the signals line shows `leader xN`).
+Still judge by content: a prolific poster's jokes, politics and reposts count for
+nothing.
 
-**Verify before you trust.** For every investing pick, and every VERIFY item
-that would matter if true, spend one web search to confirm the claim and read
-what was actually said. Headline accounts such as Polymarket and zerohedge
-routinely distort the framing, and a verified-but-reframed claim can move from
-the investing track to the ideas track. State the verification result and link
-the primary or named source.
+**Engagement** measures what the crowd already knows. Use it as context, never as
+the reason to pick.
+
+**Verify before you trust.** For every investing pick, and every VERIFY item that
+would matter if true, spend one web search to confirm the claim and read what
+was actually said. Headline accounts (Polymarket, zerohedge) routinely reframe;
+a verified-but-reframed claim may move from investing to AI or drop out. State
+the result in one sentence with the primary source linked.
 
 ## Report
 
-Write `report.md` into the run directory with this structure:
+Write `report.md` into the run directory:
 
 ```markdown
 # Signal digest — <date> <HH:MM> (<run id>)
 
-Inputs: <only when they are not the default feeds, e.g. "50 newest notes in ~/notes/raw/">
+Inputs: <only when they are not the default feeds>
 
 ## TL;DR
 
 **Investing**
-- <One bullet per pick: the takeaway as a claim and, in a few words, why it matters to the user.> ([<short label>](<link>), [<verification>](<link>))
+- <The takeaway as a claim, and in a few words why it matters to the user.> ([<label>](<link>), [<verification>](<link>))
 
-**AI advances, trends & ideas**
-- <…>
-
-**Big ideas**
-- <…, or "Nothing today." when the track has no picks>
+**AI**
+- <…, or "Nothing today.">
 
 ## Investing
 
 ### <Takeaway as a claim>
 
-Sources: [<author>, <source>, <date>](<link>) · [<other source>](<link>)
+Sources: [<author>, <source>, <date>](<link>) · [<verifying source>](<link>)
 
-What it says (engagement) · which holding or premise it bears on (for or against) · what it changes or why it changes nothing · verification result with link.
+<What it says · which holding or premise, for or against · what it changes or why nothing · verification, one sentence.>
 
-## AI advances, trends & ideas
+## AI
 
 ### <Takeaway>
 
-Sources: [<author>, <source>, <date>](<link>)
+Sources: …
 
-…
+<What it does and how · what it enables or threatens · verification.>
 
-## Big ideas
-
-### <Concept name>
-
-Sources: [<author>, <source>, <date>](<link>)
-
-The idea in one sentence · the forms it takes (including ones from this haul, each linked) · why it's worth holding onto.
-
-## Dropped
+## Near misses
 
 <N collected → M shortlisted → K picked.>
 
-- [<author>, <source>](<link>): <what it was, and why it lost>
+- [<author>, <source>](<link>): <what it was and why it lost, one line>
 - Source errors: <source and error, or none>
 ```
 
-In a union run, shortlist items marked `PICKED EARLIER TODAY` were already
-reported. If one is still among the vital few, keep it and append "(earlier
-today)" to its heading and its TL;DR bullet. List new picks first within each
-TL;DR group, so a rerun shows what changed at a glance.
+Rules:
 
-The TL;DR is bullets, never a paragraph, grouped under the same three tracks
-as the sections below and in the same order (Investing, AI advances, Big ideas). It holds one bullet per pick and
-nothing the sections don't support, so the user can stop reading there. Keep all
-three headings; a track with no picks gets "Nothing today." Each bullet ends with
-inline links under short labels (`@handle`, `r/sub`, the outlet's name): the
-original source, plus the verifying source when there is one. The full list
-stays on the pick's `Sources:` line.
-
-**Every pick gets one clickable `Sources:` line** right under its heading, with
-all its sources on that one line. The description starts after a blank line,
-as its own paragraph. A line break alone would merge the two in rendered
-Markdown. Links come from that item's `links:` line in `shortlist.md`. That line
-holds the post URL and, for a vault note or other local document, an
-`obsidian://` or `file://` link that opens it. Link the note itself, and its
-original URL too when it has one. Give every item you folded into a pick
-(`also_in`, supporting evidence) its own link. Each near-miss in Dropped links
-inline the same way, so the user can open any of them. Copy links from the shortlist
-rather than building them by hand, and never link a URL you didn't see. When an
-item has no link (`links: none`), say so and cite it by author and date.
-
-The reader is a strong engineer, not a finance specialist. Expand jargon on first
-use, give every figure its source and date, and label fiscal years. **Write the
-report in English**, whatever the sources' language. Cite Chinese (or any other
-language) verbatim only where the original wording carries something a
-translation would lose, such as a coined phrase, a named framework or a quote
-being weighed, and follow it with an English gloss. In chat, reply with the TL;DR bullets plus the
-report path. Don't paste the report back.
+- **Budget: about 800 words, never more than 1,200**, links excluded. TL;DR bullets
+  are one or two sentences. A pick's body is under 150 words. Near misses holds at
+  most five lines; the tail gets no more words than that.
+- Whenever Investing has fewer than two picks, the first Near-misses line names the
+  best investing candidate that was not picked and why it lost, so a dropped
+  candidate on a holding or premise never vanishes without a trace.
+- Keep both TL;DR headings; a goal with no picks says "Nothing today."
+- Every pick gets one `Sources:` line right under its heading, then a blank line,
+  then the body (a bare line break would merge them in rendered Markdown). Copy
+  links from the item's `links:` line in `shortlist.md`; never link a URL you
+  didn't see. A vault note links to the note (`obsidian://`) and to its original
+  URL when it has one. When an item has `links: none`, cite it by author and date.
+- Label every link by what it actually is: the author or outlet at that URL. Link
+  the primary source (the filing, the paper, the person's own post, the outlet
+  that reported it) when it is reachable; when only secondary coverage is, label
+  it "<primary> via <outlet>" rather than as the primary.
+- Every figure carries its source and date; label fiscal years; expand jargon on
+  first use. The reader is a strong engineer, not a finance specialist.
+- **Write in English** whatever the sources' language. Quote Chinese verbatim only
+  where the wording carries something a translation loses (a coined phrase, a
+  quote being weighed), followed by an English gloss.
+- In chat, reply with the TL;DR bullets plus the report path. Don't paste the
+  report.
 
 ## Log the picks
 
-After the report is written, record the picks:
+A pick is an item with its own heading in the report; folded-in evidence is not
+a pick. Log each with its goal:
 
 ```bash
-… pick --run-dir <run id> --ids <id1>,<id2>,…
+… pick --run-dir <run id> --ids invest:<id1>,learn:<id2>
 ```
 
-Pass every pick. Picks already logged by an earlier run today are skipped, and
-listed under `already_logged_earlier_today`, so nothing is counted twice.
-
-`… stats` then shows pick rates by source and author across runs. That is the
-second power law: a few accounts and sources produce most of the picks. Suggest
-pruning sources that never get picked, and following the accounts that do. Picks
-whose `keep_reason` is `uncertain` or `verify` show what Jev's value ranking
-alone would have missed. If they pile up, Jev's weights in
-`src/signal_digest/jev_filter.py` need retuning, not the recall guard.
+Picks already logged by an earlier run today are skipped and listed under
+`already_logged_earlier_today`. `… stats` then shows pick rates by source and
+author across runs: the second power law. A few accounts and sources produce
+most of the picks; suggest pruning sources that never get picked and following
+the accounts that do. Picks whose `keep_reason` is `uncertain`, `verify` or
+`dropped: …` are what Jev's ranking alone would have missed; if they pile up, the
+weights in `src/signal_digest/jev_filter.py` need retuning.
 
 ## Where things live
 
 - Code: `~/projects/news/src/signal_digest/` (`run.py` CLI, `sources.py`
-  adapters, `jev_filter.py` questions, weights and selection, `profile.py`
-  reader context). Add a new built-in source by writing one `collect_<name>`
-  adapter and registering it in `SOURCES`.
-- Data: `~/projects/news/data/signal_digest/runs/<run id>/` (whole runs are
-  deleted after 7 days), `picks.jsonl` and `seen_counts.json` (item counts of
-  deleted runs, for `stats`).
+  adapters, `jev_filter.py` questions and weights, `profile.py` reader context,
+  `run_daily.py` the 9:00 and 15:45 LaunchAgent entry point).
+- Data: `~/projects/news/data/signal_digest/runs/<run id>/` (deleted after
+  10 days; keep it that long so a week-later review can compare report.md against the
+  items, scores and raw snapshots it came from), `picks.jsonl` (the memory that
+  drives `PICKED <date>` markers),
+  `seen_counts.json`.
 - The reader profile is rebuilt every run from `stock_picker/data/portfolio.csv`,
-  `data/ticker.csv` and the premise register. `--profile FILE` swaps in any JSON
-  object for a different reader.
+  `data/ticker.csv` and the premise register; `--profile FILE` swaps it.
