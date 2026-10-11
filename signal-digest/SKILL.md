@@ -45,6 +45,29 @@ Other invocations you will need:
 thresholds such as `--min-keep` and `--max-keep`, `--profile`, model). Don't
 restate them here.
 
+## Reruns on the same day
+
+Each run gets its own directory named by its start time (`YYYYMMDD_HHMM`, with
+`_2` appended for a second run in the same minute), and nothing in an earlier
+run is overwritten, so every run's report stays. `--same-day` decides what a run
+does with today's earlier runs that had the same inputs (the same built-in
+sources and `--input` targets). "Today" is the local calendar date.
+
+| The user asks for | Mode |
+|---|---|
+| "my digest", or a rerun with no qualifier | `union` (the default): select from this fetch plus everything today's earlier runs collected, so the report is the day's best-of as of now |
+| "anything new since earlier?" | `--same-day new`: only items no earlier run today collected |
+| "a fresh digest", or a rerun after retuning the filter | `--same-day fresh`: ignore earlier runs |
+
+Union and new reuse the Jev answers of earlier runs, so only items not seen
+before cost anything. In `new` mode, `nothing_new: true` means every fetched
+item was already collected. Say so and stop. Otherwise, report only what clears
+the bar; "nothing new worth your time" is a good answer, and filling the caps
+with weak items is not.
+
+`run` deletes runs dated more than 7 days ago before it starts. Their item counts
+are kept in `seen_counts.json`, so `stats` pick rates stay correct.
+
 ## Choose the inputs
 
 Use the default feeds only when the user names no inputs. When they do name
@@ -70,7 +93,7 @@ at the whole vault for "latest posts". Each document becomes one item (title
 from frontmatter or the first heading, a `summary` field leads the text, `ref` is
 the note's absolute path). The newest are chosen by file modification time.
 Small hauls (a dozen items or fewer) don't need the prefilter, so add
-`--filter none`. Name the inputs in the report's verdict line whenever they are
+`--filter none`. Name the inputs on the report's `Inputs:` line whenever they are
 not the default feeds.
 
 **Failure handling.** One broken source doesn't stop the run. It shows up in
@@ -118,13 +141,6 @@ tracks:
   asymmetrically. A crowd of bullish posts on a holding is a sentiment
   reading, not news. Say so, and compare against the user's latest valuation
   when one exists (`~/projects/stock_picker/data/valuations/<TICKER>/`).
-- **Big ideas.** A concept that explains many things at once or recurs in many
-  forms is worth more than many facts, because grasping it unlocks the rest.
-  Examples: bounded rationality, supply bottlenecks and where the overflow goes,
-  economies of scale, feedback loops, the way agents change who captures value.
-  For each, name the concept, state it in one sentence, and list the different
-  forms it takes. Include the forms visible elsewhere in this same haul; that
-  cross-linking is the payoff.
 - **AI advances, trends and startup ideas.** Three kinds of item belong here:
   - an important AI technology advance: a new capability, a new method or
     architecture, or a step change in efficiency or cost. Say what it does, how
@@ -136,6 +152,14 @@ tracks:
   How long the point stays useful matters more than how new it is. An advance
   earns a pick when it changes what is possible or what it costs, not when it is
   a benchmark bump.
+
+- **Big ideas.** A concept that explains many things at once or recurs in many
+  forms is worth more than many facts, because grasping it unlocks the rest.
+  Examples: bounded rationality, supply bottlenecks and where the overflow goes,
+  economies of scale, feedback loops, the way agents change who captures value.
+  For each, name the concept, state it in one sentence, and list the different
+  forms it takes. Include the forms visible elsewhere in this same haul; that
+  cross-linking is the payoff, and it is why this track comes last in the report.
 
 Posts by people who run major AI, chip, cloud or internet companies, and faithful
 reports of their words, are primary sources on strategy. They are often the
@@ -163,37 +187,75 @@ the primary or named source.
 Write `report.md` into the run directory with this structure:
 
 ```markdown
-# Signal digest — <date> (<run id>)
+# Signal digest — <date> <HH:MM> (<run id>)
 
-<Verdict: one or two sentences naming what actually matters today, or that nothing does.>
+Inputs: <only when they are not the default feeds, e.g. "50 newest notes in ~/notes/raw/">
+
+## TL;DR
+
+**Investing**
+- <One bullet per pick: the takeaway as a claim and, in a few words, why it matters to the user.> ([<short label>](<link>), [<verification>](<link>))
+
+**AI advances, trends & ideas**
+- <…>
+
+**Big ideas**
+- <…, or "Nothing today." when the track has no picks>
 
 ## Investing
+
 ### <Takeaway as a claim>
-Source: [<author>, <source>, <date>](<link>) · also: [<other source>](<link>)
+
+Sources: [<author>, <source>, <date>](<link>) · [<other source>](<link>)
+
 What it says (engagement) · which holding or premise it bears on (for or against) · what it changes or why it changes nothing · verification result with link.
 
-## Big ideas
-### <Concept name>
-Source: [<author>, <source>, <date>](<link>)
-The idea in one sentence · the forms it takes (including ones from this haul, each linked) · why it's worth holding onto.
-
 ## AI advances, trends & ideas
+
 ### <Takeaway>
-Source: [<author>, <source>, <date>](<link>)
+
+Sources: [<author>, <source>, <date>](<link>)
+
 …
 
-## Dropped
-<N collected → M shortlisted → K picked; one line per notable near-miss and why it lost; source errors.>
+## Big ideas
 
-Sources: <links>
+### <Concept name>
+
+Sources: [<author>, <source>, <date>](<link>)
+
+The idea in one sentence · the forms it takes (including ones from this haul, each linked) · why it's worth holding onto.
+
+## Dropped
+
+<N collected → M shortlisted → K picked.>
+
+- [<author>, <source>](<link>): <what it was, and why it lost>
+- Source errors: <source and error, or none>
 ```
 
-**Every pick gets a clickable `Source:` line** right under its heading, and it
-uses the links shown on that item's `links:` line in `shortlist.md`. That line
+In a union run, shortlist items marked `PICKED EARLIER TODAY` were already
+reported. If one is still among the vital few, keep it and append "(earlier
+today)" to its heading and its TL;DR bullet. List new picks first within each
+TL;DR group, so a rerun shows what changed at a glance.
+
+The TL;DR is bullets, never a paragraph, grouped under the same three tracks
+as the sections below and in the same order (Investing, AI advances, Big ideas). It holds one bullet per pick and
+nothing the sections don't support, so the user can stop reading there. Keep all
+three headings; a track with no picks gets "Nothing today." Each bullet ends with
+inline links under short labels (`@handle`, `r/sub`, the outlet's name): the
+original source, plus the verifying source when there is one. The full list
+stays on the pick's `Sources:` line.
+
+**Every pick gets one clickable `Sources:` line** right under its heading, with
+all its sources on that one line. The description starts after a blank line,
+as its own paragraph. A line break alone would merge the two in rendered
+Markdown. Links come from that item's `links:` line in `shortlist.md`. That line
 holds the post URL and, for a vault note or other local document, an
 `obsidian://` or `file://` link that opens it. Link the note itself, and its
 original URL too when it has one. Give every item you folded into a pick
-(`also_in`, supporting evidence) its own link. Copy links from the shortlist
+(`also_in`, supporting evidence) its own link. Each near-miss in Dropped links
+inline the same way, so the user can open any of them. Copy links from the shortlist
 rather than building them by hand, and never link a URL you didn't see. When an
 item has no link (`links: none`), say so and cite it by author and date.
 
@@ -202,7 +264,7 @@ use, give every figure its source and date, and label fiscal years. **Write the
 report in English**, whatever the sources' language. Cite Chinese (or any other
 language) verbatim only where the original wording carries something a
 translation would lose, such as a coined phrase, a named framework or a quote
-being weighed, and follow it with an English gloss. In chat, reply with the verdict and the picks in a few lines plus the
+being weighed, and follow it with an English gloss. In chat, reply with the TL;DR bullets plus the
 report path. Don't paste the report back.
 
 ## Log the picks
@@ -212,6 +274,9 @@ After the report is written, record the picks:
 ```bash
 … pick --run-dir <run id> --ids <id1>,<id2>,…
 ```
+
+Pass every pick. Picks already logged by an earlier run today are skipped, and
+listed under `already_logged_earlier_today`, so nothing is counted twice.
 
 `… stats` then shows pick rates by source and author across runs. That is the
 second power law: a few accounts and sources produce most of the picks. Suggest
@@ -226,8 +291,9 @@ alone would have missed. If they pile up, Jev's weights in
   adapters, `jev_filter.py` questions, weights and selection, `profile.py`
   reader context). Add a new built-in source by writing one `collect_<name>`
   adapter and registering it in `SOURCES`.
-- Data: `~/projects/news/data/signal_digest/runs/<run id>/` (`raw/` is pruned
-  after 14 days; items, scores, shortlist and report stay) and `picks.jsonl`.
+- Data: `~/projects/news/data/signal_digest/runs/<run id>/` (whole runs are
+  deleted after 7 days), `picks.jsonl` and `seen_counts.json` (item counts of
+  deleted runs, for `stats`).
 - The reader profile is rebuilt every run from `stock_picker/data/portfolio.csv`,
   `data/ticker.csv` and the premise register. `--profile FILE` swaps in any JSON
   object for a different reader.
