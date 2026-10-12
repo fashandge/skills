@@ -42,13 +42,17 @@ Answer every point in one or two sentences, with the item linked.
    earlier story, was the "what changed" real, or a new voice on known facts?
 4. **Spot-check.** One factual claim per report, against a primary source. Say
    confirmed, reframed or wrong.
-5. **Format.** Word count against the 800/1,200 budget, TL;DR standing alone,
-   link labels naming the real source, Near misses naming the best unpicked
-   investing item when Investing had fewer than two picks.
+5. **Format.** Run the lint on each report and quote its errors and the
+   warnings you agree with:
+   `cd ~/projects && /opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python -m news.src.signal_digest.run lint --run-dir <run id>`.
+   An error costs the Format point. Then by eye: the TL;DR standing alone,
+   and Near misses naming the best unpicked investing item when Investing had
+   fewer than two picks.
 6. **Pipeline health.** Source errors, stale brief or X Today, AI-news items
    with no body, retweets still ending in "…", and the Jev rank and
    `keep_reason` of each pick (from `scored.jsonl`; a pick below the keep line
-   is a filter miss worth noting).
+   is a filter miss worth noting; the line is per track since 2026-10-12, so
+   compare an investing pick's `invest` rank, not its overall rank).
 7. **One suggestion at most.** The single change with the best evidence from
    this day, appended to `reviews/suggestions.md` as one line with the date and
    the evidence link. If the day shows nothing new, append nothing.
@@ -79,6 +83,9 @@ Score: Investing <0-2> · AI <0-2> · Misses <0-2> · Format <0-2> · Pipeline <
 ```
 
 Scores: 2 = met the goal, 1 = partly, 0 = failed; `Misses` 2 means none found.
+Every score below 2 names its reason in the matching section, in one clause
+("Format 1: TL;DR bullet of three sentences"); an unexplained point lost cannot
+be acted on.
 Under 300 words. Also append the day's picks to `reviews/feedback.md` as
 `- [ ] <date> <run id> · <title> (<link>)` when they are not there yet, so the
 user can mark them. Do not edit `~/skills/signal-digest/SKILL.md` or the

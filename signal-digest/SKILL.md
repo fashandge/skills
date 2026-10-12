@@ -108,7 +108,13 @@ Read `shortlist.md` and nothing else in bulk. Its top holds, in order: what was
 picked on earlier days this week, a "Top investing candidates" index (the
 overall ranking is by `max(invest, learn)`, which buries investing items under
 learn-track items), then the survivors ordered by Jev value, with VERIFY,
-UNCERTAIN and UNSCORED items last. Then:
+UNCERTAIN and UNSCORED items last. The keep line is drawn per track (the top 35
+by invest and the top 35 by learn both pass), so an investing post is never
+pushed out by learn-track articles. The value order is not a cross-source
+comparison: since AI-news items carry full article bodies, long Zhihu articles
+take most of the top ranks (ranks 1–5 on 2026-10-12) while a two-line X post on
+a holding sits at rank 40. Read the investing index and the tickers, not the
+rank, for investing. Then:
 
 - **Skim the top of `discarded.md`** once per run. The filter is recall-first but
   not perfect; it has dropped real picks as "promo" (a question-style Reddit post,
@@ -130,8 +136,17 @@ UNCERTAIN and UNSCORED items last. Then:
   were already reported. A development in one of them is a pick (developing
   stories tend to matter most); lead the entry with what is new and link the
   earlier pick's source once. A restatement without a new fact is not a pick,
-  and neither is another commentator's take on facts already reported. A story
-  picked on two earlier days needs its first sentence to say what changed.
+  and neither is another commentator's take on facts already reported, nor the
+  same person's longer version of a take already picked (the talk behind a
+  thread, the slides, an essay). A story picked on two earlier days needs its
+  first sentence to say what changed.
+- **Old news is usually known.** The user runs these tools daily, so a launch,
+  price change or deal from a major lab or vendor that is more than two days old
+  is assumed known. Check whether the feed carried it earlier
+  (`grep -l '<term>' ~/projects/news/data/signal_digest/runs/*/items.jsonl`);
+  if it did and it wasn't picked, it needs a reason now. It can still earn a pick
+  for a non-obvious consequence; then the consequence is the heading and the
+  TL;DR bullet, and the known fact gets one clause.
 
 ## Pick the vital few
 
@@ -192,7 +207,7 @@ Write `report.md` into the run directory:
 ```markdown
 # Signal digest — <date> <HH:MM> (<run id>)
 
-Inputs: <only when they are not the default feeds>
+Inputs: <only when they are not the default feeds, or the run is `--same-day new`>
 
 ## TL;DR
 
@@ -246,13 +261,30 @@ Rules:
   it "<primary> via <outlet>" rather than as the primary.
 - Every figure carries its source and date; label fiscal years; expand jargon on
   first use. The reader is a strong engineer, not a finance specialist.
+- A quotation links the document that contains the words (the slides, not the
+  blog post beside them). A quote that reaches you through coverage (a Chinese
+  write-up of an English talk) is attributed to the person only after you find it
+  in the primary; otherwise attribute it to the coverage.
 - **Write in English** whatever the sources' language. Quote Chinese verbatim only
   where the wording carries something a translation loses (a coined phrase, a
   quote being weighed), followed by an English gloss.
 - In chat, reply with the TL;DR bullets plus the report path. Don't paste the
   report.
 
-## Log the picks
+## Check the report, then log the picks
+
+Run the lint before logging and fix every error it reports:
+
+```bash
+… lint --run-dir <run id>
+```
+
+It checks the word budget, the pick cap, the TL;DR and `Sources:` structure, and
+every link label against its URL (a label saying "via Coinpaper" on a kucoin.com
+URL is the kind of slip it exists for). `lookup_links` lists every link that is
+not an item of this run: each must be a page you opened during verification, not
+a URL from memory; remove any you can't account for. Warnings are judgment calls;
+errors are not. The daily reviewer runs the same lint on your report.
 
 A pick is an item with its own heading in the report; folded-in evidence is not
 a pick. Log each with its goal:
@@ -272,8 +304,9 @@ weights in `src/signal_digest/jev_filter.py` need retuning.
 ## Where things live
 
 - Code: `~/projects/news/src/signal_digest/` (`run.py` CLI, `sources.py`
-  adapters, `jev_filter.py` questions and weights, `profile.py` reader context,
-  `run_daily.py` the 9:00 and 15:45 LaunchAgent entry point).
+  adapters, `jev_filter.py` questions, weights and the per-track keep line,
+  `lint.py` the report checks, `profile.py` reader context, `run_daily.py` the
+  9:00 and 15:45 LaunchAgent entry point).
 - Data: `~/projects/news/data/signal_digest/runs/<run id>/` (deleted after
   10 days; keep it that long so a week-later review can compare report.md against the
   items, scores and raw snapshots it came from), `picks.jsonl` (the memory that
