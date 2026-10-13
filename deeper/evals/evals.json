@@ -1,0 +1,23 @@
+{
+  "skill_name": "deeper",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I asked you to summarize our churn numbers from the Q3 dashboard export (data/q3_churn.csv) into a few bullets for the QBR. Before you do that: /deeper",
+      "expected_output": "Names a specific professional (e.g. a survival-analysis statistician), identifies the dashboard export as digested and points at the raw event logs or customer table beneath it, names concrete methods (cohort/survival analysis, a database query rather than a markdown table), names an outside judge (held-out quarter, reproduction of a known figure), and rewrites the prompt in a fenced block without adding deliverables; stops and asks before running.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "make this deeper, then run it: write a wiki note in my vault on how prompt caching works in the Claude API, based on what you remember",
+      "expected_output": "Flags 'what you remember' as the digested layer and points at the primary docs / claude-api skill as raw material; names instruments (reading the actual API reference, a live token-count or cache-hit measurement); names a judge other than the model (a measured cache_read_input_tokens figure, the docs themselves); rewrites the prompt; then executes the rewritten task because the user said to run it.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "how would a top professional do this instead of what I asked? the task was: fix the flaky test in tests/test_fetch.py that fails about 1 in 10 runs",
+      "expected_output": "Names the professional (a reliability/test-infrastructure engineer), states what they'd do that wasn't asked (reproduce deterministically, find the root cause rather than retry), raw material (the actual failure output across many runs, CI logs, the timing/network dependency in the code), methods (run N times under seed/timing control, bisect, isolate the nondeterminism), outside judge (e.g. 200 consecutive green runs under the same conditions that previously failed, or a test that fails deterministically before the fix); rewrite keeps the deliverable as 'fix the test'.",
+      "files": []
+    }
+  ]
+}
