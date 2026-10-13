@@ -40,6 +40,9 @@ Answer every point in one or two sentences, with the item linked.
    10, and whether it should have beaten a pick. Items on a holding count double.
 3. **Repeats and developments.** For any pick marked as a development of an
    earlier story, was the "what changed" real, or a new voice on known facts?
+   A speaker whose own stake changes what the facts mean (the lender behind a
+   deal doubting its financing) is a development, not a new voice; score the
+   write-up on whether it led with that stake.
 4. **Spot-check.** One factual claim per report, against a primary source. Say
    confirmed, reframed or wrong.
 5. **Format.** Run the lint on each report and quote its errors and the

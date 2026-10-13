@@ -191,11 +191,16 @@ companies, and faithful reports of their words, are primary sources on strategy
 and often the earliest public signal. The prefilter boosts them (list and
 weights in `src/signal_digest/leaders.py`; the signals line shows `leader xN`).
 Still judge by content: a prolific poster's jokes, politics and reposts count for
-nothing, and a leader's remark on a story already picked is a new voice, not a
-development, unless it discloses a figure, a decision or guidance of the
-leader's own company. Who speaks raises the weight of a fact; it does not
-replace one (the Broadcom CEO's "capital could be the constraint", 2026-10-12,
-was the funding story's third day with no new number).
+nothing. A leader's remark on a story already picked is a development in two
+cases: it discloses a figure, a decision or guidance of the leader's own
+company, or the speaker's own stake changes what the known facts mean. On
+2026-10-12 the funding story had two days of issuance data and bank forecasts
+behind it; then the CEO of Broadcom, the lender behind Anthropic's chip leases,
+said capital could be the constraint. The same words from a commentator are a
+new voice; from the lender they are the story moving from observers to a
+participant. When the stake is the point, the heading says so ("the lender
+behind Anthropic's chips doubts the financing"), not "two CEOs named the weak
+links".
 
 **Engagement** measures what the crowd already knows. Use it as context, never as
 the reason to pick.
