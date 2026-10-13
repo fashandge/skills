@@ -105,16 +105,18 @@ news `brief_date` or X Today's `fetched` is not today, say how old it is.
 ## Read selectively
 
 Read `shortlist.md` and nothing else in bulk. Its top holds, in order: what was
-picked on earlier days this week, a "Top investing candidates" index (the
-overall ranking is by `max(invest, learn)`, which buries investing items under
-learn-track items), then the survivors ordered by Jev value, with VERIFY,
-UNCERTAIN and UNSCORED items last. The keep line is drawn per track (the top 35
+picked on earlier days this week, a "Top investing candidates" index of the top 12 by
+invest composite (the overall ranking is by `max(invest, learn)`, which buries
+investing items under learn-track items; every investing pick so far sat inside
+this index), then the survivors ordered by Jev value, with VERIFY, UNCERTAIN
+and UNSCORED items last. The keep line is drawn per track (the top 35
 by invest and the top 35 by learn both pass), so an investing post is never
 pushed out by learn-track articles. The value order is not a cross-source
 comparison: since AI-news items carry full article bodies, long Zhihu articles
 take most of the top ranks (ranks 1–5 on 2026-10-12) while a two-line X post on
-a holding sits at rank 40. Read the investing index and the tickers, not the
-rank, for investing. Then:
+a holding sits at rank 40. That is left as it is, because the articles that get
+picked are long too. Read the investing index and the tickers, not the rank,
+for investing. Then:
 
 - **Skim the top of `discarded.md`** once per run. The filter is recall-first but
   not perfect; it has dropped real picks as "promo" (a question-style Reddit post,
@@ -189,7 +191,11 @@ companies, and faithful reports of their words, are primary sources on strategy
 and often the earliest public signal. The prefilter boosts them (list and
 weights in `src/signal_digest/leaders.py`; the signals line shows `leader xN`).
 Still judge by content: a prolific poster's jokes, politics and reposts count for
-nothing.
+nothing, and a leader's remark on a story already picked is a new voice, not a
+development, unless it discloses a figure, a decision or guidance of the
+leader's own company. Who speaks raises the weight of a fact; it does not
+replace one (the Broadcom CEO's "capital could be the constraint", 2026-10-12,
+was the funding story's third day with no new number).
 
 **Engagement** measures what the crowd already knows. Use it as context, never as
 the reason to pick.
@@ -198,7 +204,10 @@ the reason to pick.
 would matter if true, spend one web search to confirm the claim and read what
 was actually said. Headline accounts (Polymarket, zerohedge) routinely reframe;
 a verified-but-reframed claim may move from investing to AI or drop out. State
-the result in one sentence with the primary source linked.
+the result in one sentence with the primary source linked. The heading and the
+TL;DR then carry what the primary source says, not the feed post's paraphrase
+(on 2026-10-12 a post's "memory is the weak link" became a heading; the source
+said financing).
 
 ## Report
 
@@ -244,11 +253,18 @@ Sources: …
 Rules:
 
 - **Budget: about 800 words, never more than 1,200**, links excluded. TL;DR bullets
-  are one or two sentences. A pick's body is under 150 words. Near misses holds at
-  most five lines; the tail gets no more words than that.
+  are one or two sentences, at most 60 words. A pick's body is under 150 words.
+  Near misses holds at most five lines; the tail gets no more words than that.
+  The lint rejects a longer bullet or body, so a three-pick report fits only
+  when every body is tight: cut the story so far and the second example, never
+  the verification sentence.
 - Whenever Investing has fewer than two picks, the first Near-misses line names the
   best investing candidate that was not picked and why it lost, so a dropped
-  candidate on a holding or premise never vanishes without a trace.
+  candidate on a holding or premise never vanishes without a trace. It is a
+  different item from every pick (a second claim inside a picked post does not
+  count; the lint rejects it). Walk the "Top investing candidates" index from
+  the top: the first item you did not pick is the one to name, with its index
+  rank, unless you say why a lower one is the stronger candidate.
 - Keep both TL;DR headings; a goal with no picks says "Nothing today."
 - Every pick gets one `Sources:` line right under its heading, then a blank line,
   then the body (a bare line break would merge them in rendered Markdown). Copy
@@ -279,12 +295,15 @@ Run the lint before logging and fix every error it reports:
 … lint --run-dir <run id>
 ```
 
-It checks the word budget, the pick cap, the TL;DR and `Sources:` structure, and
-every link label against its URL (a label saying "via Coinpaper" on a kucoin.com
-URL is the kind of slip it exists for). `lookup_links` lists every link that is
+It checks the word budget, the pick cap, the TL;DR bullet and pick-body lengths,
+the TL;DR and `Sources:` structure, the first Near-misses line, and every link
+label against its URL (a label saying "via Coinpaper" on a kucoin.com URL is the
+kind of slip it exists for). `lookup_links` lists every link that is
 not an item of this run: each must be a page you opened during verification, not
 a URL from memory; remove any you can't account for. Warnings are judgment calls;
-errors are not. The daily reviewer runs the same lint on your report.
+errors are not. A budget warning on a report whose parts all pass means the
+near misses or the headings are padded; trim them. The daily reviewer runs the
+same lint on your report.
 
 A pick is an item with its own heading in the report; folded-in evidence is not
 a pick. Log each with its goal:
