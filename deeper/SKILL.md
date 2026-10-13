@@ -17,7 +17,7 @@ Pin down the task before touching it. Sources, in order of preference:
 1. **The session.** The user's most recent request, or the task you were in the middle of when they said "deeper". Reconstruct it from what was actually asked and what you have actually done so far — files read, commands run, data touched. This context is the whole reason the skill runs in-session; use it.
 2. **A pasted prompt or a file** the user points at.
 
-Write the task in one or two lines as the user would state it, and name the **field** and the **specific professional** whose work this is. Not "an expert" — a forensic accountant, a survey statistician, a reliability engineer, a working translator of legal Chinese. If the task straddles fields, pick the one whose standards would embarrass the current draft most. If the task is genuinely unclear, ask one sharp question; otherwise state your reading and proceed.
+Write the task in one or two lines as the user would state it, and name the **field** and the **specific professional** whose work this is. Name a concrete job title, not the generic label "an expert" or "a professional": a forensic accountant, a survey statistician, a reliability engineer, a working translator of legal Chinese. A generic label yields generic answers below ("use rigorous statistics"); a real title pulls in that role's actual instruments, raw material, and standards of proof. If the task straddles fields, pick the one whose standards would embarrass the current draft most. If the task is genuinely unclear, ask one sharp question; otherwise state your reading and proceed.
 
 ## Step 2: Answer the four questions
 
