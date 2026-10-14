@@ -95,8 +95,14 @@ unless you also pass `--sources default`.
 A dozen items or fewer don't need the prefilter; add `--filter none`. Name the
 inputs on the report's `Inputs:` line whenever they are not the default feeds.
 
-**Failures.** One broken source doesn't stop the run; it appears in
-`collect.sources.<name>.error`. Report it and carry on. A missing
+**Failures.** One broken source doesn't stop the run. A source that raises or
+returns nothing is fetched a second time after a short pause; the manifest then
+shows `attempts: 2`, and a source that failed both times keeps its
+`collect.sources.<name>.error`. Report a failed source in Near misses and carry
+on; when a whole X feed is missing from the morning run, say so in chat too,
+since the afternoon run's default `union` merges the morning items but cannot
+recover what was never fetched. An enrichment failure (retweet lookup, linked
+article) no longer loses the feed; the posts arrive unenriched. A missing
 `TYPESAFE_API_KEY` returns `ok: false` with the fix; tell the user and re-run
 `filter --run-dir <id> --filter none`. If Reddit's session has expired, refresh
 it with `python ~/projects/browser/src/refresh_state.py reddit.com`. If the AI
