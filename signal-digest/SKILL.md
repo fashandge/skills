@@ -95,14 +95,37 @@ unless you also pass `--sources default`.
 A dozen items or fewer don't need the prefilter; add `--filter none`. Name the
 inputs on the report's `Inputs:` line whenever they are not the default feeds.
 
-**Failures.** One broken source doesn't stop the run. A source that raises or
-returns nothing is fetched a second time after a short pause; the manifest then
-shows `attempts: 2`, and a source that failed both times keeps its
-`collect.sources.<name>.error`. Report a failed source in Near misses and carry
-on; when a whole X feed is missing from the morning run, say so in chat too,
-since the afternoon run's default `union` merges the morning items but cannot
-recover what was never fetched. An enrichment failure (retweet lookup, linked
-article) no longer loses the feed; the posts arrive unenriched. A missing
+**Failures.** One broken source doesn't stop the run. The pipeline repairs what
+it can on its own, and every repair leaves a trace in `manifest.json` under
+`collect.sources.<name>`: a source that raises or returns nothing is fetched a
+second time after a short pause (`attempts: 2`); a failed enrichment (retweet
+lookup, linked article) keeps the posts unenriched instead of losing the feed;
+Reddit refreshes its own session; an X Today's News file that is not from today
+is fetched inline (`repair`, or `repair_failed`). A source that still failed
+keeps its `error`, and its traceback is in the run's `collect.log`. The
+shortlist header repeats all of this as a `Collection:` line when anything
+happened. Two things are yours:
+
+- **Repair once, then refetch once.** When a source still has an `error` or
+  zero items, read `collect.log` for the traceback. An operational cause (an
+  expired X or Reddit session, a fetcher that just needed another go) you fix
+  directly. A bug in our own code (a traceback into `~/projects/news/src` or
+  `~/skills`) you fix minimally, run that package's tests, and only when they
+  pass commit it in that repo with a message naming the run, `git pull --rebase`
+  and push to main; if the tests fail or one attempt doesn't find the cause,
+  `git checkout -- .` there and leave the failure for the Collection line. Then
+  `… refetch --run-dir <run id>`: it fetches only the failed sources again into
+  the same run, merges the items, re-filters, and records `repair` on each. It
+  refuses a second pass on the same run, so there is no refetch loop. The
+  unattended job posts any failure, repair or lint error to Discord, which is
+  how a problem stays visible after the daily review retires.
+- **Report it.** The report's `Collection:` line names every source that failed,
+  was retried, or was repaired, with what happened, including a code fix's commit
+  hash and the refetch result (the lint checks the names against the manifest). When a whole X feed is still missing from the morning run, say
+  so in chat too, since the afternoon run's default `union` merges the morning
+  items but cannot recover what was never fetched.
+
+A missing
 `TYPESAFE_API_KEY` returns `ok: false` with the fix; tell the user and re-run
 `filter --run-dir <id> --filter none`. If Reddit's session has expired, refresh
 it with `python ~/projects/browser/src/refresh_state.py reddit.com`. If the AI
@@ -258,7 +281,7 @@ Sources: …
 <N collected → M shortlisted → K picked.>
 
 - [<author>, <source>](<link>): <what it was and why it lost, one line>
-- Source errors: <source and error, or none>
+- Collection: <every source that failed, was retried or repaired, and what happened; or "all sources fetched clean on the first attempt">
 ```
 
 Rules:
@@ -307,8 +330,9 @@ Run the lint before logging and fix every error it reports:
 ```
 
 It checks the word budget, the pick cap, the TL;DR bullet and pick-body lengths,
-the TL;DR and `Sources:` structure, the first Near-misses line, and every link
-label against its URL (a label saying "via Coinpaper" on a kucoin.com URL is the
+the TL;DR and `Sources:` structure, the first Near-misses line, the `Collection:`
+line against the manifest (every failed, retried or repaired source must be
+named), and every link label against its URL (a label saying "via Coinpaper" on a kucoin.com URL is the
 kind of slip it exists for). `lookup_links` lists every link that is
 not an item of this run: each must be a page you opened during verification, not
 a URL from memory; remove any you can't account for. Warnings are judgment calls;
@@ -339,7 +363,8 @@ weights in `src/signal_digest/jev_filter.py` need retuning.
   9:00 and 15:45 LaunchAgent entry point).
 - Data: `~/projects/news/data/signal_digest/runs/<run id>/` (deleted after
   10 days; keep it that long so a week-later review can compare report.md against the
-  items, scores and raw snapshots it came from), `picks.jsonl` (the memory that
+  items, scores and raw snapshots it came from; `collect.log` there holds the
+  collectors' stderr, tracebacks included), `picks.jsonl` (the memory that
   drives `PICKED <date>` markers),
   `seen_counts.json`.
 - The reader profile is rebuilt every run from `stock_picker/data/portfolio.csv`,

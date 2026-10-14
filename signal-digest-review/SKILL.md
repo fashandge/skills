@@ -51,8 +51,11 @@ Answer every point in one or two sentences, with the item linked.
    An error costs the Format point. Then by eye: the TL;DR standing alone,
    and Near misses naming the best unpicked investing item when Investing had
    fewer than two picks.
-6. **Pipeline health.** Source errors, stale brief or X Today, AI-news items
-   with no body, retweets still ending in "…", and the Jev rank and
+6. **Pipeline health.** Source errors and repairs (`attempts`, `repair`,
+   `repair_failed` and `refetch` in the manifest's `collect` block, with the
+   traceback in the run's `collect.log`; the report's `Collection:` line must
+   match them, and a repair that worked is not a pipeline fault), stale brief
+   or X Today, AI-news items with no body, retweets still ending in "…", and the Jev rank and
    `keep_reason` of each pick (from `scored.jsonl`; a pick below the keep line
    is a filter miss worth noting; the line is per track since 2026-10-12, so
    compare an investing pick's `invest` rank, not its overall rank).
