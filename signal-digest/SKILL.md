@@ -119,8 +119,10 @@ happened. Two things are yours:
   refuses a second pass on the same run, so there is no refetch loop. The
   unattended job posts any failure, repair or lint error to Discord, which is
   how a problem stays visible after the daily review retires.
-- **Report it.** The report's `Collection:` line names every source that failed,
-  was retried, or was repaired, with what happened, including a code fix's commit
+- **Report it.** The report's `Collection:` line opens with what every source
+  fetched (the shortlist header's "Fetched per source" counts), so a feed that
+  quietly came back thin is visible even when nothing failed, then names every
+  source that failed, was retried, or was repaired, with what happened, including a code fix's commit
   hash and the refetch result (the lint checks the names against the manifest). When a whole X feed is still missing from the morning run, say
   so in chat too, since the afternoon run's default `union` merges the morning
   items but cannot recover what was never fetched.
@@ -281,7 +283,7 @@ Sources: …
 <N collected → M shortlisted → K picked.>
 
 - [<author>, <source>](<link>): <what it was and why it lost, one line>
-- Collection: <every source that failed, was retried or repaired, and what happened; or "all sources fetched clean on the first attempt">
+- Collection: fetched <source count · source count · …>; <every source that failed, was retried or repaired, and what happened; or "all sources fetched clean on the first attempt">
 ```
 
 Rules:
@@ -331,8 +333,8 @@ Run the lint before logging and fix every error it reports:
 
 It checks the word budget, the pick cap, the TL;DR bullet and pick-body lengths,
 the TL;DR and `Sources:` structure, the first Near-misses line, the `Collection:`
-line against the manifest (every failed, retried or repaired source must be
-named), and every link label against its URL (a label saying "via Coinpaper" on a kucoin.com URL is the
+line against the manifest (every source's fetched count, and every failed,
+retried or repaired source, must be named), and every link label against its URL (a label saying "via Coinpaper" on a kucoin.com URL is the
 kind of slip it exists for). `lookup_links` lists every link that is
 not an item of this run: each must be a page you opened during verification, not
 a URL from memory; remove any you can't account for. Warnings are judgment calls;

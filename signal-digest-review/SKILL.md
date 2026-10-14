@@ -54,7 +54,8 @@ Answer every point in one or two sentences, with the item linked.
 6. **Pipeline health.** Source errors and repairs (`attempts`, `repair`,
    `repair_failed` and `refetch` in the manifest's `collect` block, with the
    traceback in the run's `collect.log`; the report's `Collection:` line must
-   match them, and a repair that worked is not a pipeline fault), stale brief
+   match them, and a repair that worked is not a pipeline fault), a source whose
+   fetched count on that line is far below its usual, stale brief
    or X Today, AI-news items with no body, retweets still ending in "…", and the Jev rank and
    `keep_reason` of each pick (from `scored.jsonl`; a pick below the keep line
    is a filter miss worth noting; the line is per track since 2026-10-12, so
