@@ -119,7 +119,9 @@ happened. Two things are yours:
   refuses a second pass on the same run, so there is no refetch loop. The
   unattended job posts any failure, repair or lint error to Discord, which is
   how a problem stays visible after the daily review retires.
-- **Report it.** The report's `Collection:` line opens with what every source
+- **Report it.** The report's `Collection:` sentence, in the opening paragraph of
+  Near misses right after the funnel line (not a bullet: the bullets are items
+  that lost), opens with what every source
   fetched (the shortlist header's "Fetched per source" counts), so a feed that
   quietly came back thin is visible even when nothing failed, then names every
   source that failed, was retried, or was repaired, with what happened, including a code fix's commit
@@ -280,10 +282,9 @@ Sources: …
 
 ## Near misses
 
-<N collected → M shortlisted → K picked.>
+<N collected → M shortlisted → K picked.> Collection: fetched <source count · source count · …>; <every source that failed, was retried or repaired, and what happened; or "all sources fetched clean on the first attempt">
 
 - [<author>, <source>](<link>): <what it was and why it lost, one line>
-- Collection: fetched <source count · source count · …>; <every source that failed, was retried or repaired, and what happened; or "all sources fetched clean on the first attempt">
 ```
 
 Rules:
