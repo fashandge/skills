@@ -75,10 +75,21 @@ posts in the personalized order you actually see when you open the page).
   For the follow-up you didn't plan for, `--from <run dir> --grep X --rescan`
   recounts over posts already on disk: no network, no browser, instant. Reach
   for that instead of hand-rolling `grep` over the folder.
-- **Long runs are safe to start** — 429s are backed off automatically, posts are
-  fetched in batches with a fresh browser session each, and every post is
+- **Long runs are safe to start** — rate limits are paced and waited out (next
+  point), posts are fetched in batches with a fresh browser session each, and every post is
   appended to `index.jsonl` as it lands. After any interruption, re-run the same
   command with `--out <same dir> --resume`.
+- **Rate limits are paced, bounded, and losses are named** — Reddit allows 100
+  requests per 10-minute window and reports what is left on every response.
+  Below 10 left, the fetcher spreads the rest over the window (a large run slows
+  to Reddit's pace; it prints one line when this starts). A 429 waits exactly
+  until Reddit's reported reset, but only while all such waits fit in
+  `--max-cooldown` (default 600 s, one window; `0` = never wait). Once a wait
+  would not fit, every post not yet tried is skipped. The `DONE:` line lists
+  each failed and skipped URL (and `index.md` repeats them), so read it before
+  reporting coverage; `--resume` later picks them up. If you trim the output
+  (`| tail -2`), keep the `DONE:` line — it is complete on its own — and never
+  report "N posts fetched" without checking it for failed or skipped posts.
 - **Comments are complete** — "load more" stubs are expanded via the
   `morechildren` API. The per-post header shows `comments: <num>` vs how many were
   rendered; the small gap is just skipped `[deleted]`/`[removed]` bodies.

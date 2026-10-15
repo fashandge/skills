@@ -62,23 +62,47 @@ class TestFetchJson:
         page = FakePage([{"status": 200, "body": '{"ok": 1}'}])
         assert frp.fetch_json(page, "u") == {"ok": 1}
 
-    def test_429_backs_off_then_succeeds(self, monkeypatch):
-        monkeypatch.setattr(frp.time, "sleep", lambda s: None)
+    def test_429_waits_for_the_reported_reset_then_succeeds(self):
+        waits = []
+        frp.RATE = frp.RateLimit(max_cooldown=600, sleep=waits.append)
         page = FakePage([
-            {"status": 429, "retryAfter": "1", "body": ""},
-            {"status": 429, "retryAfter": None, "body": ""},
+            {"status": 429, "reset": "42", "remaining": "0", "body": ""},
             {"status": 200, "body": '{"ok": 1}'},
         ])
         assert frp.fetch_json(page, "u") == {"ok": 1}
-        assert page.calls == 3
+        assert waits == [43]  # the reported reset plus a 1 s margin, nothing blind
 
-    def test_429_exhausted_raises_with_status(self, monkeypatch):
-        monkeypatch.setattr(frp.time, "sleep", lambda s: None)
-        page = FakePage([{"status": 429, "retryAfter": None, "body": ""}] * 3)
+    def test_429_past_the_budget_raises_at_once_without_backoff(self):
+        waits = []
+        frp.RATE = frp.RateLimit(max_cooldown=100, sleep=waits.append)
+        page = FakePage([{"status": 429, "reset": "540", "body": ""}])
         with pytest.raises(frp.RedditHTTPError) as e:
-            frp.fetch_json(page, "u", retries=2)
-        assert e.value.status == 429
-        assert "rate limited" in str(e.value)
+            frp.fetch_json(page, "u")
+        assert e.value.status == 429 and page.calls == 1 and waits == []
+        assert "--resume" in str(e.value)
+
+    def test_429_without_headers_uses_retry_after_then_the_fallback(self):
+        waits = []
+        frp.RATE = frp.RateLimit(max_cooldown=600, sleep=waits.append)
+        page = FakePage([
+            {"status": 429, "retryAfter": "5", "body": ""},
+            {"status": 429, "body": ""},
+            {"status": 200, "body": "{}"},
+        ])
+        frp.fetch_json(page, "u")
+        assert waits == [6, frp.FALLBACK_COOLDOWN + 1]
+
+    def test_5xx_still_backs_off(self, monkeypatch):
+        monkeypatch.setattr(frp.time, "sleep", lambda s: None)
+        page = FakePage([{"status": 503, "body": ""}, {"status": 200, "body": "{}"}])
+        assert frp.fetch_json(page, "u") == {}
+        assert page.calls == 2
+
+    def test_every_response_updates_the_budget(self):
+        frp.RATE = frp.RateLimit(clock=lambda: 1000.0)
+        frp.fetch_json(FakePage([{"status": 200, "remaining": "57.0", "reset": "300",
+                                  "body": "{}"}]), "u")
+        assert frp.RATE.remaining == 57 and frp.RATE.reset_at == 1300
 
     def test_403_does_not_retry_and_names_the_refresh_command(self):
         page = FakePage([{"status": 403, "body": ""}])
@@ -408,3 +432,215 @@ class TestPaginate:
         ], "after": "x"}}]
         got = frp.paginate(lambda u: pages[0], "/r/x/new", {}, n=10, cutoff=1000)
         assert [p["id"] for p in got] == ["a"]
+
+
+# --------------------------------------------------------------------------- #
+# Rate limits: on 2026-10-14 a burst spent Reddit's 100-request window and 6 of
+# 13 posts were silently dropped (each burned ~60 s of blind backoff, then the
+# run printed only "DONE: 2 posts"). Waits must follow Reddit's own reset
+# time, stay within a run-wide budget, and every loss must be named.
+# --------------------------------------------------------------------------- #
+def r429(pl="x"):
+    return frp.RedditHTTPError(429, pl, "rate limited")
+
+
+def items(*pls, start=1):
+    return list(enumerate(pls, start))
+
+
+def url(pl):
+    return f"{frp.REDDIT}{pl}"
+
+
+class ScriptedBatches:
+    """fetch_batch stand-in: each call consumes one scripted outcome.
+
+    An outcome is {permalink: exc-or-None}; posts mapped to None (or absent)
+    land in the ledger. A 429 defers the rest of the call, as run_batch does.
+    An outcome that is an Exception instance is raised (a dead session).
+    """
+
+    def __init__(self, out_dir, outcomes):
+        self.out_dir, self.outcomes, self.calls = out_dir, list(outcomes), []
+
+    def __call__(self, batch):
+        self.calls.append([pl for _, pl in batch])
+        outcome = self.outcomes.pop(0) if self.outcomes else {}
+        if isinstance(outcome, Exception):
+            raise outcome
+        errors = {}
+        for pos, (idx, pl) in enumerate(batch):
+            exc = outcome.get(pl)
+            if exc is None:
+                frp.append_ledger(self.out_dir, {"n": idx, "url": url(pl)})
+                continue
+            errors[pl] = exc
+            if frp.is_rate_limited(exc):
+                return errors, batch[pos + 1:]
+        return errors, []
+
+
+@pytest.fixture(autouse=True)
+def fresh_rate_limit(monkeypatch):
+    """Each test gets its own budget; the real one would sleep."""
+    monkeypatch.setattr(frp, "RATE", frp.RateLimit(sleep=lambda s: None))
+
+
+class Clock:
+    def __init__(self, t=0.0):
+        self.t = t
+
+    def __call__(self):
+        return self.t
+
+
+class TestRateLimit:
+    def make(self, remaining, reset, **kw):
+        clock, waits = Clock(), []
+        rl = frp.RateLimit(clock=clock, sleep=waits.append, **kw)
+        rl.update(remaining, reset)
+        return rl, clock, waits
+
+    def test_no_pacing_while_plenty_remain(self):
+        rl, _, waits = self.make("99.0", "540")
+        rl.pace()
+        assert waits == []
+
+    def test_low_budget_spreads_the_rest_over_the_window(self):
+        rl, _, waits = self.make("4", "200")
+        rl.pace()
+        assert waits == [50]  # 200 s left / 4 requests
+
+    def test_exhausted_budget_waits_out_the_window(self):
+        rl, _, waits = self.make("0", "120")
+        rl.pace()
+        assert waits == [120]
+
+    def test_count_goes_stale_once_the_window_resets(self):
+        rl, clock, waits = self.make("2", "30")
+        clock.t = 31
+        rl.pace()
+        assert waits == [] and rl.remaining is None
+
+    def test_unknown_budget_never_pauses(self):
+        rl, _, waits = self.make(None, None)
+        rl.pace()
+        assert waits == []
+
+    def test_cooldown_waits_exactly_until_reset_within_budget(self):
+        rl, _, waits = self.make("0", "540", max_cooldown=600)
+        assert rl.cooldown(540) is True
+        assert waits == [541] and rl.spent == 541
+
+    def test_cooldown_refuses_rather_than_overrun_the_budget(self):
+        rl, _, waits = self.make("0", "540", max_cooldown=600)
+        rl.cooldown(540)
+        assert rl.cooldown(540) is False  # a second full window does not fit
+        assert waits == [541]
+
+    def test_zero_budget_never_waits(self):
+        rl, _, waits = self.make("0", "5", max_cooldown=0)
+        assert rl.cooldown(5) is False and waits == []
+
+
+class TestFetchPosts:
+    def run(self, tmp_path, outcomes, its, batch_size=25):
+        waits = []
+        fb = ScriptedBatches(tmp_path, outcomes)
+        failed, skipped = frp.fetch_posts(its, tmp_path, batch_size, fb,
+                                          sleep=waits.append)
+        return failed, skipped, fb
+
+    def test_clean_run_reports_nothing(self, tmp_path):
+        failed, skipped, fb = self.run(tmp_path, [{}], items("/a", "/b"))
+        assert (failed, skipped) == ({}, [])
+
+    def test_posts_keep_the_numbers_they_were_given(self, tmp_path):
+        self.run(tmp_path, [{}], items("/a", "/b", "/c", start=7))
+        assert sorted(r["n"] for r in frp.read_ledger(tmp_path)) == [7, 8, 9]
+
+    def test_an_escaped_429_fails_that_post_and_skips_the_rest(self, tmp_path):
+        failed, skipped, fb = self.run(
+            tmp_path, [{"/b": r429()}], items("/a", "/b", "/c", "/d", "/e"),
+            batch_size=3)
+        assert failed == {url("/b"): "HTTP 429"}
+        assert skipped == [url("/c"), url("/d"), url("/e")]
+        assert len(fb.calls) == 1  # later batches cost no requests
+
+    def test_other_errors_fail_only_their_post(self, tmp_path):
+        err = frp.RedditHTTPError(404, "/a", "no such post")
+        failed, skipped, fb = self.run(tmp_path, [{"/a": err}, {}],
+                                       items("/a", "/b", "/c"), batch_size=2)
+        assert failed == {url("/a"): "HTTP 404"} and skipped == []
+        assert len(fb.calls) == 2
+
+    def test_dead_session_retries_once_then_names_what_is_lost(self, tmp_path):
+        frp.append_ledger(tmp_path, {"n": 1, "url": url("/a")})  # landed before the crash
+        boom = RuntimeError("browser closed")
+        failed, _, fb = self.run(tmp_path, [boom, boom], items("/a", "/b"))
+        assert fb.calls == [["/a", "/b"], ["/b"]]
+        assert failed == {url("/b"): "session died: browser closed"}
+
+    def test_dead_session_recovers_on_the_retry(self, tmp_path):
+        failed, _, fb = self.run(tmp_path, [RuntimeError("x"), {}], items("/a"))
+        assert failed == {} and len(fb.calls) == 2
+
+
+class TestRunBatch:
+    def test_a_429_stops_the_batch_and_defers_the_rest(self, monkeypatch, tmp_path):
+        tried = []
+
+        def fake_fetch_post(fetch, pl, *a):
+            tried.append(pl)
+            if pl == "/b":
+                raise r429(pl)
+            return {"post": {"title": pl}, "comments_md": "", "comment_count": 0}
+
+        monkeypatch.setattr(frp, "in_session", lambda op: op(None, None))
+        monkeypatch.setattr(frp, "fetch_post", fake_fetch_post)
+        monkeypatch.setattr(frp.time, "sleep", lambda s: None)
+        errors, deferred = frp.run_batch(items("/a", "/b", "/c", "/d"), tmp_path,
+                                         "confidence", 0, False)
+        assert tried == ["/a", "/b"]
+        assert list(errors) == ["/b"] and frp.is_rate_limited(errors["/b"])
+        assert deferred == [(3, "/c"), (4, "/d")]
+
+    def test_posts_are_paced_at_least_1_5_s_apart(self, monkeypatch, tmp_path):
+        sleeps = []
+        monkeypatch.setattr(frp, "in_session", lambda op: op(None, None))
+        monkeypatch.setattr(frp, "fetch_post", lambda *a: {
+            "post": {"title": "t"}, "comments_md": "", "comment_count": 0})
+        monkeypatch.setattr(frp.time, "sleep", sleeps.append)
+        frp.run_batch(items("/a", "/b", "/c"), tmp_path, "confidence", 0, False)
+        assert len(sleeps) == 3 and min(sleeps) >= 1.5
+
+
+class TestMoreChildrenRateLimit:
+    def test_a_429_while_expanding_comments_fails_the_post_not_truncates_it(self):
+        top = [{"kind": "more", "data": {"children": ["c1", "c2"]}}]
+
+        def fetch(u):
+            raise r429(u)
+
+        with pytest.raises(frp.RedditHTTPError) as e:
+            frp.build_comment_forest(fetch, "t3_x", top)
+        assert e.value.status == 429
+
+
+class TestDoneLine:
+    def test_clean_run_is_unchanged(self, tmp_path):
+        assert frp.done_line(5, tmp_path, {}, []) == f"DONE: 5 posts -> {tmp_path}"
+
+    def test_names_every_failed_and_skipped_url_on_the_one_line(self, tmp_path):
+        line = frp.done_line(2, tmp_path, {url("/a"): "HTTP 429", url("/b"): "HTTP 404"},
+                             [url("/c")])
+        assert "\n" not in line
+        assert line.startswith("DONE: 2 posts, 2 failed (")
+        for u in (url("/a"), url("/b"), url("/c")):
+            assert u in line
+        assert "[HTTP 429]" in line and "1 skipped" in line and "--resume" in line
+
+    def test_index_md_lists_failed_and_skipped(self, tmp_path):
+        frp.write_index(tmp_path, [], "h", {url("/a"): "HTTP 429"}, [url("/b")])
+        md = (tmp_path / "index.md").read_text()
+        assert f"**FAILED** {url('/a')}" in md and f"**SKIPPED**" in md

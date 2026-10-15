@@ -106,9 +106,12 @@ async (u) => {
   try {
     const r = await fetch(u, {credentials: 'include'});
     return {status: r.status, retryAfter: r.headers.get('retry-after'),
+            remaining: r.headers.get('x-ratelimit-remaining'),
+            reset: r.headers.get('x-ratelimit-reset'),
             body: await r.text()};
   } catch (e) {
-    return {status: 0, retryAfter: null, body: '', error: String(e)};
+    return {status: 0, retryAfter: null, remaining: null, reset: null,
+            body: '', error: String(e)};
   }
 }
 """
@@ -231,15 +234,93 @@ class RedditHTTPError(RuntimeError):
         super().__init__(msg)
 
 
+def _num(v) -> float | None:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+# Reddit's logged-in .json budget, as its headers report it (measured
+# 2026-10-14): 100 requests per 10-minute window, with x-ratelimit-remaining
+# and x-ratelimit-reset (seconds until the window resets) on every response.
+PACE_BELOW = 10              # start spacing requests out below this many left
+FALLBACK_COOLDOWN = 60       # seconds to wait on a 429 that names no reset time
+DEFAULT_MAX_COOLDOWN = 600   # run-wide cap on 429 waits (--max-cooldown); one window
+
+
+class RateLimit:
+    """Reddit's per-account request budget, tracked from response headers.
+
+    `pace()` runs before every request: while plenty remain it does nothing;
+    below PACE_BELOW it spreads the remaining requests evenly over the time
+    left in the window, so the run slows down instead of hitting a 429.
+    `cooldown()` runs on a 429: it waits exactly until the reported reset,
+    but only if that fits in what is left of `max_cooldown` across the whole
+    run; otherwise it refuses, and the caller gives up on the request.
+    """
+
+    def __init__(self, max_cooldown: float = DEFAULT_MAX_COOLDOWN,
+                 clock=time.monotonic, sleep=time.sleep):
+        self.max_cooldown, self.clock, self.sleep = max_cooldown, clock, sleep
+        self.remaining: float | None = None
+        self.reset_at: float | None = None
+        self.spent = 0.0
+        self._pacing_noted = False
+
+    def update(self, remaining, reset) -> None:
+        remaining, reset = _num(remaining), _num(reset)
+        if remaining is not None:
+            self.remaining = remaining
+        if reset is not None:
+            self.reset_at = self.clock() + reset
+
+    def pace(self) -> None:
+        if self.remaining is None or self.reset_at is None:
+            return
+        left = self.reset_at - self.clock()
+        if left <= 0:  # the window has reset; the count is stale
+            self.remaining, self.reset_at = None, None
+            return
+        if self.remaining >= PACE_BELOW:
+            return
+        delay = left / max(self.remaining, 1)
+        if not self._pacing_noted:
+            self._pacing_noted = True
+            print(f"  rate budget low ({self.remaining:.0f} requests left, window "
+                  f"resets in {left:.0f}s): spacing requests ~{delay:.0f}s apart",
+                  flush=True)
+        self.sleep(delay)
+
+    def cooldown(self, reset_in: float | None) -> bool:
+        wait = (reset_in if reset_in is not None else FALLBACK_COOLDOWN) + 1
+        if self.spent + wait > self.max_cooldown:
+            return False
+        print(f"  rate limited: waiting {wait:.0f}s for Reddit's window to reset "
+              f"({self.spent + wait:.0f}/{self.max_cooldown:.0f}s cool-down budget)",
+              flush=True)
+        self.sleep(wait)
+        self.spent += wait
+        self.remaining, self.reset_at = None, None
+        self._pacing_noted = False
+        return True
+
+
+RATE = RateLimit()  # one budget per process; main() sets max_cooldown
+
+
 def fetch_json(page, url: str, retries: int = 5):
     """GET `url` from inside the reddit.com origin and parse JSON.
 
     Handles the failure modes that otherwise surface as a bare JSONDecodeError:
-    429 (empty body) is retried with backoff, and every other non-200 raises a
-    RedditHTTPError that names the status and what to do about it.
+    a 429 waits for Reddit's reported reset within the run's cool-down budget
+    (RATE) and raises once that is spent; 5xx are retried with backoff; every
+    other non-200 raises a RedditHTTPError that names the status and the fix.
     """
     for attempt in range(retries + 1):
+        RATE.pace()
         r = page.evaluate(_FETCH_JS, url)
+        RATE.update(r.get("remaining"), r.get("reset"))
         status, body = r.get("status", 0), r.get("body") or ""
 
         if status == 200:
@@ -254,28 +335,27 @@ def fetch_json(page, url: str, retries: int = 5):
                     "python ~/projects/browser/src/refresh_state.py reddit.com",
                     body) from None
 
-        if status in (429, 500, 502, 503, 504) and attempt < retries:
-            delay = None
-            ra = r.get("retryAfter")
-            if ra:
-                try:
-                    delay = float(ra)
-                except ValueError:
-                    delay = None
-                if delay is not None and delay > 120:
-                    delay = None  # implausible; fall back to our own backoff
-            if delay is None:
+        if status == 429:
+            # No blind backoff: the window resets when Reddit says, so either
+            # wait exactly that long (if the run's budget allows) or give up.
+            reset_in = _num(r.get("reset"))
+            if reset_in is None:
+                reset_in = _num(r.get("retryAfter"))
+            if attempt < retries and RATE.cooldown(reset_in):
+                continue
+            raise RedditHTTPError(429, url,
+                                  "rate limited and the cool-down budget is spent — "
+                                  "rerun later with --resume, or raise --max-cooldown")
+
+        if status in (500, 502, 503, 504) and attempt < retries:
+            delay = _num(r.get("retryAfter"))
+            if delay is None or delay > 120:  # absent or implausible: own backoff
                 delay = min(60.0, 2.0 * (2 ** attempt)) * random.uniform(0.8, 1.2)
             sys.stderr.write(f"  [http {status}] retry {attempt + 1}/{retries} "
                              f"in {delay:.0f}s\n")
             sys.stderr.flush()
             time.sleep(delay)
             continue
-
-        if status == 429:
-            raise RedditHTTPError(429, url,
-                                  "rate limited and out of retries — rerun with a "
-                                  "smaller --batch-size or -n, or wait a few minutes")
         if status in (401, 403):
             raise RedditHTTPError(status, url,
                                   "the logged-in session is likely expired. Refresh: "
@@ -765,6 +845,8 @@ def build_comment_forest(fetch, link_fullname: str, top_children: list[dict],
             for t in data["json"]["data"]["things"]:
                 add_thing(t)
         except Exception as exc:  # keep going; partial is better than nothing
+            if is_rate_limited(exc):
+                raise  # not partial: the post is retried after a cool-down
             sys.stderr.write(f"  [warn] morechildren batch failed: {exc}\n")
         time.sleep(0.4)
     return roots
@@ -905,9 +987,32 @@ def rescan_grep(out_dir: pathlib.Path, pattern: str) -> list[dict]:
     return rows
 
 
-def write_index(out_dir: pathlib.Path, rows: list[dict], header: str) -> None:
+def done_line(n_posts: int, out_dir: pathlib.Path, failed: dict[str, str],
+              skipped: list[str]) -> str:
+    """The run's last word — complete on its own, since callers often `tail` it."""
+    line = f"DONE: {n_posts} posts"
+    if failed:
+        line += f", {len(failed)} failed (" + ", ".join(
+            f"{u} [{r}]" for u, r in failed.items()) + ")"
+    if skipped:
+        line += (f", {len(skipped)} skipped after the rate-limit cool-down budget "
+                 f"ran out (" + ", ".join(skipped) + ")")
+    if failed or skipped:
+        line += "; rerun the same command with --resume to retry them"
+    return f"{line} -> {out_dir}"
+
+
+def write_index(out_dir: pathlib.Path, rows: list[dict], header: str,
+                failed: dict[str, str] | None = None,
+                skipped: list[str] | None = None) -> None:
     (out_dir / "index.json").write_text(json.dumps(rows, indent=2))
     md = [f"# Reddit fetch — {header}, {len(rows)} posts", ""]
+    for u, r in (failed or {}).items():
+        md.append(f"- **FAILED** {u} — {r}")
+    for u in skipped or []:
+        md.append(f"- **SKIPPED** (rate-limit budget spent) {u}")
+    if failed or skipped:
+        md.append("")
     for r in rows:
         hits = (f" · **{r['grep_hits']} grep hits**"
                 if r.get("grep_hits") else "")
@@ -938,33 +1043,109 @@ def in_session(op):
         _run, slug="reddit.com", is_auth_error=is_auth_error)
 
 
-def run_batch(permalinks: list[str], start_idx: int, out_dir: pathlib.Path,
+# On 2026-10-14 ~45 full threads fetched 0.8 s apart spent Reddit's whole
+# 100-request window; every later post then burned ~60 s of blind 429 backoff
+# and was silently dropped. RATE (above) now paces from Reddit's own headers
+# and waits out a 429 only within the run's budget; a 429 that still reaches
+# this layer means the budget is spent, so the rest of the run is skipped.
+POST_DELAY = 2.0             # seconds between posts, jittered ±25%
+
+
+def is_rate_limited(exc: BaseException | None) -> bool:
+    return isinstance(exc, RedditHTTPError) and exc.status == 429
+
+
+def failure_reason(exc: BaseException) -> str:
+    if isinstance(exc, RedditHTTPError):
+        return f"HTTP {exc.status}" if exc.status else str(exc).splitlines()[-1].strip()
+    return (str(exc).splitlines() or [type(exc).__name__])[0][:80]
+
+
+def run_batch(items: list[tuple[int, str]], out_dir: pathlib.Path,
               comment_sort: str, max_more_calls: int, with_comments: bool,
-              grep: str | None = None) -> list[dict]:
-    """Fetch one batch of posts in a single Chrome session. Returns written rows.
+              grep: str | None = None
+              ) -> tuple[dict[str, BaseException], list[tuple[int, str]]]:
+    """Fetch (index, permalink) items in a single Chrome session.
+
+    Returns (errors, deferred): errors maps each permalink that was tried and
+    failed to its exception; deferred lists the items not tried because a 429
+    outlasted fetch_json's backoff — each would only burn another minute of it.
+    Landed posts go straight to the ledger.
 
     This is the swap point: if per-batch in-process sessions ever prove
     unreliable, this body becomes a subprocess call without touching callers.
     """
     def op(page, fetch):
-        rows = []
-        for offset, pl in enumerate(permalinks):
-            idx = start_idx + offset
+        errors: dict[str, BaseException] = {}
+        for pos, (idx, pl) in enumerate(items):
             try:
                 res = fetch_post(fetch, pl, comment_sort, max_more_calls, with_comments)
                 row = write_post(out_dir, idx, pl, res, grep)
                 append_ledger(out_dir, row)
-                rows.append(row)
                 hits = (f" grep:{row['grep_hits']}"
                         if row.get("grep_hits") else "")
                 print(f"  {idx:>3}. [{row['score']}↑ {row['num_comments']}c "
                       f"({row['comments_fetched']} fetched){hits}] "
                       f"{row['title'][:70]}", flush=True)
             except Exception as exc:
-                print(f"  {idx:>3}. FAILED {pl}: {exc}", flush=True)
-            time.sleep(0.8)
-        return rows
+                errors[pl] = exc
+                print(f"  {idx:>3}. FAILED {pl}: {failure_reason(exc)}", flush=True)
+                if is_rate_limited(exc):
+                    return errors, items[pos + 1:]
+            time.sleep(POST_DELAY * random.uniform(0.75, 1.25))
+        return errors, []
     return in_session(op)
+
+
+def fetch_posts(items: list[tuple[int, str]], out_dir: pathlib.Path,
+                batch_size: int, fetch_batch,
+                sleep=time.sleep) -> tuple[dict[str, str], list[str]]:
+    """Fetch every (index, permalink) item in batches. Returns (failed, skipped).
+
+    failed maps each URL that was tried and never landed to a short reason;
+    skipped lists URLs never tried. `fetch_batch(items) -> (errors, deferred)`
+    is run_batch with its options bound; it may raise if its browser session
+    dies, which earns one retry with a fresh session.
+
+    Waiting out rate limits happens inside fetch_json (RATE), so a 429 that
+    reaches here means the run's cool-down budget is spent: that post fails
+    and every post not yet tried is skipped without another request.
+    """
+    failed: dict[str, str] = {}
+    skipped: list[str] = []
+    gave_up = False
+    batches = [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
+    for bi, batch in enumerate(batches, 1):
+        if gave_up:
+            skipped += [f"{REDDIT}{pl}" for _, pl in batch]
+            continue
+        print(f"batch {bi}/{len(batches)} "
+              f"(posts {batch[0][0]}-{batch[-1][0]})", flush=True)
+        pending = batch
+        for session_try in (1, 2):
+            try:
+                errors, deferred = fetch_batch(pending)
+            except Exception as exc:
+                landed = {r["url"] for r in read_ledger(out_dir)}
+                pending = [(i, pl) for i, pl in pending if f"{REDDIT}{pl}" not in landed]
+                if session_try == 2:
+                    print(f"  batch {bi} failed again ({exc}); moving on", flush=True)
+                    failed.update({f"{REDDIT}{pl}": f"session died: {failure_reason(exc)}"
+                                   for _, pl in pending})
+                else:
+                    print(f"  batch {bi} died ({exc}); retrying once with a fresh "
+                          f"session", flush=True)
+                continue
+            failed.update({f"{REDDIT}{pl}": failure_reason(e) for pl, e in errors.items()})
+            if any(is_rate_limited(e) for e in errors.values()):
+                gave_up = True
+                skipped += [f"{REDDIT}{pl}" for _, pl in deferred]
+                print("  rate limited with the cool-down budget spent; skipping the "
+                      "remaining posts", flush=True)
+            break
+        if bi < len(batches) and not gave_up:
+            sleep(2)
+    return failed, skipped
 
 
 # --------------------------------------------------------------------------- #
@@ -1063,6 +1244,14 @@ def build_parser() -> argparse.ArgumentParser:
     o.add_argument("--batch-size", type=int, default=25,
                    help="posts per Chrome session (default 25); a fresh browser "
                         "session is started per batch")
+    o.add_argument("--max-cooldown", type=float, default=DEFAULT_MAX_COOLDOWN,
+                   metavar="SECONDS",
+                   help="total time the whole run may wait out Reddit 429s "
+                        f"(default {DEFAULT_MAX_COOLDOWN} = one full rate-limit "
+                        "window). Each 429 waits exactly until Reddit's reported "
+                        "reset, if that fits what is left; otherwise the remaining "
+                        "posts are skipped and listed on the DONE line. 0 = never "
+                        "wait. Pacing before the limit is reached is not counted")
     o.add_argument("--comments", action=argparse.BooleanOptionalAction, default=None,
                    help="fetch full comment trees (default: on for listings and "
                         "--from, off for --query search)")
@@ -1167,6 +1356,7 @@ def validate(ap: argparse.ArgumentParser, args) -> None:
 def main():
     ap = build_parser()
     args = ap.parse_args()
+    RATE.max_cooldown = args.max_cooldown
     validate(ap, args)
 
     py, script = sys.executable, str(pathlib.Path(__file__).resolve())
@@ -1356,36 +1546,22 @@ def main():
     print(f"selected {len(todo)} posts; fetching"
           f"{'' if args.comments else ' (no comments)'}...", flush=True)
 
-    batches = [todo[i:i + args.batch_size] for i in range(0, len(todo), args.batch_size)]
-    for bi, batch in enumerate(batches, 1):
-        print(f"batch {bi}/{len(batches)} "
-              f"(posts {next_idx}-{next_idx + len(batch) - 1})", flush=True)
-        try:
-            run_batch(batch, next_idx, out_dir, args.comment_sort,
-                      args.max_more_calls, args.comments, args.grep)
-        except Exception as exc:
-            print(f"  batch {bi} died ({exc}); retrying once with a fresh session",
-                  flush=True)
-            fetched = {r["url"] for r in read_ledger(out_dir)}
-            rest = [pl for pl in batch if f"{REDDIT}{pl}" not in fetched]
-            try:
-                run_batch(rest, next_idx + (len(batch) - len(rest)), out_dir,
-                          args.comment_sort, args.max_more_calls, args.comments,
-                          args.grep)
-            except Exception as exc2:
-                print(f"  batch {bi} failed again ({exc2}); moving on", flush=True)
-        next_idx += len(batch)
-        if bi < len(batches):
-            time.sleep(2)
+    failed, skipped = fetch_posts(
+        list(enumerate(todo, next_idx)), out_dir, args.batch_size,
+        lambda items: run_batch(items, out_dir, args.comment_sort,
+                                args.max_more_calls, args.comments, args.grep))
 
     rows = read_ledger(out_dir)
-    write_index(out_dir, rows, header)
+    write_index(out_dir, rows, header, failed, skipped)
     manifest["counts"]["fetched"] = len(rows)
-    manifest["counts"]["failed"] = max(0, len(todo) + len(existing) - len(rows))
+    manifest["counts"]["failed"] = len(failed)
+    manifest["counts"]["skipped"] = len(skipped)
+    manifest["failed"] = [{"url": u, "reason": r} for u, r in failed.items()]
+    manifest["skipped"] = skipped
     manifest["index_json"] = str(out_dir / "index.json")
     manifest["index_md"] = str(out_dir / "index.md")
 
-    print(f"\nDONE: {len(rows)} posts -> {out_dir}", flush=True)
+    print(f"\n{done_line(len(rows), out_dir, failed, skipped)}", flush=True)
     print(f"index: {out_dir / 'index.md'}", flush=True)
     if args.json:
         print(json.dumps(manifest, indent=2))
