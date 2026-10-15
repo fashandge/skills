@@ -151,6 +151,17 @@ a holding sits at rank 40. That is left as it is, because the articles that get
 picked are long too. Read the investing index and the tickers, not the rank,
 for investing. Then:
 
+- **One entry per story, where the pipeline can tell.** Retweets and quotes of
+  one root post are folded under the story's best original post as `also:`
+  lines (the heading says `story of N posts`), and the entry ranks by the
+  story's best value, so a famous account's zero-like retweets no longer take
+  slots of their own (six of the top 14 on 2026-10-14 15:45 were one Meta
+  paper). Cite and `pick` the member whose words you use: the original for
+  the fact, a quote for its own commentary; any member's id works. The fold
+  sees only a shared root post, so a quote of the lab's announcement and a
+  quote of the author's thread are two entries, and independent posts on one
+  headline (six of the top 30 that run were the Anthropic $16.8B quarter)
+  stay separate: count them as one candidate and cite the best-sourced one.
 - **Skim the top of `discarded.md`** once per run. The filter is recall-first but
   not perfect; it has dropped real picks as "promo" (a question-style Reddit post,
   a clickbait-styled Chinese headline). Pull back anything wrongly dropped.
@@ -362,7 +373,8 @@ weights in `src/signal_digest/jev_filter.py` need retuning.
 
 - Code: `~/projects/news/src/signal_digest/` (`run.py` CLI, `sources.py`
   adapters, `jev_filter.py` questions, weights and the per-track keep line,
-  `lint.py` the report checks, `profile.py` reader context, `run_daily.py` the
+  `render.py` the shortlist and its story folding, `lint.py` the report
+  checks, `profile.py` reader context, `run_daily.py` the
   9:00 and 15:45 LaunchAgent entry point).
 - Data: `~/projects/news/data/signal_digest/runs/<run id>/` (deleted after
   10 days; keep it that long so a week-later review can compare report.md against the
