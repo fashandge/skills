@@ -113,8 +113,9 @@ still be editing (§4, §9).
 The dedicated skill-editing, wiki/absorb, and judgment/research rows still
 take precedence over the trivial-task row.
 
-For Claude workers, Fable at low effort is the spawn script's default, so
-every route here passes flags explicitly: the opus rows pass `--model opus --effort medium`
+For Claude workers, opus at medium effort is the spawn script's default;
+every route here still passes flags explicitly so the table stays the
+authority: the opus rows pass `--model opus --effort medium`
 (straightforward coding, simple judgment/summary) or `--model opus --effort high`
 (hard coding, skill edits, taste/judgment-heavy writing, vault research, wiki writing, absorb). The Fable model value the
 CLI accepts is `fable` (currently Fable 5.1) — `fable-5` is rejected at startup
