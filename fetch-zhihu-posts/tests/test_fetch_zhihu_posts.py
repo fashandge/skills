@@ -129,3 +129,12 @@ def test_cli_rejects_target_plus_query():
 def test_cli_rejects_a_target_with_no_question_id():
     with pytest.raises(SystemExit):
         fzp.main(["https://zhuanlan.zhihu.com/p/999"])
+
+
+def test_read_ledger_keeps_rows_with_raw_unicode_line_separators(tmp_path):
+    # append_ledger writes ensure_ascii=False, so U+2028 etc. stay raw; a
+    # splitlines() reader cut the row in half and silently dropped it.
+    title = "标题 第二行 段\x85尾"
+    fzp.append_ledger(tmp_path, {"n": 1, "title": title})
+    fzp.append_ledger(tmp_path, {"n": 2, "title": "plain"})
+    assert fzp.read_ledger(tmp_path) == [{"n": 1, "title": title}, {"n": 2, "title": "plain"}]

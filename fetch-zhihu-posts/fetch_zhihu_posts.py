@@ -380,7 +380,9 @@ def read_ledger(out_dir: pathlib.Path) -> list[dict]:
     if not p.exists():
         return []
     rows = []
-    for line in p.read_text(encoding="utf-8").splitlines():
+    # Split on "\n" only: splitlines() also breaks on U+2028 and friends, which
+    # answer text can carry raw (ensure_ascii=False), and the row would be lost.
+    for line in p.read_text(encoding="utf-8").split("\n"):
         line = line.strip()
         if line:
             try:

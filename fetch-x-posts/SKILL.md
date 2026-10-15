@@ -28,8 +28,8 @@ changes the window. Don't skip it on "fetch only" runs.
 
 | Task | Module | Auth | Data location |
 |------|--------|------|---------------|
-| Search query | `x_search` | browser cookies via `xreach search` | `data/x_search/<sanitized_query>/search_*.jsonl` |
-| Home feed For You / Following | `x_home_feed` | browser cookies via `xreach home` | `data/x_home_feed/{for_you,following}/home_*.jsonl` |
+| Search query | `x_search` | browser cookies via `xreach search` | `data/x_search/<sanitized_query>/search_YYYYMMDD_HHMMSS_<type>.jsonl` |
+| Home feed For You / Following | `x_home_feed` | browser cookies via `xreach home` | `data/x_home_feed/{for_you,following}/home_YYYYMMDD_HHMMSS.jsonl` |
 | User timeline bulk | `user_tweets` | browser cookies via `xreach tweets` | `data/user_tweets/<handle>/tweets.jsonl` + `.resume.json` |
 
 ## Commands (use ml env python)
@@ -128,8 +128,13 @@ File order by module:
 ```bash
 python << 'PY'
 import json, pathlib, glob
-path = sorted(pathlib.Path("data/x_search/<sanitized_query>").glob("*.jsonl"))[-1]
-posts = [json.loads(l) for l in path.read_text().splitlines()]
+# newest snapshot of one search type; the name carries the type, and a same-second
+# repeat run gets a -2 suffix, so pick by mtime rather than by name
+path = max(pathlib.Path("data/x_search/<sanitized_query>").glob("search_*_top*.jsonl"),
+           key=lambda p: p.stat().st_mtime)
+# split on "\n", never splitlines(): tweet text can hold a raw U+2028, which
+# splitlines() breaks on, and json.loads then fails on the half line
+posts = [json.loads(l) for l in path.read_text().split("\n") if l.strip()]
 posts_sorted = sorted(posts, key=lambda x: x.get("likeCount",0), reverse=True)
 print(f"Total: {len(posts)} unique")
 for p in posts_sorted[:10]:

@@ -943,7 +943,7 @@ def read_ledger(out_dir: pathlib.Path) -> list[dict]:
     if not p.exists():
         return []
     rows = []
-    for line in p.read_text().splitlines():
+    for line in p.read_text().split("\n"):  # not splitlines(): it also splits on U+2028 etc. inside strings
         line = line.strip()
         if line:
             try:
