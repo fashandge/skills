@@ -67,10 +67,12 @@ Add, in any order:
   Pass: wake-ups arrive independently and possibly out of order; each is
   classified against the handle in its own notification, and the session
   stays interactive between them.
-- **All agents**: one worker per installed agent (claude, codex, kimi, pi).
-  Pass: every agent asks rather than inventing the fact. In the validated
-  run all four asked; codex and kimi and pi settle as plain `idle` text
-  questions — only claude has been seen using the picker (`blocked`).
+- **All agents**: one worker per agent installed here (today claude, codex,
+  dsh, pi, muse; kimi only while a subscription exists). Pass: every agent
+  asks rather than inventing the fact. In the validated run (claude, codex,
+  kimi, pi) all four asked; codex, kimi and pi settled as plain `idle` text
+  questions — only claude has been seen using the picker (`blocked`). dsh and
+  muse were added to the launcher later and are unverified on this loop.
 - **Blocked path**: at least one claude worker, hoping for the picker; if it
   appears, answer with `send-keys` arrows + enter. If no worker ever lands
   in `blocked`, note it — the path went unexercised, not failed.

@@ -1,6 +1,6 @@
 ---
 name: spawn-worker
-description: Spawn a coding agent (Claude Code, Codex, DeepSeek Harness, pi, or Gemini via Antigravity) in a new terminal tab — locally in the current herdr/cmux/tmux session, or on a remote box like oci-box — and walk away. No handoff protocol, no monitoring, no bookkeeping. This is the default way to hand work to another agent. Use when the user says "hand this off", "delegate this", "spawn a worker", "run this in another tab", "start an agent on this", "put a worker on it", "run it on the box", or "have codex/dsh/deepseek/pi/gemini do this". An opt-in attended mode (herdr only) stays on call to answer the worker's questions via herdr's event-driven waits — use it when the user says "stay on call", "answer its questions", "unblock it if it gets stuck", or "watch for it getting blocked". For a batch of related tasks fanned out across several workers, route to the orchestrate-workers skill instead.
+description: Spawn a coding agent (Claude Code, Codex, DeepSeek Harness, pi, Gemini via Antigravity, or Muse Code) in a new terminal tab — locally in the current herdr/cmux/tmux session, or on a remote box like oci-box — and walk away. No handoff protocol, no monitoring, no bookkeeping. This is the default way to hand work to another agent. Use when the user says "hand this off", "delegate this", "spawn a worker", "run this in another tab", "start an agent on this", "put a worker on it", "run it on the box", or "have codex/dsh/deepseek/pi/gemini/muse do this". An opt-in attended mode (herdr only) stays on call to answer the worker's questions via herdr's event-driven waits — use it when the user says "stay on call", "answer its questions", "unblock it if it gets stuck", or "watch for it getting blocked". For a batch of related tasks fanned out across several workers, route to the orchestrate-workers skill instead.
 ---
 
 # Spawn a worker in a new tab
@@ -74,35 +74,36 @@ preparation (the prompt file below is local; `-` works remotely too):
   --agent pi --remote-host oci-box --remote-cwd /home/opc/projects/<repo>
 ```
 
-Pick **codex** on Luna (`--agent codex --model gpt-6-luna --effort xhigh`)
-for very easy tasks without much
-judgment (simple script changes, moving files) and bulk mechanical sweeps.
-**DeepSeek Harness** (`--agent dsh --model DeepSeek-V41-Flash --effort high`)
-is the trivial-task fallback when codex is unavailable.
-It launches `dsh --profile dsh-tui` with the task as its startup prompt and a
-private model/effort overlay that preserves the profile's other settings.
-The launcher maps DeepSeek-V41-Flash to `deepseek-official/deepseek-flash`
-and accepts DeepSeek's native effort names: off, low, high, max. Omit permission overrides; the
-profile owns those settings.
-The executable and configured profile must exist on the worker host. Under
-orchestrate-workers, dsh at max is the straightforward-coding fallback
-after Codex Sol medium is unavailable. If dsh is unavailable for a trivial task, use **pi** on MiniMax-M3 at
-high effort — pass
-`--model minimax/MiniMax-M3 --effort high`, since the script's pi default is
-still DeepSeek V4 Flash. **gemini** (Antigravity's `agy` CLI; the script's
-default of Gemini 3.7 Flash at high effort is right, so no model/effort flags
-needed) is explicit-only: spawn it when the user names gemini as the worker,
-never by your own routing. `--split right` (herdr only) is
-for a worker you intend to watch as it works — a reviewer — rather than walk
-away from; the default tab is right for everything else. When the task
-belongs to a different project than the session, spawn it where it lives:
-that project's directory as the worker cwd plus `--workspace-label <label>`
-(herdr only), which places the tab in the herdr workspace with that label,
-creating it on first use. Remotely the same placement rides on
-`--remote-workspace <label>` — the local flag is rejected there, and without
-the remote one every worker on that host piles into one default workspace.
-`--help` documents the rest: agents, model/effort overrides, workspaces,
-split ratio.
+**Which agent.** Use the agent the user named; when they named none, the
+script's default — claude on opus at medium effort — is right for a lone
+hand-off. Routing by difficulty (cheap models for mechanical sweeps, a
+higher tier for hard work, quota fallbacks) is orchestrate-workers §2's
+table; do not restate it here, so the two cannot drift. `--help` is the
+authority on agents, model/effort defaults, and flags. What it cannot carry:
+
+- **codex** — its script default predates the current routes, so pass the
+  model explicitly, picked from orchestrate-workers §2 by the task's shape.
+- **dsh** (DeepSeek Harness) — launches the `dsh-tui` profile with a private
+  model/effort overlay per worker; the profile owns permissions, so omit
+  `--pmode`. Efforts are DeepSeek's native names (off, low, high, max). The
+  executable and profile must exist on the worker host.
+- **pi** — the script default is DeepSeek V4 Flash; for MiniMax pass
+  `--model minimax/MiniMax-M3 --effort high`.
+- **gemini** (Antigravity's `agy`) and **muse** (Muse Code) — explicit-only:
+  spawn them when the user names them, never by your own routing. Their
+  script defaults are right, so `--agent gemini` or `--agent muse` alone is
+  the whole flag.
+- **kimi** — no subscription at the moment; spawn it only if the user insists.
+
+**Where.** `--split right` (herdr only) is for a worker you intend to watch
+as it works — a reviewer — rather than walk away from; the default tab is
+right for everything else. When the task belongs to a different project than
+the session, spawn it where it lives: that project's directory as the worker
+cwd plus `--workspace-label <label>` (herdr only), which places the tab in
+the herdr workspace with that label, creating it on first use. Remotely the
+same placement rides on `--remote-workspace <label>` — the local flag is
+rejected there, and without the remote one every worker on that host piles
+into one default workspace.
 
 One JSON line comes back with the `handle` (a herdr pane ID like `w5:p9`, a cmux
 surface UUID, or a tmux session name) and the `backend`. Remote results also
@@ -141,9 +142,8 @@ is the herdr skill's territory: read it and use its event-driven waits
 loop. Its inside-herdr gate applies to the local session only; for a remote
 worker keep the `ssh <host>` prefix. cmux and tmux have no such API — and none
 of this changes the default posture above: absent a request to wait, spawn and
-walk away. (An orchestrator session is the one caller that keeps its own
-label→handle notes for such follow-ups — orchestrate-workers §9 — still
-in-session only, no file.)
+walk away. (Follow-ups from an orchestrator session are orchestrate-workers
+§9's business.)
 
 Closing a finished worker's tab is the user's call — this mode tracks nothing,
 so cleanup is manual by design: `herdr tab close <tab-id>`.

@@ -100,61 +100,36 @@ what's installed). Quota fallbacks use the route-specific thresholds below:
 | Taste-heavy or judgment-heavy work: skill creation or edits (global `~/skills` or project-local `skills/`, always, regardless of gauged difficulty), an original argument (a research article, an investment thesis), or research into the user's own notes vault (`/research-notes`, even when largely synthesis) | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`) when Claude's overall session or weekly quota is ≥95% used or opus is unavailable |
 | Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator — codex gpt-6-astra high when the implementers were Claude, pi, or DeepSeek, claude Fable medium when they were codex; a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus workers) | none |
 
-**DeepSeek Harness** uses spawn-worker's `--agent dsh`, which launches the
-installed `dsh-tui` profile with a separate model/effort overlay per worker.
-Use DeepSeek-V41-Flash at high for the trivial-task fallback and max for the
-coding fallback. These are DeepSeek's native effort names. Omit
-permission flags: the profile still owns those settings. Trivial tasks need
-no Claude quota check. Unavailable means the selected worker cannot run
-because its executable/profile is missing, quota is exhausted, or a known
-startup/authentication failure prevents its use; choose the next fallback
-before spawning. Do not start a replacement alongside a worker that may
-still be editing (§4, §9).
-The dedicated skill-editing, wiki/absorb, and judgment/research rows still
-take precedence over the trivial-task row.
+Every spawn passes the row's flags explicitly, even where they match a
+script default, so this table stays the only authority; `--help` owns the
+defaults, and spawn-worker §2 owns per-agent mechanics (dsh's profile
+overlay, pi's model, explicit-only agents). The dedicated skill-editing,
+wiki/absorb, and judgment/research rows take precedence over the trivial-task
+row. Two Claude CLI gotchas: the Fable model value is `fable` (`fable-5` is
+rejected at startup), and the script gives bare-`opus` workers the Concise
+output style on its own while Fable workers keep the default.
 
-For Claude workers, opus at medium effort is the spawn script's default;
-every route here still passes flags explicitly so the table stays the
-authority: the opus rows pass `--model opus --effort medium`
-(straightforward coding, simple judgment/summary) or `--model opus --effort high`
-(hard coding, skill edits, taste/judgment-heavy writing, vault research, wiki writing, absorb). The Fable model value the
-CLI accepts is `fable` (currently Fable 5.1) — `fable-5` is rejected at startup
-("selected model may not exist"). The script launches bare-`opus` workers with the Concise output
-style on its own (`--settings '{"outputStyle": "Concise"}'`) — Fable workers
-keep the default style.
+**Unavailable** means the selected worker cannot run: its executable or
+profile is missing, its quota is exhausted, or a known startup or
+authentication failure prevents its use. Choose the next fallback before
+spawning; never start a replacement alongside a worker that may still be
+editing (§4, §9). Kimi has no subscription at the moment and is not a
+fallback for anything. **gemini** and **muse** sit outside this table on
+purpose: never route a task to them by difficulty — spawn them only when the
+user names them, for the tasks they name (or the whole batch if that is what
+they asked), with no quota gate.
 
-For the codex routes, pass `--agent codex --model gpt-6-luna --effort xhigh`
-for the trivial-task route, `--agent codex --model gpt-6-sol --effort medium`
-for the opus-medium coding fallback, `--agent codex --model gpt-6-astra --effort low` for
-the opus-high hard-coding route, and `--agent codex --model gpt-6-astra --effort high` for the
-opus-high taste/judgment route explicitly rather than relying on the spawn script's
-codex default. Kimi is no longer available (no subscription); use only the
-fallbacks specified in the table.
-
-**gemini** (Antigravity's `agy` CLI, Gemini 3.7 Flash at high effort — the
-script default, so `--agent gemini` alone is the whole spawn flag) sits outside
-this table on purpose: never route a task to it by difficulty. Use it only when
-the user explicitly asks for gemini workers, and then for the tasks they name —
-or the whole batch if that is what they asked. It needs no quota gate and is
-not a `→` fallback for any Claude route.
-
-Before each **opus coding** spawn (medium or high) and each **opus-high
-taste/judgment** spawn run `claude-quota --json`. In `limits`,
-select only unscoped entries (`scope` is null) whose `kind` is `session` or
-`weekly_all`. If either overall quota's `percent` is ≥95, fall back to sol
-medium for the opus-medium row (then DeepSeek-V41-Flash max via dsh if sol is
-unavailable), astra low for the opus-high hard-coding row, or astra high for
-the opus-high taste/judgment row. Ignore all
-model-scoped quotas, including Fable's. Do not use `--check`:
-it checks every window. If an overall quota is missing or nonnumeric, report
-it as unavailable rather than substituting a model quota or treating it as zero.
-
-The **opus-medium simple judgment/summary route and the opus-high wiki/absorb
-route skip quota checks** and have no fallback: spawn opus directly.
-
-Every percentage is quota *used*. When a gate trips, use the row's fallback
-instead of spawning its primary model. Run each quota command standalone before
-spawning, not after a worker fails, and never batch it with another command.
+**Quota gate.** Before each spawn on a row whose fallback is conditioned on
+Claude's quota — the two opus coding rows and the opus-high taste/judgment
+row — run `claude-quota --json` standalone, never batched with another
+command and never after a worker has already failed. Do not use `--check`;
+it checks every window. In `limits`, select only unscoped entries (`scope`
+is null) whose `kind` is `session` or `weekly_all`; every `percent` is quota
+*used*. If either is ≥95, spawn the row's fallback instead of its primary.
+Ignore all model-scoped quotas, including Fable's. If an overall quota is
+missing or nonnumeric, report it as unavailable rather than substituting a
+model quota or treating it as zero. Rows whose fallback says "no quota
+check" spawn opus directly.
 
 Prompt sizing is spawn-worker §1's rule, unchanged: thin by default — the
 task in the user's own words, nothing added. On top of it, add only what
@@ -190,17 +165,15 @@ spawn everything in the orchestrator's session. Waves (§5) and attended
 waits work unchanged across workspaces: herdr handles are global within one
 herdr server.
 
-Workers on a remote box route the same way — same match rule, same labels —
-with the placement details in the routing doc's remote section. Follow
-spawn-worker's remote preparation once per host before the first wave: wake
-OCI and wait for SSH, then reuse/enable/add the matching saved machine so
-remote tabs appear in the same local Herdr window. Handles still live in
-the box's herdr server: retain `(host, session, handle)` and use `ssh <host>`
-for every remote wave gate, attended wait, read, and follow-up. Route there
-only when the user asks for the box, and
-never for a task whose result has to land in the Mac's working tree: a
-remote worker edits the box's checkout, so attended review (§6) becomes
-reading the diff and committing over ssh.
+Workers on a remote box route the same way — same rule, same labels — with
+placement in the routing doc's remote section and host preparation in
+spawn-worker's remote-workers reference, done once per host before the first
+wave. Handles live in the box's herdr server: retain `(host, session,
+handle)` and prefix every remote wave gate, attended wait, read, and
+follow-up with `ssh <host>`. Route there only when the user asks for the
+box, and never for a task whose result has to land in the Mac's working
+tree: a remote worker edits the box's checkout, so attended review (§6)
+becomes reading the diff and committing over ssh.
 
 ## 4. Coordinate shared state
 
