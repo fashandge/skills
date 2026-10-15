@@ -1,6 +1,6 @@
 ---
 name: review-with-agent
-description: Have one or more other agents (Codex, Claude, pi) adversarially review code changes in a live herdr pane, then verify and address their findings and repeat the review-address cycle until approval or the round cap. Use when the user explicitly asks for a second agent or second model to review code, e.g. "have codex review this", "get claude to review my diff", "second-model review of these changes", "review this with codex and fix what it finds", "have two agents review this". Do not auto-trigger for ordinary code-review requests that don't ask for a second agent — the harness's own code-review skill covers those. For reviewing a plan/design doc instead of code, use plan-with-agent; for reviewing a skill, use skill-review-with-agent.
+description: Have one or more other agents (Codex or Claude) adversarially review code changes in a live herdr pane, then verify and address their findings and repeat the review-address cycle until approval or the round cap. Use when the user explicitly asks for a second agent or second model to review code, e.g. "have codex review this", "get claude to review my diff", "second-model review of these changes", "review this with codex and fix what it finds", "have two agents review this". Do not auto-trigger for ordinary code-review requests that don't ask for a second agent — the harness's own code-review skill covers those. For reviewing a plan/design doc instead of code, use plan-with-agent; for reviewing a skill, use skill-review-with-agent.
 ---
 
 # Review with Agent
@@ -8,24 +8,9 @@ description: Have one or more other agents (Codex, Claude, pi) adversarially rev
 A second frontier model reviews your change set in a live pane next to you, you verify
 and address what it finds, and it reviews again.
 
-**Read `references/herdr-review-loop.md` for the mechanics and the loop protocol** —
-spawning, placement, waiting, reading, next-round prompts, finding verification and
-dispositions, the round cap, stopping, escalation, and wrap-up. It is shared with
-`skill-review-with-agent` and `plan-with-agent` so the siblings cannot drift. This file
-owns what is specific to reviewing *code changes*.
-
-The one hard exclusion is self-review: the reviewer must never be the exact model this
-session is running. Same vendor at a different tier is fine.
-
-## Modes
-
-- **Default** — one reviewer, split beside you in the current tab.
-- **New tab** — the reviewer keeps its own tab. Wide diffs, narrow terminals, or on request.
-- **Multiple reviewers** — two or three models from different vendors review the same
-  candidate in parallel; wait for all, combine, address once, then send them all into the
-  next round together. Use when the user asks, or when the change is risky enough that
-  independent perspectives are worth the tokens. Independent agreement is strong signal;
-  a finding only one model raises deserves extra scrutiny, not automatic rejection.
+**Read `references/herdr-review-loop.md` first** — it owns the mechanics and the round
+protocol, shared with `skill-review-with-agent` and `plan-with-agent` so the siblings
+cannot drift. This file owns what is specific to reviewing *code changes*.
 
 ## 1. Scope the change set
 
@@ -45,11 +30,10 @@ Pin down what is under review before spawning anything. Don't make the user comm
 
 ## 2. Choose the reviewer
 
-Never self-review; honor an explicit user choice of model subject to that; otherwise
-default to a cross-vendor reviewer one tier stronger, or the strongest cross-vendor peer
-when this session is already top tier. Read
-`~/skills/plan-with-agent/references/model-selection.md` for the roster, the
-session→reviewer mapping, and effort.
+Never self-review: the reviewer is never the exact model this session is running (same
+vendor at a different tier is fine). Honor an explicit user choice subject to that.
+Otherwise `~/skills/plan-with-agent/references/model-selection.md` owns the default
+session→reviewer mapping, the roster, and the effort per round.
 
 ## 3. The review prompt
 
@@ -70,32 +54,46 @@ actual APIs and conventions, missing tests, security issues, and significant
 simplification opportunities. Judge the change against its stated intent —
 flag scope creep. Verify assumptions from any design docs against the code.
 
-Report findings, correctness first, each with a severity
-(blocker|major|minor|nit) and file:line. Prefer a short list of substantive
-findings over an exhaustive list of small ones; do not propose
-re-architecture or new features unless a real defect requires it. Say so
-explicitly if you find nothing. Do not change any code.
+Output format — first line exactly:
+VERDICT: APPROVE | REVISE
+APPROVE if and only if no blocker or major findings remain. Then each
+finding on its own bullet, correctness first:
+[blocker|major|minor|nit] <title> — <file:line> — <what and why>
+Prefer a short list of substantive findings over an exhaustive list of
+small ones; do not propose re-architecture or new features unless a real
+defect requires it. Do not change any code.
 ```
 
 Spawn with that prompt, then wait and read, per the shared reference.
 
-## 4. Verify, then address
+## 4. Run the loop
 
-Follow the shared reference's round protocol — verify each finding against the actual
-code path before acting on it, fix blockers and majors, record every finding's
-disposition, and push back when the reviewer is wrong. Follow-up rounds ask for blocker
-and major findings only (the shared reference's "Keeping findings substantive" section). Code adds one rule: re-run the
-relevant tests after every change.
+Follow the shared reference's round protocol, next-round prompt, cap, stop and escalation
+rules, and wrap-up. Code adds two rules: re-run the relevant tests after every change,
+and include the final test status in the wrap-up.
 
-With multiple reviewers, combine before addressing: group findings that make the same
-claim, note where reviewers independently agree, and keep genuine disagreements visible
-rather than averaging them away.
+## Multiple reviewers
 
-## 5. Loop
+Two or three models from *different* vendors review the same candidate in parallel — two
+instances of one model mostly agree with each other, which buys nothing. Use when the
+user asks, or when the change is risky enough that independent perspectives are worth
+the tokens.
 
-Send the next round per the shared reference — what changed, what you rejected and why,
-and to re-review the working tree — and apply its cap, stop, and escalation rules.
+- **Spawn** each with its own label and the same prompt; herdr lays out the successive
+  splits.
+- **Wait** on each handle in turn; they run in parallel, so the last wait returns when
+  the slowest finishes.
+- **Combine before addressing**: group findings that make the same claim, and keep
+  genuine disagreements visible rather than averaging them away. Independent agreement is
+  strong signal; a finding only one model raises deserves extra scrutiny, not automatic
+  rejection.
+- **Next round**: send every reviewer the *same* round summary — including findings that
+  came from a different reviewer — so each re-reviews knowing what actually changed, and
+  one that disagrees with another's accepted finding can say so. Run the block in the
+  background:
 
-## 6. Wrap up
-
-Wrap up per the shared reference, and include the final test status.
+  ```bash
+  for h in <handle-1> <handle-2>; do
+    herdr agent prompt "$h" "<round summary>" --wait --timeout 1200000 &
+  done; wait
+  ```

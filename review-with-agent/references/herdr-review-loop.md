@@ -21,9 +21,9 @@ everything below:
 test "${HERDR_ENV:-}" = 1 && herdr pane current
 ```
 
-If that fails, say so and offer a headless one-shot reviewer instead (`codex exec` /
-`claude -p` piped a review prompt, output read back and verified by you). Don't fall
-back to a polling loop or a detached tab you cannot wait on.
+If that fails, say so and offer a headless one-shot reviewer instead (`agents-cli` with
+the review prompt on stdin — see `~/.claude/docs/agents-cli.md` — output read back and
+verified by you). Don't fall back to a polling loop or a detached tab you cannot wait on.
 
 ## Spawn and place
 
@@ -32,7 +32,7 @@ prompt goes on stdin, so length is not a constraint:
 
 ```bash
 ~/projects/agents/scripts/spawn_worker.sh <label> - <cwd> \
-  --agent codex --model <model> --effort <effort> --split right --ratio 0.5 <<'EOF'
+  --agent <codex|claude> --model <model> --effort <effort> --split right --ratio 0.5 <<'EOF'
 <the review prompt>
 EOF
 # -> one JSON line with "handle": e.g. "w6:p2"
@@ -41,9 +41,6 @@ EOF
 - **Default**: the split above — the user sees the review without switching tabs.
 - **New tab**: drop `--split`; spawn_worker's default is its own tab. Use when the
   content is wide, the terminal narrow, or the user asks.
-- **Multiple reviewers**: spawn each with its own label; herdr lays out the successive
-  splits. Pick models from *different* vendors — two instances of one model mostly
-  agree with each other, which buys nothing.
 
 `--split` is herdr-only and cannot combine with `--remote-host`: a remote worker lands
 in the remote host's herdr server, where no pane of yours exists to split against.
@@ -55,9 +52,7 @@ herdr agent wait <handle> --timeout 1200000   # run this in the background
 herdr agent read <handle> --source recent-unwrapped --lines 200
 ```
 
-`agent wait` is event-driven over herdr's socket — never write a polling loop. With
-several reviewers, wait on each in turn; they run in parallel, so the last wait returns
-when the slowest finishes.
+`agent wait` is event-driven over herdr's socket — never write a polling loop.
 
 **Run the wait in the background.** A review takes minutes — 1 to 9 in practice — and a
 foreground wait makes the user wait too, queueing anything they want to say behind it
@@ -73,32 +68,28 @@ did change mid-review, discard that round rather than reasoning about which find
 survived; re-establish scope and re-prompt. A discarded round costs one prompt; a review
 silently interpreted against the wrong state costs far more.
 
-**`blocked` is a real outcome, not a slow `idle`.** A freshly spawned agent can settle on
-a first-run dialog instead of the task — codex prompts "Hooks need review" whenever a
-hook it knows has changed, and then sits there indefinitely. Check rather than assume:
-
-```bash
-herdr agent get <handle>    # agent_status: working | idle | blocked | done | unknown
-```
-
-If blocked, read the pane, answer the dialog with `herdr agent send-keys` or by telling
-the user, and only then wait again. A review you never noticed was blocked reads exactly
-like a review that found nothing.
+**`blocked` is a real outcome, not a slow `idle`.** `agent wait` returns on `idle`,
+`done` *or* `blocked`, and prints the agent record — read its `agent_status` rather than
+assuming the review finished. A freshly spawned agent can settle on a first-run dialog
+instead of the task — codex prompts "Hooks need review" whenever a hook it knows has
+changed, and then sits there indefinitely. If blocked, read the pane, answer the dialog
+with `herdr agent send-keys` or by telling the user, and only then wait again. A review
+you never noticed was blocked reads exactly like a review that found nothing.
 
 ## Keeping findings substantive
 
 Round 1 prompts ask for a short list of substantive findings over an exhaustive one, and
 say that re-architecture and added features are out of scope unless a real defect requires
-them. An open brief invites the reviewer to fill the space: Codex reviewers in particular
-(`gpt-6-astra` and `gpt-5.6-sol`, observed 2026-09-10) over-engineer and drift into detail
-when nothing bounds them, and a long list of nits buries the two findings that matter.
+them. An open brief invites the reviewer to fill the space: some reviewers over-engineer
+and drift into detail when nothing bounds them (`model-selection.md` notes which), and a
+long list of nits buries the two findings that matter.
 
 **From round 2 onward, ask for blocker and major findings only** — no minors, no nits, no
 new features or restructuring — framed as "what would make this produce a wrong result".
 Later rounds verify a shrinking delta; an unconstrained reviewer fills the space with
-detail instead. The constraint costs nothing in substance: in the run above, round 2 under
-it still surfaced three valid majors. Lift it only when the user asks for an exhaustive
-pass.
+detail instead. The constraint costs nothing in substance: in the run that prompted it,
+round 2 under the constraint still surfaced three valid majors. Lift it only when the user
+asks for an exhaustive pass.
 
 ## Next round
 
@@ -119,18 +110,6 @@ state *before* it starts the turn and return instantly, reading the previous rou
 output as if it were the new review. And a follow-up round takes as long as the first,
 so the background-wait rule above applies here too — run the command in the background,
 and hold the artifact still until it settles.
-
-With multiple reviewers, send every one of them the *same* round summary — including
-findings that came from a different reviewer — so each re-reviews knowing what actually
-changed, and one that disagrees with another's accepted finding can say so. Background
-each `prompt --wait` so they submit and work in parallel, and run the whole block in the
-background:
-
-```bash
-for h in <handle-1> <handle-2>; do
-  herdr agent prompt "$h" "<round summary>" --wait --timeout 1200000 &
-done; wait
-```
 
 ## Keeping the reviewer read-only
 
@@ -158,7 +137,8 @@ the reviewer what you rejected and why in the next round; that is how a wrong fi
 stops recurring. Push back when you disagree, and tell the user plainly — deference to a
 reviewer that is wrong is worse than no review.
 
-Keep the same reviewer across rounds, lowering its effort after the first
+Keep the same reviewer, at the same effort, across rounds — a pane's effort is fixed at
+spawn, and the majors-only scoping above is what keeps later rounds short
 (`~/skills/plan-with-agent/references/model-selection.md` owns the roster and effort
 mapping).
 
