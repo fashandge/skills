@@ -33,7 +33,7 @@ Pin down what is under review before spawning anything. Don't make the user comm
 Never self-review: the reviewer is never the exact model this session is running (same
 vendor at a different tier is fine). Honor an explicit user choice subject to that.
 Otherwise `~/skills/plan-with-agent/references/model-selection.md` owns the default
-session→reviewer mapping, the roster, and the effort per round.
+session→reviewer mapping, the roster, and the effort.
 
 ## 3. The review prompt
 
