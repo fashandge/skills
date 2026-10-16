@@ -139,9 +139,11 @@ news `brief_date` or X Today's `fetched` is not today, say how old it is.
 
 Read `shortlist.md` and nothing else in bulk. Its top holds, in order: what was
 picked on earlier days this week, a "Top investing candidates" index of the top 12 by
-invest composite (the overall ranking is by `max(invest, learn)`, which buries
-investing items under learn-track items; every investing pick so far sat inside
-this index), then the survivors ordered by Jev value, with VERIFY, UNCERTAIN
+invest composite plus every entry that names a holding as a stock (a cashtag, or
+the bare ticker in a title), whatever its rank, each marked `holding $INTC` and
+`VERIFY` where that applies (the overall ranking is by `max(invest, learn)`,
+which buries investing items under learn-track items; every investing pick so
+far sat inside this index), then the survivors ordered by Jev value, with VERIFY, UNCERTAIN
 and UNSCORED items last. The keep line is drawn per track (the top 35
 by invest and the top 35 by learn both pass), so an investing post is never
 pushed out by learn-track articles. The value order is not a cross-source
@@ -338,6 +340,15 @@ Rules:
   count; the lint rejects it). Walk the "Top investing candidates" index from
   the top: the first item you did not pick is the one to name, with its index
   rank, unless you say why a lower one is the stronger candidate.
+- **An event at a holding itself is named whether or not it is picked.** An
+  index entry marked `holding` that reports something happening to the company
+  (a lawsuit, a contract, guidance, a price change, a management change) gets
+  the one search every VERIFY item gets, then a pick, a clause inside a pick, or
+  a Near-misses line with the verdict. A ticker list, a selloff roll call or a
+  sector read is not an event and needs nothing. On 2026-10-15 15:45 Tower's
+  fraud suit against Intel sat in the index as a VERIFY item and the report
+  never mentioned it, while two unsourced MU rumours got lines; the lint now
+  warns about every unnamed VERIFY item on a holding.
 - Keep both TL;DR headings; a goal with no picks says "Nothing today."
 - Every pick gets one `Sources:` line right under its heading, then a blank line,
   then the body (a bare line break would merge them in rendered Markdown). Copy
@@ -350,6 +361,10 @@ Rules:
   it "<primary> via <outlet>" rather than as the primary.
 - Every figure carries its source and date; label fiscal years; expand jargon on
   first use. The reader is a strong engineer, not a finance specialist.
+- A vendor's superlative or ranking ("the most capable US open-weight model") is
+  the vendor's claim until an independent benchmark confirms it: attribute it
+  ("Meta calls it …"), in the TL;DR too, or drop it. On 2026-10-15 the TL;DR
+  stated Meta's claim about Muse Spark Open as fact.
 - A quotation links the document that contains the words (the slides, not the
   blog post beside them). A quote that reaches you through coverage (a Chinese
   write-up of an English talk) is attributed to the person only after you find it
@@ -372,7 +387,9 @@ It checks the word budget, the pick cap, the TL;DR bullet and pick-body lengths,
 the TL;DR and `Sources:` structure, the first Near-misses line, the `Collection:`
 line against the manifest (every source's fetched count, and every failed,
 retried or repaired source, must be named), and every link label against its URL (a label saying "via Coinpaper" on a kucoin.com URL is the
-kind of slip it exists for). `lookup_links` lists every link that is
+kind of slip it exists for). It warns about every VERIFY item that names a
+holding and appears nowhere in the report, by author and id: decide whether it
+is an event at the holding, and if so name it. `lookup_links` lists every link that is
 not an item of this run: each must be a page you opened during verification, not
 a URL from memory; remove any you can't account for. Warnings are judgment calls;
 errors are not. A budget warning on a report whose parts all pass means the
