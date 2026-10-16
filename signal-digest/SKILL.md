@@ -1,6 +1,6 @@
 ---
 name: signal-digest
-description: Power-law digest of the user's information feeds for two goals — investment return with controlled risk, and keeping up with AI technology and industry trends for learning and startup ideas. Digests the default feeds (X For You + Following, the Reddit home feed, the AI-news daily brief, X's "Today's News") or any inputs the user names instead (a notes folder, a JSONL list, an X search or subreddit fetched first). A script collects and prefilters with TypeSafe's Jev; the agent then picks the vital few (at most three a day), verifies them and writes a short report. Use whenever the user asks for "my digest", "what matters in my feeds today", "filter my feeds", "signal vs noise from my sources", "apply the power law to my feeds", wants a cross-source summary of their feeds rather than one feed, or asks to "digest" / "find what matters in" any set of posts or notes, even without naming this skill. To just fetch or summarize one X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
+description: Power-law digest of the user's information feeds for two goals — investment return with controlled risk, and keeping up with AI technology and industry trends for learning and startup ideas. Digests the default feeds (X For You + Following, an X search for talks by chip and cloud CEOs, the Reddit home feed, the AI-news daily brief, X's "Today's News") or any inputs the user names instead (a notes folder, a JSONL list, an X search or subreddit fetched first). A script collects and prefilters with TypeSafe's Jev; the agent then picks the vital few (at most three a day), verifies them and writes a short report. Use whenever the user asks for "my digest", "what matters in my feeds today", "filter my feeds", "signal vs noise from my sources", "apply the power law to my feeds", wants a cross-source summary of their feeds rather than one feed, or asks to "digest" / "find what matters in" any set of posts or notes, even without naming this skill. To just fetch or summarize one X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
 ---
 
 # signal-digest
@@ -50,7 +50,7 @@ The job is to find those few items and nothing else. The test for every item is
 cd ~/projects && /opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python -m news.src.signal_digest.run run
 ```
 
-With no arguments it collects the five default sources, filters with Jev, and
+With no arguments it collects the six default sources, filters with Jev, and
 prints one JSON object with `run_dir`, per-source counts and errors, and the
 `shortlist` path. It takes a few minutes (X and Reddit drive a browser), so run
 it with `run_in_background` and wait for the notification. `-h` on the module
@@ -235,7 +235,32 @@ companies, and faithful reports of their words, are primary sources on strategy
 and often the earliest public signal. The prefilter boosts them (list and
 weights in `src/signal_digest/leaders.py`; the signals line shows `leader xN`).
 Still judge by content: a prolific poster's jokes, politics and reposts count for
-nothing. A leader's remark on a story already picked is a development in two
+nothing.
+
+Most of these people never post, so their talks (a podcast, a keynote, an
+earnings call, a conference interview) used to reach the feeds only when a
+followed account summarized one. The `leader_talks` source removes that
+dependence: it searches X for the names in `leaders.py` (chip, supply-chain and
+hyperscaler CEOs, English and Chinese) and brings the top posts of the last
+three days, so a talk is collected whether or not the feeds carried it. Treat
+its entries as the first thing to read in full. A CEO disclosing a demand mix,
+a capacity figure, a lead time or next year's bottleneck (on 2026-10-15, Huang
+on Bg2: frontier labs are a quarter to a third of demand, gear per gigawatt went
+from $18B to over $40B, land and power limit next year) is the earliest primary
+source on where the build-out's constraints are, which serves both goals at once
+and usually is the day's most valuable item. Such a talk still competes for the
+three slots rather than getting a slot of its own: an uncapped slot would fill
+with talks that have nothing new (a founding anecdote, a tour, a politics
+remark) and the reader would stop trusting it. The figure earns the slot, not
+the name, and a talk with a new figure beats any commentator's take for one.
+When it still loses, a Near-misses line carries the figure in one sentence, so
+a bottleneck disclosure never vanishes. The same talk arrives as several posts
+(an outlet, a thread, a Chinese summary, quote-tweets): count them as one
+candidate and cite the one closest to the words. A talk the search brings in
+from two or three days back that no earlier run carried is new to the user,
+whatever its date.
+
+A leader's remark on a story already picked is a development in two
 cases: it discloses a figure, a decision or guidance of the leader's own
 company, or the speaker's own stake changes what the known facts mean. On
 2026-10-12 the funding story had two days of issuance data and bank forecasts
@@ -374,8 +399,9 @@ weights in `src/signal_digest/jev_filter.py` need retuning.
 - Code: `~/projects/news/src/signal_digest/` (`run.py` CLI, `sources.py`
   adapters, `jev_filter.py` questions, weights and the per-track keep line,
   `render.py` the shortlist and its story folding, `lint.py` the report
-  checks, `profile.py` reader context, `run_daily.py` the
-  9:00 and 15:45 LaunchAgent entry point).
+  checks, `profile.py` reader context, `leaders.py` the leader handles and
+  the names, words and window behind the `leader_talks` search, `run_daily.py`
+  the 9:00 and 15:45 LaunchAgent entry point).
 - Data: `~/projects/news/data/signal_digest/runs/<run id>/` (deleted after
   10 days; keep it that long so a week-later review can compare report.md against the
   items, scores and raw snapshots it came from; `collect.log` there holds the
