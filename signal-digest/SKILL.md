@@ -146,7 +146,10 @@ which buries investing items under learn-track items; every investing pick so
 far sat inside this index), then the survivors ordered by Jev value, with VERIFY, UNCERTAIN
 and UNSCORED items last. The keep line is drawn per track (the top 35
 by invest and the top 35 by learn both pass), so an investing post is never
-pushed out by learn-track articles. The value order is not a cross-source
+pushed out by learn-track articles, and an entry that names a holding's ticker
+passes whatever its rank (tagged `HOLDING`): on a 200-item morning the invest
+line sat at 0.44 and a $MU post on CXMT's flat Q3 fell under it at 0.42
+(2026-10-16 09:00), the fact the afternoon's MU pick needed. The value order is not a cross-source
 comparison: since AI-news items carry full article bodies, long Zhihu articles
 take most of the top ranks (ranks 1–5 on 2026-10-12) while a two-line X post on
 a holding sits at rank 40. That is left as it is, because the articles that get
@@ -179,7 +182,13 @@ for investing. Then:
   deep. When that block is missing on a `quote` item, or a retweet still ends in
   "…", the lookup failed: open the URL before dismissing it when the author or a
   holding's ticker matters ("That's why I'm invested in $COHR" says nothing on
-  its own).
+  its own). A quote post whose own words are a few words, or whose words Jev
+  flagged as promo, is scored on the quoted post (its signals line says `scored
+  on the quoted post`): the heading's author wrote the reaction, the quoted
+  author the content. Judge, cite and attribute the quoted post; when the root
+  was not collected, link the quote post's URL and say the claim reaches you
+  through it (2026-10-16 15:45: "sell everything" quoting a report of
+  Anthropic's 80–90% automation projection was the day's AI pick).
 - Items marked `PICKED <date>`, and stories in the "Picked on earlier days" list,
   were already reported. A development in one of them is a pick (developing
   stories tend to matter most); lead the entry with what is new and link the
@@ -216,6 +225,24 @@ evidence. Collapse the same story told by several sources into one pick.
   event window). A crowd of bullish posts alone is a sentiment reading, not a
   pick; it gets one line under Near misses. When you add market data by lookup,
   say so; the feed didn't supply it.
+
+**Derive the period before you read a figure.** A cumulative disclosure (nine
+months, year to date, a half) says nothing about the latest quarter until you
+subtract the periods already reported; the implied quarter and its
+quarter-on-quarter trend is the fact that bears on a holding, and the heading
+carries that, not the headline total. On 2026-10-16 15:45 CXMT's nine-month
+profit was read as a cash pile when Q1 and Q2 implied Q3 up 1–4% QoQ on revenue
+up 15–20%, the fact that bore on MU. Show the arithmetic in one clause. And a
+second vendor restating a known condition (Dell on memory tightness, three days
+after the quote) is a new voice, not a new fact: it earns a clause, not a pick.
+
+**Collect the story's evidence before writing a pick.** Grep today's runs for
+the company, ticker and Chinese name of the pick's subject, in `shortlist.md`
+and `discarded.md` alike
+(`grep -il 'CXMT\|长鑫\|\$MU' ~/projects/news/data/signal_digest/runs/<today>_*/{shortlist,discarded}.md`),
+and fold in whatever adds a figure or contradicts the claim as one linked
+sentence. The morning's discarded "Q3 almost flat QoQ" post belonged inside the
+afternoon's CXMT pick and would have corrected it.
 
 Compare against the user's latest valuation when one exists:
 `~/projects/stock_picker/data/valuations/<TICKER>/<date>.md` is the base model
@@ -407,7 +434,7 @@ Picks already logged by an earlier run today are skipped and listed under
 `already_logged_earlier_today`. `… stats` then shows pick rates by source and
 author across runs: the second power law. A few accounts and sources produce
 most of the picks; suggest pruning sources that never get picked and following
-the accounts that do. Picks whose `keep_reason` is `uncertain`, `verify` or
+the accounts that do. Picks whose `keep_reason` is `uncertain`, `verify`, `holding` or
 `dropped: …` are what Jev's ranking alone would have missed; if they pile up, the
 weights in `src/signal_digest/jev_filter.py` need retuning.
 
