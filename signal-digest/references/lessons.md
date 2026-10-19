@@ -48,3 +48,22 @@ seems wrong for the case in front of you. Newest last.
 - **2026-10-18 · propose log entries, never write them.** The 09:00 AMD pick read a Morgan
   Stanley model reconciliation as a 43% cut; the explanation surfaced that afternoon. An
   unattended run's framing can be wrong the same day, so the user applies proposals.
+- **2026-10-18 09:00 · an analyst's revision is measured against the standing coverage.**
+  The AMD pick read Morgan Stanley's "43% cut" (14.1M → 8.0M GPUs over 2026–30, note unseen)
+  as evidence against the bull case. The firm's main US coverage already modelled 672k / 1.1M /
+  1.4M for 2026–28; the cut was MS Asia reconciling an inflated model toward that view, so
+  "not new news". The same Neo Reports brief carried KeyBanc raising AMD's AI GPU revenue to
+  about $16.5B, and the pick left it out.
+- **2026-10-18 09:00 · read a figure against the holding first.** KeyBanc's EMIB-T substrate
+  yields (50–60% at Ibiden, 20–30% at Unimicron; invest #4) got a Near-misses line as "channel
+  checks, not an Intel disclosure, support P2", while the AMD reconciliation (invest #12) took
+  the slot. The user logged the yields as an INTC watch item against the foundry assumption,
+  plus a P2 bullet.
+- **2026-10-18 09:00 · a Reddit link post is scored on a stub.** The day's AI pick, Anthropic's
+  employment paper, sat at #67 of 72 as `uncertain` (0.239) because the Reddit post's body was
+  the link line alone.
+- **2026-10-18 09:00 · a time window stays with its figure.** "Since early 2025" was attached
+  to the junior share of technical hires (27% → 9%) when the source dates the junior share of
+  employees (21% → 14%).
+- **2026-10-18 15:45 · a roundup is not a shift.** The AI pick on incumbents blocking agents
+  collected blocks known since September through a secondary aggregator (learn #30, 0.325).

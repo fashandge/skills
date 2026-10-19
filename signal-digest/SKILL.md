@@ -175,6 +175,11 @@ tickers, not the rank; every investing pick so far sat inside the index. Then:
   `ref` (`raw/ai_news/NN.md`). An item with no `ref` and a one-sentence text
   came from an older brief (snippet only) or a failed body fetch; open the
   Zhihu URL before picking or dismissing it.
+- **A Reddit link post is scored on a stub.** Its body is the title and a
+  `(link/media post) URL` line, so Jev rates it `uncertain` and it sits near the
+  bottom (a lab's own research page has sat at #67 of 72). When the title or the
+  linked domain names a lab, a holding or a paper, open the URL before dismissing
+  it.
 - **Quote tweets and retweets now arrive whole.** A retweet carries the full
   retweeted text, and a quote tweet ends with `[Quoting @author: …]`, one level
   deep. When that block is missing on a `quote` item, or a retweet still ends in
@@ -227,6 +232,24 @@ evidence. Collapse the same story told by several sources into one pick.
   pick; it gets one line under Near misses. When you add market data by lookup,
   say so; the feed didn't supply it.
 
+**Read a figure against the holding it names before any premise.** A yield, a
+lead time, a unit cap or a price on a holding's own product is a specific new
+fact whatever its source: "a channel check, not a disclosure" sets the hedge and
+the proposal's `source_type`, not whether it is a pick. Say which card it bears
+on and which way first (substrate yields at Intel's packaging partners are
+against INTC's foundry assumption), and only then whether it also confirms a
+shared premise. Filed as "supports P2" it reads as confirmation and loses the
+slot to a weaker item that looks like evidence against.
+
+**An analyst's revision is measured against the firm's standing coverage, not
+against its own prior.** A "43% cut" of a model you never saw is news only if
+the new number sits below what the firm's main coverage and your own valuation
+already assume. Spend the verification search on the standing estimates: a
+regional model reconciled toward the house view is "not new news" and belongs
+in Near misses. When the note is unseen, the heading says the figure reaches
+you through coverage and states it against the standing numbers you found, not
+against the old figure alone.
+
 **Derive the period before you read a figure.** A cumulative disclosure (nine
 months, year to date, a half) says nothing about the latest quarter until you
 subtract the periods already reported; the implied quarter and its
@@ -241,6 +264,9 @@ and `discarded.md` alike
 (`grep -il 'CXMT\|长鑫\|\$MU' ~/projects/news/data/signal_digest/runs/<today>_*/{shortlist,discarded}.md`),
 and fold in whatever adds a figure or contradicts the claim as one linked
 sentence; a morning's discarded post has corrected an afternoon's pick before.
+The pick's own source counts: a brief that lists several analyst notes carries
+the counter-note beside the one you quote, and it goes into the pick as one
+linked clause, never into silence.
 
 Compare against the user's latest valuation when one exists:
 `~/projects/stock_picker/data/valuations/<TICKER>/<date>.md` is the base model
@@ -251,7 +277,11 @@ cite it only as such. Quote every figure with its file name and date.
 what it costs (say what it does, how it works at a level a strong engineer can
 follow, and what it enables or threatens; a benchmark bump doesn't qualify); a
 durable shift in how the industry works; an unmet need a product could fill.
-How long the point stays useful matters more than how new it is. When a pick is
+How long the point stays useful matters more than how new it is. A roundup is
+not a shift: an aggregator's list of moves each more than two days old (blocks
+the feeds carried weeks ago) restates known facts, and a durable shift earns its
+pick only with a fact or a primary source of its own, which is what the pick
+cites. When a pick is
 best understood as a general concept (a bottleneck and where the overflow goes,
 a feedback loop, payoff asymmetry), write it up that way: name the concept in one
 sentence and link the forms it takes in this haul. That is a way of writing a
@@ -375,7 +405,9 @@ Rules:
   that reported it) when it is reachable; when only secondary coverage is, label
   it "<primary> via <outlet>" rather than as the primary.
 - Every figure carries its source and date; label fiscal years; expand jargon on
-  first use. The reader is a strong engineer, not a finance specialist.
+  first use. A time window ("since early 2025") stays with the figure the source
+  attaches it to: when two figures sit together, check which one is dated before
+  carrying the window. The reader is a strong engineer, not a finance specialist.
 - A vendor's superlative or ranking ("the most capable US open-weight model") is
   the vendor's claim until an independent benchmark confirms it: attribute it
   ("Meta calls it …"), in the TL;DR too, or drop it.
