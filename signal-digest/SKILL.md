@@ -443,7 +443,10 @@ the ones they approve with `/portfolio-brief log the digest proposals`.
    `kind`, `pick` as `invest:<item id>` or `near-miss`, and `args`), and `skipped` (one
    `{what, why}` per candidate declined). The pick's verification sentence sets
    `source_type` and the caveats that go into `item` or `claim`; `date` is the evidence's
-   date.
+   date. Link every source: a watch item's `source` and an evidence entry's `links` each need
+   the URL of every post or article named (and the primary document's when one exists);
+   the dry run in step 4 rejects an outlet name or run id alone. Where `item` or `claim`
+   attributes a fact, write the attribution as the link ("per [Carrio](url) only").
 4. **Validate**: `PB apply-proposals <run dir>/proposed_log.json --dry-run`. Fix every
    failed proposal; one that comes back `already_present` is logged already, so drop it.
 5. **Append `## Proposed log`** at the end of `report.md`: one line per proposal in file
