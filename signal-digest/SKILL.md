@@ -1,6 +1,6 @@
 ---
 name: signal-digest
-description: Power-law digest of the user's information feeds for two goals — investment return with controlled risk, and keeping up with AI technology and industry trends for learning and startup ideas. Digests the default feeds (X For You + Following, an X search for talks by chip and cloud CEOs, the Reddit home feed, the AI-news daily brief, X's "Today's News") or any inputs the user names instead (a notes folder, a JSONL list, an X search or subreddit fetched first). A script collects and prefilters with TypeSafe's Jev; the agent then picks the vital few (at most three a day), verifies them and writes a short report. Use whenever the user asks for "my digest", "what matters in my feeds today", "filter my feeds", "signal vs noise from my sources", "apply the power law to my feeds", wants a cross-source summary of their feeds rather than one feed, or asks to "digest" / "find what matters in" any set of posts or notes, even without naming this skill. To just fetch or summarize one X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
+description: Power-law digest of the user's information feeds for two goals — investment return with controlled risk, and AI technology and industry trends for learning and startup ideas. Digests the default feeds (X For You and Following, an X search for chip and cloud CEO talks, the Reddit home feed, the AI-news daily brief, X's Today's News) or any inputs the user names (a notes folder, a JSONL list, a fetched X search or subreddit). A script collects and prefilters with TypeSafe's Jev; the agent picks the vital few (at most three a day), verifies them, writes a short report and proposes stock_picker log entries. Use for "my digest", "what matters in my feeds today", "filter my feeds", "signal vs noise from my sources", a cross-source summary of the feeds, or "digest" / "find what matters in" any set of posts or notes. To fetch or summarize one X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
 ---
 
 # signal-digest
@@ -44,6 +44,9 @@ The job is to find those few items and nothing else. The test for every item is
    write the report, propose entries for the user's research logs, log the picks.
    The judgment lives here; Jev's scores are a prior, not a verdict.
 
+The dated incidents behind the rules below are in `references/lessons.md`; read it
+only when a rule seems wrong for the case in front of you.
+
 ## Run
 
 ```bash
@@ -77,9 +80,7 @@ inputs:
   not "reported": a pick may call itself a development only of something an
   earlier report printed (its picks and Near misses), never of an entry that
   merely sat in an earlier shortlist or discarded log; otherwise it carries the
-  base fact as news. On 2026-10-17 15:45 "this morning's run carried the
-  release" opened the DeepSeek pick, though the 09:00 report never named
-  DeepSeek (it sat at shortlist #41 and #46).
+  base fact as news.
 - "a fresh digest", or after retuning the filter: `--same-day fresh`.
 
 ### Other inputs
@@ -125,15 +126,13 @@ happened. Two things are yours:
   refuses a second pass on the same run, so there is no refetch loop. The
   unattended job posts any failure, repair or lint error to Discord, which is
   how a problem stays visible after the daily review retires.
-- **Report it.** The report's `Collection:` sentence, in the opening paragraph of
-  Near misses right after the funnel line (not a bullet: the bullets are items
-  that lost), opens with what every source
-  fetched (the shortlist header's "Fetched per source" counts), so a feed that
-  quietly came back thin is visible even when nothing failed, then names every
-  source that failed, was retried, or was repaired, with what happened, including a code fix's commit
-  hash and the refetch result (the lint checks the names against the manifest). When a whole X feed is still missing from the morning run, say
-  so in chat too, since the afternoon run's default `union` merges the morning
-  items but cannot recover what was never fetched.
+- **Report it.** The report's `Collection:` sentence (its place is in the Report
+  template; the lint checks it against the manifest) opens with every source's
+  fetched count from the shortlist header, so a feed that quietly came back thin
+  is visible even when nothing failed, then names every source that failed, was
+  retried or was repaired and what happened, including a code fix's commit hash
+  and the refetch result. When a whole feed is still missing after the refetch,
+  say so in chat too: no report can cover what was never fetched.
 
 A missing
 `TYPESAFE_API_KEY` returns `ok: false` with the fix; tell the user and re-run
@@ -144,35 +143,28 @@ news `brief_date` or X Today's `fetched` is not today, say how old it is.
 ## Read selectively
 
 Read `shortlist.md` and nothing else in bulk. Its top holds, in order: what was
-picked on earlier days this week, a "Top investing candidates" index of the top 12 by
-invest composite plus every entry that names a holding as a stock (a cashtag, or
-the bare ticker in a title), whatever its rank, each marked `holding $INTC` and
-`VERIFY` where that applies (the overall ranking is by `max(invest, learn)`,
-which buries investing items under learn-track items; every investing pick so
-far sat inside this index), then the survivors ordered by Jev value, with VERIFY, UNCERTAIN
-and UNSCORED items last. The keep line is drawn per track (the top 35
-by invest and the top 35 by learn both pass), so an investing post is never
-pushed out by learn-track articles, and an entry that names a holding's ticker
-passes whatever its rank (tagged `HOLDING`): on a 200-item morning the invest
-line sat at 0.44 and a $MU post on CXMT's flat Q3 fell under it at 0.42
-(2026-10-16 09:00), the fact the afternoon's MU pick needed. The value order is not a cross-source
-comparison: since AI-news items carry full article bodies, long Zhihu articles
-take most of the top ranks (ranks 1–5 on 2026-10-12) while a two-line X post on
-a holding sits at rank 40. That is left as it is, because the articles that get
-picked are long too. Read the investing index and the tickers, not the rank,
-for investing. Then:
+picked on earlier days this week; a "Top investing candidates" index of the top
+12 by invest composite plus every entry that names a holding as a stock (a
+cashtag, or the bare ticker in a title) whatever its rank, each marked
+`holding $INTC` and `VERIFY` where that applies; then the survivors by Jev
+value, with VERIFY, UNCERTAIN and UNSCORED items last. The keep line is per
+track (the top 35 by invest and the top 35 by learn both pass) and an entry
+naming a holding's ticker passes whatever its rank (`HOLDING`). The overall
+order is `max(invest, learn)` and is not a cross-source comparison: AI-news
+items carry full article bodies, so long Zhihu articles out-rank a two-line X
+post on a holding by length alone. For investing, read the index and the
+tickers, not the rank; every investing pick so far sat inside the index. Then:
 
 - **One entry per story, where the pipeline can tell.** Retweets and quotes of
   one root post are folded under the story's best original post as `also:`
   lines (the heading says `story of N posts`), and the entry ranks by the
   story's best value, so a famous account's zero-like retweets no longer take
-  slots of their own (six of the top 14 on 2026-10-14 15:45 were one Meta
-  paper). Cite and `pick` the member whose words you use: the original for
-  the fact, a quote for its own commentary; any member's id works. The fold
-  sees only a shared root post, so a quote of the lab's announcement and a
-  quote of the author's thread are two entries, and independent posts on one
-  headline (six of the top 30 that run were the Anthropic $16.8B quarter)
-  stay separate: count them as one candidate and cite the best-sourced one.
+  slots of their own. Cite and `pick` the member whose words you use: the
+  original for the fact, a quote for its own commentary; any member's id works.
+  The fold sees only a shared root post, so a quote of the lab's announcement
+  and a quote of the author's thread are two entries, and independent posts on
+  one headline stay separate: count them as one candidate and cite the
+  best-sourced one.
 - **Skim the top of `discarded.md`** once per run. The filter is recall-first but
   not perfect; it has dropped real picks as "promo" (a question-style Reddit post,
   a clickbait-styled Chinese headline). Pull back anything wrongly dropped.
@@ -193,15 +185,11 @@ for investing. Then:
   on the quoted post`): the heading's author wrote the reaction, the quoted
   author the content. Judge, cite and attribute the quoted post; when the root
   was not collected, link the quote post's URL and say the claim reaches you
-  through it (2026-10-16 15:45: "sell everything" quoting a report of
-  Anthropic's 80–90% automation projection was the day's AI pick). In a
-  `--same-day new` run the root is often in an earlier run today, discarded or
-  shortlisted and left out as seen: grep that run's logs for the quoted
-  author's handle, open the root, and cite and attribute it in place of the
-  wrapper (`pick` still takes the wrapper's id: only this run's items are
-  accepted). On 2026-10-17 15:45 the pick went to "Notice the cost column" while
-  @PawelHuryn's post with the 105-bug data sat in the 09:00 `discarded.md` at
-  0.263.
+  through it. In a `--same-day new` run the root is often in an earlier run
+  today, discarded or shortlisted and left out as seen: grep that run's logs
+  for the quoted author's handle, open the root, and cite and attribute it in
+  place of the wrapper (`pick` still takes the wrapper's id: only this run's
+  items are accepted).
 - Items marked `PICKED <date>`, and stories in the "Picked on earlier days" list,
   were already reported. A development in one of them is a pick (developing
   stories tend to matter most); lead the entry with what is new and link the
@@ -243,9 +231,7 @@ evidence. Collapse the same story told by several sources into one pick.
 months, year to date, a half) says nothing about the latest quarter until you
 subtract the periods already reported; the implied quarter and its
 quarter-on-quarter trend is the fact that bears on a holding, and the heading
-carries that, not the headline total. On 2026-10-16 15:45 CXMT's nine-month
-profit was read as a cash pile when Q1 and Q2 implied Q3 up 1–4% QoQ on revenue
-up 15–20%, the fact that bore on MU. Show the arithmetic in one clause. And a
+carries that, not the headline total. Show the arithmetic in one clause. And a
 second vendor restating a known condition (Dell on memory tightness, three days
 after the quote) is a new voice, not a new fact: it earns a clause, not a pick.
 
@@ -254,8 +240,7 @@ the company, ticker and Chinese name of the pick's subject, in `shortlist.md`
 and `discarded.md` alike
 (`grep -il 'CXMT\|长鑫\|\$MU' ~/projects/news/data/signal_digest/runs/<today>_*/{shortlist,discarded}.md`),
 and fold in whatever adds a figure or contradicts the claim as one linked
-sentence. The morning's discarded "Q3 almost flat QoQ" post belonged inside the
-afternoon's CXMT pick and would have corrected it.
+sentence; a morning's discarded post has corrected an afternoon's pick before.
 
 Compare against the user's latest valuation when one exists:
 `~/projects/stock_picker/data/valuations/<TICKER>/<date>.md` is the base model
@@ -286,9 +271,7 @@ dependence: it searches X for the names in `leaders.py` (chip, supply-chain and
 hyperscaler CEOs, English and Chinese) and brings the top posts of the last
 three days, so a talk is collected whether or not the feeds carried it. Treat
 its entries as the first thing to read in full. A CEO disclosing a demand mix,
-a capacity figure, a lead time or next year's bottleneck (on 2026-10-15, Huang
-on Bg2: frontier labs are a quarter to a third of demand, gear per gigawatt went
-from $18B to over $40B, land and power limit next year) is the earliest primary
+a capacity figure, a lead time or next year's bottleneck is the earliest primary
 source on where the build-out's constraints are, which serves both goals at once
 and usually is the day's most valuable item. Such a talk still competes for the
 three slots rather than getting a slot of its own: an uncapped slot would fill
@@ -304,14 +287,11 @@ whatever its date.
 
 A leader's remark on a story already picked is a development in two
 cases: it discloses a figure, a decision or guidance of the leader's own
-company, or the speaker's own stake changes what the known facts mean. On
-2026-10-12 the funding story had two days of issuance data and bank forecasts
-behind it; then the CEO of Broadcom, the lender behind Anthropic's chip leases,
-said capital could be the constraint. The same words from a commentator are a
-new voice; from the lender they are the story moving from observers to a
-participant. When the stake is the point, the heading says so ("the lender
-behind Anthropic's chips doubts the financing"), not "two CEOs named the weak
-links".
+company, or the speaker's own stake changes what the known facts mean (the
+lender behind a deal doubting its financing). The same words from a commentator
+are a new voice; from a participant they move the story. When the stake is the
+point, the heading says so ("the lender behind Anthropic's chips doubts the
+financing"), not "two CEOs named the weak links".
 
 **Engagement** measures what the crowd already knows. Use it as context, never as
 the reason to pick.
@@ -321,9 +301,7 @@ would matter if true, spend one web search to confirm the claim and read what
 was actually said. Headline accounts (Polymarket, zerohedge) routinely reframe;
 a verified-but-reframed claim may move from investing to AI or drop out. State
 the result in one sentence with the primary source linked. The heading and the
-TL;DR then carry what the primary source says, not the feed post's paraphrase
-(on 2026-10-12 a post's "memory is the weak link" became a heading; the source
-said financing).
+TL;DR then carry what the primary source says, not the feed post's paraphrase.
 
 ## Report
 
@@ -385,10 +363,7 @@ Rules:
   (a lawsuit, a contract, guidance, a price change, a management change) gets
   the one search every VERIFY item gets, then a pick, a clause inside a pick, or
   a Near-misses line with the verdict. A ticker list, a selloff roll call or a
-  sector read is not an event and needs nothing. On 2026-10-15 15:45 Tower's
-  fraud suit against Intel sat in the index as a VERIFY item and the report
-  never mentioned it, while two unsourced MU rumours got lines; the lint now
-  warns about every unnamed VERIFY item on a holding.
+  sector read is not an event and needs nothing.
 - Keep both TL;DR headings; a goal with no picks says "Nothing today."
 - Every pick gets one `Sources:` line right under its heading, then a blank line,
   then the body (a bare line break would merge them in rendered Markdown). Copy
@@ -403,8 +378,7 @@ Rules:
   first use. The reader is a strong engineer, not a finance specialist.
 - A vendor's superlative or ranking ("the most capable US open-weight model") is
   the vendor's claim until an independent benchmark confirms it: attribute it
-  ("Meta calls it …"), in the TL;DR too, or drop it. On 2026-10-15 the TL;DR
-  stated Meta's claim about Muse Spark Open as fact.
+  ("Meta calls it …"), in the TL;DR too, or drop it.
 - A quotation links the document that contains the words (the slides, not the
   blog post beside them). A quote that reaches you through coverage (a Chinese
   write-up of an English talk) is attributed to the person only after you find it
@@ -421,9 +395,8 @@ Investing picks are also evidence for the user's research logs in `stock_picker`
 **watch item** per holding (news a thesis card's next print must settle) and the
 **portfolio premise register**. This skill only *proposes* entries and never writes
 either log, because nobody reviews an unattended run before it lands and a framing can
-turn out wrong the same day (2026-10-18: the 09:00 AMD pick read a Morgan Stanley model
-reconciliation as a 43% cut; the explanation surfaced that afternoon). The user applies
-the ones they approve with `/portfolio-brief log the digest proposals`.
+turn out wrong the same day. The user applies the ones they approve with
+`/portfolio-brief log the digest proposals`.
 
 `PB` below is `/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python ~/projects/stock_picker/skills/portfolio-brief/portfolio_brief.py`.
 
