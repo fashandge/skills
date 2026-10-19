@@ -73,7 +73,13 @@ inputs:
   "(earlier today)" on its heading and TL;DR bullet, and list new picks first.
 - "anything new since earlier?": `--same-day new`, only items no earlier run
   today collected. `nothing_new: true` means every item was already seen; say so
-  and stop. Otherwise "nothing new worth your time" is a good answer.
+  and stop. Otherwise "nothing new worth your time" is a good answer. "Seen" is
+  not "reported": a pick may call itself a development only of something an
+  earlier report printed (its picks and Near misses), never of an entry that
+  merely sat in an earlier shortlist or discarded log; otherwise it carries the
+  base fact as news. On 2026-10-17 15:45 "this morning's run carried the
+  release" opened the DeepSeek pick, though the 09:00 report never named
+  DeepSeek (it sat at shortlist #41 and #46).
 - "a fresh digest", or after retuning the filter: `--same-day fresh`.
 
 ### Other inputs
@@ -188,7 +194,14 @@ for investing. Then:
   author the content. Judge, cite and attribute the quoted post; when the root
   was not collected, link the quote post's URL and say the claim reaches you
   through it (2026-10-16 15:45: "sell everything" quoting a report of
-  Anthropic's 80–90% automation projection was the day's AI pick).
+  Anthropic's 80–90% automation projection was the day's AI pick). In a
+  `--same-day new` run the root is often in an earlier run today, discarded or
+  shortlisted and left out as seen: grep that run's logs for the quoted
+  author's handle, open the root, and cite and attribute it in place of the
+  wrapper (`pick` still takes the wrapper's id: only this run's items are
+  accepted). On 2026-10-17 15:45 the pick went to "Notice the cost column" while
+  @PawelHuryn's post with the 105-bug data sat in the 09:00 `discarded.md` at
+  0.263.
 - Items marked `PICKED <date>`, and stories in the "Picked on earlier days" list,
   were already reported. A development in one of them is a pick (developing
   stories tend to matter most); lead the entry with what is new and link the
