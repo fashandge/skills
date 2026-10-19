@@ -41,8 +41,8 @@ The job is to find those few items and nothing else. The test for every item is
    run). It discards only confident ads and confident junk, and always passes
    items Jev was unsure about (it is weaker on Chinese).
 3. **Pick and write** (you): read the shortlist, choose the vital few, verify,
-   write the report, log the picks. The judgment lives here; Jev's scores are a
-   prior, not a verdict.
+   write the report, propose entries for the user's research logs, log the picks.
+   The judgment lives here; Jev's scores are a prior, not a verdict.
 
 ## Run
 
@@ -412,8 +412,43 @@ Rules:
 - **Write in English** whatever the sources' language. Quote Chinese verbatim only
   where the wording carries something a translation loses (a coined phrase, a
   quote being weighed), followed by an English gloss.
-- In chat, reply with the TL;DR bullets plus the report path. Don't paste the
-  report.
+- In chat, reply with the TL;DR bullets, the report path and the number of log
+  proposals. Don't paste the report.
+
+## Propose log entries for the portfolio
+
+Investing picks are also evidence for the user's research logs in `stock_picker`: a
+**watch item** per holding (news a thesis card's next print must settle) and the
+**portfolio premise register**. This skill only *proposes* entries and never writes
+either log, because nobody reviews an unattended run before it lands and a framing can
+turn out wrong the same day (2026-10-18: the 09:00 AMD pick read a Morgan Stanley model
+reconciliation as a 43% cut; the explanation surfaced that afternoon). The user applies
+the ones they approve with `/portfolio-brief log the digest proposals`.
+
+`PB` below is `/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python ~/projects/stock_picker/skills/portfolio-brief/portfolio_brief.py`.
+
+1. **Candidates**: each investing pick, and each Near-misses line on a holding or a
+   premise. The routing rule (one holding's card → watch item; a shared premise → premise
+   evidence; both when both), the significance bar and the fact-level redundancy check are
+   owned by `portfolio-brief` Step 5 (`~/projects/stock_picker/skills/portfolio-brief/SKILL.md`);
+   apply them as written there. The formats are in `~/projects/stock_picker/docs/attention-layer.md`
+   (*Watch items*, *Premise register*, *Proposal files*). Zero proposals is a normal run.
+2. **Read the current state first.** `PB status --compact` gives each holding's
+   `open_watch` and `baseline.path`; read that baseline's `## Thesis card` so `bears_on`
+   names a specific assumption, trigger, scenario or premise and `test_at` names the next
+   print (its `Next re-test`). Read each touched premise's **Claim** and evidence in the
+   register, and any `proposed_log.json` from today's earlier runs: what they proposed is
+   not proposed again, approved or not.
+3. **Write `proposed_log.json`** into the run directory: `run_id`, `proposals` (each with
+   `kind`, `pick` as `invest:<item id>` or `near-miss`, and `args`), and `skipped` (one
+   `{what, why}` per candidate declined). The pick's verification sentence sets
+   `source_type` and the caveats that go into `item` or `claim`; `date` is the evidence's
+   date.
+4. **Validate**: `PB apply-proposals <run dir>/proposed_log.json --dry-run`. Fix every
+   failed proposal; one that comes back `already_present` is logged already, so drop it.
+5. **Append `## Proposed log`** at the end of `report.md`: one line per proposal in file
+   order, `N. watch TICKER · <direction> — <title>` or `N. premise Pn · <direction> — <claim
+   in a dozen words>`, or `None.` The numbers are what the user approves by.
 
 ## Check the report, then log the picks
 
@@ -464,6 +499,7 @@ weights in `src/signal_digest/jev_filter.py` need retuning.
   items, scores and raw snapshots it came from; `collect.log` there holds the
   collectors' stderr, tracebacks included), `picks.jsonl` (the memory that
   drives `PICKED <date>` markers),
-  `seen_counts.json`.
+  `seen_counts.json`; each run's `proposed_log.json` holds its proposals for the
+  stock_picker logs.
 - The reader profile is rebuilt every run from `stock_picker/data/portfolio.csv`,
   `data/ticker.csv` and the premise register; `--profile FILE` swaps it.

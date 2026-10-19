@@ -1,6 +1,6 @@
 ---
 name: signal-digest-review
-description: Daily quality review of the previous day's signal-digest runs during a hill-climbing period. Reads each run's report, shortlist, discarded log and pick log, scores the picks against the user's two goals (investment return with controlled risk; AI technology and industry trends for learning and startup ideas), hunts for misses, spot-checks one claim, checks pipeline health, and writes a short scorecard plus at most one improvement suggestion to a running list. Use when the user asks to "review yesterday's digest", "score the signal digest", "how did the digest do", or when the signal-digest-review LaunchAgent runs it unattended. Does not edit the signal-digest skill; changes are batched by the user.
+description: Daily quality review of the previous day's signal-digest runs during a hill-climbing period. Reads each run's report, shortlist, discarded log and pick log, scores the picks and the log proposals against the user's two goals (investment return with controlled risk; AI technology and industry trends for learning and startup ideas), hunts for misses, spot-checks one claim, checks pipeline health, and writes a short scorecard plus at most one improvement suggestion to a running list. Use when the user asks to "review yesterday's digest", "score the signal digest", "how did the digest do", or when the signal-digest-review LaunchAgent runs it unattended. Does not edit the signal-digest skill; changes are batched by the user.
 ---
 
 # signal-digest-review
@@ -15,7 +15,7 @@ where it fails, so the user can change it in batches with evidence.
 
 The runner (`news.src.signal_digest.review_daily`) names the date and the run
 directories to review, each with `report.md`, `shortlist.md`, `discarded.md`,
-`manifest.json` and `scored.jsonl`. Read, in this order and nothing else in bulk:
+`manifest.json`, `scored.jsonl` and, since 2026-10-19, `proposed_log.json`. Read, in this order and nothing else in bulk:
 
 1. `report.md` of each run.
 2. The first 30 items of each `shortlist.md` and the first 10 lines of each
@@ -24,7 +24,11 @@ directories to review, each with `report.md`, `shortlist.md`, `discarded.md`,
 4. `~/projects/news/data/signal_digest/reviews/feedback.md` if it exists: the
    user's own marks on earlier picks (`[x]` useful, `[-]` not). Their judgment
    outranks yours; when a mark disagrees with your score, say so and defer.
-5. Earlier scorecards in `reviews/` only to check whether a finding repeats.
+5. Each run's `proposed_log.json`, and which of its proposals the user applied: a watch
+   item's title in `~/notes/wiki/Investment/Investment system/Watch Items.md`, or an
+   evidence bullet's date and source in `Portfolio Premise Register.md` beside it. An
+   applied proposal is the user's approval and outranks your score, like a `[x]` mark.
+6. Earlier scorecards in `reviews/` only to check whether a finding repeats.
 
 Open an item's full content through its `ref` or URL only when a decision
 turns on it. One web search per report for the spot-check, no more.
@@ -60,7 +64,16 @@ Answer every point in one or two sentences, with the item linked.
    `keep_reason` of each pick (from `scored.jsonl`; a pick below the keep line
    is a filter miss worth noting; the line is per track since 2026-10-12, so
    compare an investing pick's `invest` rank, not its overall rank).
-7. **One suggestion at most.** The single change with the best evidence from
+7. **Log proposals.** The rules are the routing rule, significance bar and redundancy
+   check in `~/projects/stock_picker/skills/portfolio-brief/SKILL.md` Step 5; judge against
+   those, not your own taste. Per run: is each proposal routed right (one holding's card →
+   watch item, a shared premise → premise evidence, the right premise, `for`/`against`
+   relative to its **Claim** line), above the bar, not a re-proposal of an earlier run's,
+   and framed as the verified primary source says rather than the feed post? A pick on a
+   holding or premise with neither a proposal nor a `skipped` entry is a miss. Run
+   `/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python ~/projects/stock_picker/skills/portfolio-brief/portfolio_brief.py apply-proposals <run dir>/proposed_log.json --dry-run`;
+   a failed proposal costs the point. Never apply a proposal yourself.
+8. **One suggestion at most.** The single change with the best evidence from
    this day, appended to `reviews/suggestions.md` as one line with the date and
    the evidence link. If the day shows nothing new, append nothing.
 
@@ -71,7 +84,7 @@ Write `~/projects/news/data/signal_digest/reviews/<YYYY-MM-DD>.md`:
 ```markdown
 # Digest review — <date> (runs: <ids>)
 
-Score: Investing <0-2> · AI <0-2> · Misses <0-2> · Format <0-2> · Pipeline <0-2> → <total>/10
+Score: Investing <0-2> · AI <0-2> · Misses <0-2> · Format <0-2> · Pipeline <0-2> → <total>/10 · Proposals <0-2, or n/a>
 
 ## Picks
 - <run id> · <pick title> — <score and one-sentence why> ([source](<link>))
@@ -85,11 +98,17 @@ Score: Investing <0-2> · AI <0-2> · Misses <0-2> · Format <0-2> · Pipeline <
 ## Pipeline
 - <errors, stale sources, stubs, Jev ranks of picks>
 
+## Proposals
+- <run id> · <N. proposal> — <routed right / over the bar / duplicate / misframed; applied by the user or not>
+
 ## Suggestion
 <one line, or "none today">
 ```
 
 Scores: 2 = met the goal, 1 = partly, 0 = failed; `Misses` 2 means none found.
+`Proposals` sits outside the /10 total so scorecards before and after 2026-10-19 stay
+comparable; it is `n/a` for a run with no `proposed_log.json`, and 2 for a correct
+"None." (nothing on a holding or premise cleared the bar).
 Every score below 2 names its reason in the matching section, in one clause
 ("Format 1: TL;DR bullet of three sentences"); an unexplained point lost cannot
 be acted on.
