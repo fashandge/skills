@@ -52,7 +52,8 @@ Answer every point in one or two sentences, with the item linked.
 5. **Format.** Run the lint on each report and quote its errors and the
    warnings you agree with:
    `cd ~/projects && /opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python -m news.src.signal_digest.run lint --run-dir <run id>`.
-   An error costs the Format point. Then by eye: the TL;DR standing alone,
+   An error costs the Format point, except a `proposal N … fails` error, which the
+   lint takes from the same rules as point 7's dry run and is scored there. Then by eye: the TL;DR standing alone,
    and Near misses naming the best unpicked investing item when Investing had
    fewer than two picks.
 6. **Pipeline health.** Source errors and repairs (`attempts`, `repair`,

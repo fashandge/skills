@@ -67,3 +67,11 @@ seems wrong for the case in front of you. Newest last.
   employees (21% → 14%).
 - **2026-10-18 15:45 · a roundup is not a shift.** The AI pick on incumbents blocking agents
   collected blocks known since September through a secondary aggregator (learn #30, 0.325).
+- **2026-10-19 09:00 · the lint checks the proposals.** Two of three proposals named outlets
+  and the run id in `source` with no URL, so `apply-proposals` refused them and the user applied
+  them by hand; the link rule and the dry-run step entered the skill at 10:16 that day, and the
+  lint now checks them against the same rules (it imports stock_picker's `log_entry_rules`)
+  so the gate does not depend on the agent remembering step 4.
+  The INTC proposal also carried "a change from July" that neither the report nor the
+  @BacklogAlpha post said; `item` and `claim` now carry only what the report or an opened page
+  says.

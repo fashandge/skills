@@ -448,7 +448,9 @@ turn out wrong the same day. The user applies the ones they approve with
    `kind`, `pick` as `invest:<item id>` or `near-miss`, and `args`), and `skipped` (one
    `{what, why}` per candidate declined). The pick's verification sentence sets
    `source_type` and the caveats that go into `item` or `claim`; `date` is the evidence's
-   date. Link every source: a watch item's `source` and an evidence entry's `links` each need
+   date. `item` and `claim` carry only facts the report states or a page you opened for
+   this run says; a fact you remember (what the CEO said at the last call) stays out until
+   you open and link where it was said. Link every source: a watch item's `source` and an evidence entry's `links` each need
    the URL of every post or article named (and the primary document's when one exists);
    the dry run in step 4 rejects an outlet name or run id alone. Where `item` or `claim`
    attributes a fact, write the attribution as the link ("per [Carrio](url) only").
@@ -469,8 +471,11 @@ Run the lint before logging and fix every error it reports:
 It checks the word budget, the pick cap, the TL;DR bullet and pick-body lengths,
 the TL;DR and `Sources:` structure, the first Near-misses line, the `Collection:`
 line against the manifest (every source's fetched count, and every failed,
-retried or repaired source, must be named), and every link label against its URL (a label saying "via Coinpaper" on a kucoin.com URL is the
-kind of slip it exists for). It warns about every VERIFY item that names a
+retried or repaired source, must be named), every link label against its URL (a label saying "via Coinpaper" on a kucoin.com URL is the
+kind of slip it exists for), and `proposed_log.json`: its count against the
+`## Proposed log` lines, and every proposal against portfolio-brief's log-entry
+rules (stock_picker's `log_entry_rules`, the rules step 4's dry run applies), so a
+proposal the user cannot apply as written is an error here too. It warns about every VERIFY item that names a
 holding and appears nowhere in the report, by author and id: decide whether it
 is an event at the holding, and if so name it. `lookup_links` lists every link that is
 not an item of this run: each must be a page you opened during verification, not
