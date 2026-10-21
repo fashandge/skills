@@ -423,42 +423,55 @@ Rules:
 
 ## Propose log entries for the portfolio
 
-Investing picks are also evidence for the user's research logs in `stock_picker`: a
-**watch item** per holding (news a thesis card's next print must settle) and the
-**portfolio premise register**. This skill only *proposes* entries and never writes
-either log, because nobody reviews an unattended run before it lands and a framing can
+Picks are also evidence for the user's research logs in `stock_picker`: a
+**watch item** per holding (news a thesis card's next print must settle), the
+**portfolio premise register**, and the **AI industry claims ledger** (revisable claims
+about the AI build-out and its adoption, `~/notes/wiki/Investment/Micro fundamentals/AI
+Industry Claims/`). This skill only *proposes* entries and never writes
+any of them, because nobody reviews an unattended run before it lands and a framing can
 turn out wrong the same day. The user applies the ones they approve with
 `/portfolio-brief log the digest proposals`.
 
 `PB` below is `/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python ~/projects/stock_picker/skills/portfolio-brief/portfolio_brief.py`.
 
-1. **Candidates**: each investing pick, and each Near-misses line on a holding or a
-   premise. The routing rule (one holding's card → watch item; a shared premise → premise
-   evidence; both when both), the significance bar and the fact-level redundancy check are
+1. **Candidates**: each investing pick, each Near-misses line on a holding or a
+   premise, and each pick or Near-misses line on either goal that states an industry-level
+   fact about the AI build-out or its adoption. The routing rule (one holding's card → watch
+   item; a shared premise → premise evidence; a ledger claim → claim evidence; every one
+   that applies), the significance bar and the fact-level redundancy check are
    owned by `portfolio-brief` Step 5 (`~/projects/stock_picker/skills/portfolio-brief/SKILL.md`);
    apply them as written there. The formats are in `~/projects/stock_picker/docs/attention-layer.md`
-   (*Watch items*, *Premise register*, *Proposal files*). Zero proposals is a normal run.
+   (*Watch items*, *Premise register*, *Industry claims ledger*, *Proposal files*). Zero
+   proposals is a normal run.
 2. **Read the current state first.** `PB status --compact` gives each holding's
    `open_watch` and `baseline.path`; read that baseline's `## Thesis card` so `bears_on`
    names a specific assumption, trigger, scenario or premise and `test_at` names the next
    print (its `Next re-test`). Read each touched premise's **Claim** and evidence in the
-   register, and any `proposed_log.json` from today's earlier runs: what they proposed is
+   register. For claim evidence, read the claims index's *Registry* and the candidate claim's
+   `Claim`, `Refuted if` and newest bullets: the fact must bear on that `Claim` line, and one
+   the claim already records from another outlet is not proposed. Propose `status` and
+   `status_reason` only when the evidence moves the claim's status, and never a new claim (a
+   fact no claim covers goes in `skipped` as "no ledger claim; candidate new claim"). Read
+   any `proposed_log.json` from today's earlier runs: what they proposed is
    not proposed again, approved or not.
 3. **Write `proposed_log.json`** into the run directory: `run_id`, `proposals` (each with
-   `kind`, `pick` as `invest:<item id>` or `near-miss`, and `args`), and `skipped` (one
+   `kind`, `pick` as `invest:<item id>`, `ai:<item id>` or `near-miss`, and `args`), and `skipped` (one
    `{what, why}` per candidate declined). The pick's verification sentence sets
-   `source_type` and the caveats that go into `item` or `claim`; `date` is the evidence's
-   date. `item` and `claim` carry only facts the report states or a page you opened for
+   `source_type` (for claim evidence, the ledger's set: `news`, `sell-side`, `trade blog`,
+   `investor post`, `forum`, …, with the caveat in `qualifier`) and the caveats that go into
+   `item`, `claim` or `evidence`; `date` is the evidence's
+   date. `item`, `claim` and `evidence` carry only facts the report states or a page you opened for
    this run says; a fact you remember (what the CEO said at the last call) stays out until
    you open and link where it was said. Link every source: a watch item's `source` and an evidence entry's `links` each need
    the URL of every post or article named (and the primary document's when one exists);
-   the dry run in step 4 rejects an outlet name or run id alone. Where `item` or `claim`
+   the dry run in step 4 rejects an outlet name or run id alone. Where `item`, `claim` or `evidence`
    attributes a fact, write the attribution as the link ("per [Carrio](url) only").
 4. **Validate**: `PB apply-proposals <run dir>/proposed_log.json --dry-run`. Fix every
    failed proposal; one that comes back `already_present` is logged already, so drop it.
 5. **Append `## Proposed log`** at the end of `report.md`: one line per proposal in file
-   order, `N. watch TICKER · <direction> — <title>` or `N. premise Pn · <direction> — <claim
-   in a dozen words>`, or `None.` The numbers are what the user approves by.
+   order, `N. watch TICKER · <direction> — <title>`, `N. premise Pn · <direction> — <claim
+   in a dozen words>` or `N. claim <ID> · <direction> — <evidence in a dozen words>` (add
+   `· status → <new>` when it proposes one), or `None.` The numbers are what the user approves by.
 
 ## Check the report, then log the picks
 

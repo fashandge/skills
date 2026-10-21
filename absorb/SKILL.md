@@ -52,7 +52,7 @@ Read the top candidate wiki notes (at least skim overview blockquote + headings)
 - **Let the KB force splits the source doesn't make.** If the source treats two things as one thread but the wiki keeps them in different homes (e.g. an essay mixing an AI coding workflow with career strategy), that mismatch is the signal to split.
 - **Rerun Step 1 when needed.** If decomposition surfaces a unit whose subject wasn't in the initial survey, do a second, narrower routing pass for it — the two steps interleave.
 
-Most sources yield one unit; rich sources (interviews, long threads, conversation logs) often yield several with *different* wiki destinations — e.g. an interview clipping contributing a framework to `Investment/Investment system/...`, a ticker fact to its `Micro fundamentals/.../<TICKER>/` note, and a workflow idea to `Strategy/...`. Then decide per insight:
+Most sources yield one unit; rich sources (interviews, long threads, conversation logs) often yield several with *different* wiki destinations — e.g. an interview clipping contributing a framework to `Investment/Investment system/...`, a ticker fact to its `Micro fundamentals/.../<TICKER>/` note, and a workflow idea to `Strategy/...`. An AI-industry insight that bears on a claim in `wiki/Investment/Micro fundamentals/AI Industry Claims/` is a Merge into that claim, written only through `~/projects/stock_picker/skills/portfolio-brief/portfolio_brief.py log-industry-claim-evidence` (rules: `~/projects/stock_picker/docs/attention-layer.md` § Industry claims ledger). Then decide per insight:
 
 | Decision | When | Action |
 |----------|------|--------|
