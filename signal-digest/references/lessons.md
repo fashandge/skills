@@ -75,3 +75,17 @@ seems wrong for the case in front of you. Newest last.
   The INTC proposal also carried "a change from July" that neither the report nor the
   @BacklogAlpha post said; `item` and `claim` now carry only what the report or an opened page
   says.
+- **2026-10-20 09:00 · a watch item is a pick when there is room.** Micron's Taoyuan union
+  strike (index #13) stayed a Near-misses line under one investing pick, yet it earned a
+  300-word MU watch-item proposal against the card's margin line, and the user applied it
+  while skipping the pick's P2 bullet. The facts the proposal needed belonged in a pick body.
+- **2026-10-20 15:45 · an event ranks by its post count as well as its best post.** SpaceX's
+  Q3 call arrived as 21 posts naming $SPCX out of 126 items, each quoting one line: the best
+  ranked #21 by value, the pick (the capex guide doubled to $35–40B, 10 GW more in 2027)
+  sat at #32 outside the index, and a dozen one-line quotes were discarded at low value.
+  The shortlist now counts cashtags in ten or more items on a `Most-posted subjects:` line
+  and lists each one's best entry in the index.
+- **2026-10-20 15:45 · a fact the register already records is not proposed.** The P2
+  proposal (SpaceX rents above $50/W, payback under a year) repeated the user's own
+  same-day SPCX bullet from the earnings-call summary, which sat directly above it in P2's
+  evidence; the dry run passed it because the entry was not identical.

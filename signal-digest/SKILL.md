@@ -146,14 +146,18 @@ Read `shortlist.md` and nothing else in bulk. Its top holds, in order: what was
 picked on earlier days this week; a "Top investing candidates" index of the top
 12 by invest composite plus every entry that names a holding as a stock (a
 cashtag, or the bare ticker in a title) whatever its rank, each marked
-`holding $INTC` and `VERIFY` where that applies; then the survivors by Jev
-value, with VERIFY, UNCERTAIN and UNSCORED items last. The keep line is per
+`holding $INTC` and `VERIFY` where that applies, plus the best entry on each
+most-posted cashtag (`$SPCX in 21 posts`, counted on a `Most-posted subjects:`
+line above the index); then the survivors by Jev value, with VERIFY, UNCERTAIN
+and UNSCORED items last. The keep line is per
 track (the top 35 by invest and the top 35 by learn both pass) and an entry
 naming a holding's ticker passes whatever its rank (`HOLDING`). The overall
 order is `max(invest, learn)` and is not a cross-source comparison: AI-news
 items carry full article bodies, so long Zhihu articles out-rank a two-line X
-post on a holding by length alone. For investing, read the index and the
-tickers, not the rank; every investing pick so far sat inside the index. Then:
+post on a holding by length alone. For investing, read the index, the
+tickers and the most-posted subjects, not the rank; every investing pick
+through 10-19 sat inside the index, and the one that did not (SpaceX's call,
+10-20, entry #32) is why the index now carries the most-posted cashtags. Then:
 
 - **One entry per story, where the pipeline can tell.** Retweets and quotes of
   one root post are folded under the story's best original post as `also:`
@@ -165,6 +169,15 @@ tickers, not the rank; every investing pick so far sat inside the index. Then:
   and a quote of the author's thread are two entries, and independent posts on
   one headline stay separate: count them as one candidate and cite the
   best-sourced one.
+- **An event ranks by its post count as well as its best post.** An earnings
+  call quoted line by line, a filing, a strike: each post carries one line and
+  scores low on its own, so the best sits mid-list, most are discarded, and
+  together they are the day's investing item. The `Most-posted subjects:` line
+  counts cashtags named in ten or more of the run's items, kept or discarded,
+  with how many were shortlisted and the best entry; a subject without a cashtag
+  (SpaceX, Anthropic) you count yourself when the subject grep below returns a
+  crowd. Read every post on such an event, discarded ones included, before
+  judging it by any one entry's rank, and cite the one closest to the words.
 - **Skim the top of `discarded.md`** once per run. The filter is recall-first but
   not perfect; it has dropped real picks as "promo" (a question-style Reddit post,
   a clickbait-styled Chinese headline). Pull back anything wrongly dropped.
@@ -231,6 +244,13 @@ evidence. Collapse the same story told by several sources into one pick.
   event window). A crowd of bullish posts alone is a sentiment reading, not a
   pick; it gets one line under Near misses. When you add market data by lookup,
   say so; the feed didn't supply it.
+
+**A watch item is a pick when there is room.** When the day's picks are under
+the cap and Investing has fewer than two, a candidate on a holding that you
+would propose as a watch item takes the slot instead of a Near-misses line: a
+watch item says the next print must settle it, which is the regret test
+passed, and the facts the proposal needs belong in a pick body, not in one
+line. A Near-misses line proposes a watch item only when the cap kept it out.
 
 **Read a figure against the holding it names before any premise.** A yield, a
 lead time, a unit cap or a price on a holding's own product is a specific new
@@ -447,7 +467,10 @@ turn out wrong the same day. The user applies the ones they approve with
    `open_watch` and `baseline.path`; read that baseline's `## Thesis card` so `bears_on`
    names a specific assumption, trigger, scenario or premise and `test_at` names the next
    print (its `Next re-test`). Read each touched premise's **Claim** and evidence in the
-   register. For claim evidence, read the claims index's *Registry* and the candidate claim's
+   register, its newest bullets most carefully: the user's own same-day entries land there
+   too (an earnings-call summary arrives the same afternoon), and a fact a bullet already
+   records, whoever wrote it, is not proposed again; the dry run's `already_present` catches
+   only an identical entry, not a repeated fact. For claim evidence, read the claims index's *Registry* and the candidate claim's
    `Claim`, `Refuted if` and newest bullets: the fact must bear on that `Claim` line, and one
    the claim already records from another outlet is not proposed. Propose `status` and
    `status_reason` only when the evidence moves the claim's status, and never a new claim (a
@@ -516,7 +539,8 @@ weights in `src/signal_digest/jev_filter.py` need retuning.
 
 - Code: `~/projects/news/src/signal_digest/` (`run.py` CLI, `sources.py`
   adapters, `jev_filter.py` questions, weights and the per-track keep line,
-  `render.py` the shortlist and its story folding, `lint.py` the report
+  `render.py` the shortlist, its story folding, the investing index and the
+  most-posted subjects line, `lint.py` the report
   checks, `profile.py` reader context, `leaders.py` the leader handles and
   the names, words and window behind the `leader_talks` search, `run_daily.py`
   the 9:00 and 15:45 LaunchAgent entry point).
