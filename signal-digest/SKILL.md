@@ -245,12 +245,17 @@ evidence. Collapse the same story told by several sources into one pick.
   pick; it gets one line under Near misses. When you add market data by lookup,
   say so; the feed didn't supply it.
 
-**A watch item is a pick when there is room.** When the day's picks are under
-the cap and Investing has fewer than two, a candidate on a holding that you
-would propose as a watch item takes the slot instead of a Near-misses line: a
-watch item says the next print must settle it, which is the regret test
-passed, and the facts the proposal needs belong in a pick body, not in one
-line. A Near-misses line proposes a watch item only when the cap kept it out.
+**A candidate that yields a ledger proposal is a pick when its goal has fewer
+than two picks.** A watch item, premise evidence or claim evidence says the
+user will log this fact, which is the regret test passed, and the facts the
+proposal needs belong in a pick body, not in one Near-misses line. The slot
+is the goal's: Investing with one pick takes it even when the day stands at
+the cap, and the other goal's weaker pick (the one that yields no proposal,
+else the lower-ranked) folds into its neighbour as one linked sentence or
+moves to Near misses. Run the proposal step's routing while you pick, not
+after the report is written: a Near-misses line that ends up with proposals
+is the sign the pick was wrong. A Near-misses line carries a proposal only
+when its goal already holds two picks.
 
 **Read a figure against the holding it names before any premise.** A yield, a
 lead time, a unit cap or a price on a holding's own product is a specific new

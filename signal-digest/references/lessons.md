@@ -89,3 +89,10 @@ seems wrong for the case in front of you. Newest last.
   proposal (SpaceX rents above $50/W, payback under a year) repeated the user's own
   same-day SPCX bullet from the earnings-call summary, which sat directly above it in P2's
   evidence; the dry run passed it because the entry was not identical.
+- **2026-10-21 15:45 · a candidate that yields a ledger proposal is a pick.** Lam's call
+  (2027 equipment spending above $200B, DRAM growing fastest, clean rooms still limiting; entry
+  #26) stayed a Near-misses line under one investing pick and two AI picks, yet it yielded the
+  run's only two proposals (CHIP-4 against, MEM-1 for), the user applied both and opened claim
+  EQP-1 on it. The 10-20 rule covered watch items on a day under the cap; claim evidence on a
+  day at the cap slipped past it. The rule now covers every proposal kind and lets the goal with
+  one pick take the slot from the other goal's weaker pick.
