@@ -96,3 +96,11 @@ seems wrong for the case in front of you. Newest last.
   EQP-1 on it. The 10-20 rule covered watch items on a day under the cap; claim evidence on a
   day at the cap slipped past it. The rule now covers every proposal kind and lets the goal with
   one pick take the slot from the other goal's weaker pick.
+- **2026-10-22 09:00 · a restated window is measured by its end date.** Coherent's CTO said InP
+  laser capacity is "essentially sold out through the end of 2027" (index #12, holding COHR).
+  The proposal step matched it to the register's 2026-08-12 "FY2027 fully booked" bullet and
+  skipped it as redundant, in both runs, while Investing had a free slot each time. The user
+  logged it the same day as a mixed COHR watch item: the window had not extended into 2028
+  while LITE's CEO says LITE is almost sold out for 2029, which bears on the card's assumption
+  that growth fades as the 2027-28 capacity lands. The fact was the unmoved end date, not the
+  sold-out condition.

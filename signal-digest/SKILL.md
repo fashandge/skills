@@ -283,6 +283,18 @@ carries that, not the headline total. Show the arithmetic in one clause. And a
 second vendor restating a known condition (Dell on memory tightness, three days
 after the quote) is a new voice, not a new fact: it earns a clause, not a pick.
 
+**A holding's own officer restating a dated window is measured against the
+standing window, not matched to it.** A sold-out, booked or lead-time window
+("sold out through end-2027", "booked into FY2028") is the same fact as the
+register's bullet only when its end date is unchanged and nothing beside it
+has moved. The fact to test is whether the window moved: extended is for;
+unchanged while the capacity it covers grows, or while a peer's window runs
+longer (LITE "almost sold out for 2029" against COHR's end-2027), is mixed and
+bears on the card's growth-fade or pricing assumption; shortened is against.
+State the standing window, the new one and the peer's in one clause, and route
+it as a watch item on the holding. A match by subject alone is the redundancy
+check's false positive, and on a day with a free Investing slot it cost a pick.
+
 **Collect the story's evidence before writing a pick.** Grep today's runs for
 the company, ticker and Chinese name of the pick's subject, in `shortlist.md`
 and `discarded.md` alike
@@ -475,7 +487,9 @@ turn out wrong the same day. The user applies the ones they approve with
    register, its newest bullets most carefully: the user's own same-day entries land there
    too (an earnings-call summary arrives the same afternoon), and a fact a bullet already
    records, whoever wrote it, is not proposed again; the dry run's `already_present` catches
-   only an identical entry, not a repeated fact. For claim evidence, read the claims index's *Registry* and the candidate claim's
+   only an identical entry, not a repeated fact. A dated window restated by the holding's own
+   officer is a repeated fact only when its end date is unchanged and nothing beside it moved
+   (the rule under *Pick the vital few*); otherwise it is proposed with the comparison in `item`. For claim evidence, read the claims index's *Registry* and the candidate claim's
    `Claim`, `Refuted if` and newest bullets: the fact must bear on that `Claim` line, and one
    the claim already records from another outlet is not proposed. Propose `status` and
    `status_reason` only when the evidence moves the claim's status, and never a new claim (a
