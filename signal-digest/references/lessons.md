@@ -104,3 +104,12 @@ seems wrong for the case in front of you. Newest last.
   while LITE's CEO says LITE is almost sold out for 2029, which bears on the card's assumption
   that growth fades as the 2027-28 capacity lands. The fact was the unmoved end date, not the
   sold-out condition.
+- **2026-10-23 09:00 · a holding's product launch is an event at the holding.** Marvell's
+  Celestial AI memory appliance, 32 external lasers per box (index #10, marked `holding $LITE
+  $COHR $MRVL`), was named nowhere in the report: a new product pulling on InP capacity that
+  COHR and LITE say is sold out. The event list named lawsuits, contracts, guidance, prices and
+  management changes, and the lint warns only about VERIFY items.
+- **2026-10-23 15:45 · a watch item goes to any ticker with a card.** Jassy's "AWS 2027
+  largely sold out" pick yielded P2, MEM-1 and GEN-1 evidence and no AMZN entry or skip, because
+  the proposal step read only `reader.holdings`; the vault holds an AMZN baseline and the user
+  wrote the watch item the same day.

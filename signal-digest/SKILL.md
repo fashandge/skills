@@ -427,10 +427,15 @@ Rules:
   rank, unless you say why a lower one is the stronger candidate.
 - **An event at a holding itself is named whether or not it is picked.** An
   index entry marked `holding` that reports something happening to the company
-  (a lawsuit, a contract, guidance, a price change, a management change) gets
-  the one search every VERIFY item gets, then a pick, a clause inside a pick, or
-  a Near-misses line with the verdict. A ticker list, a selloff roll call or a
-  sector read is not an event and needs nothing.
+  (a lawsuit, a contract, guidance, a price change, a management change, a
+  product launch or a design win) gets the one search every VERIFY item gets,
+  then a pick, a clause inside a pick, or a Near-misses line with the verdict.
+  An entry marked with several holdings is an event at each of them: a
+  holding's new product that pulls on a component another holding sells out of
+  (Marvell's 32-laser memory appliance against Coherent's and Lumentum's InP)
+  is named for both sides. A ticker list, a selloff roll call or a sector read
+  is not an event and needs nothing; the lint warns only about VERIFY items, so
+  walk the `holding` entries yourself.
 - Keep both TL;DR headings; a goal with no picks says "Nothing today."
 - Every pick gets one `Sources:` line right under its heading, then a blank line,
   then the body (a bare line break would merge them in rendered Markdown). Copy
@@ -473,7 +478,13 @@ turn out wrong the same day. The user applies the ones they approve with
 
 1. **Candidates**: each investing pick, each Near-misses line on a holding or a
    premise, and each pick or Near-misses line on either goal that states an industry-level
-   fact about the AI build-out or its adoption. The routing rule (one holding's card → watch
+   fact about the AI build-out or its adoption. A watch item goes to any ticker with a
+   baseline card in the vault, not only to `reader.holdings`: when a pick's subject is a
+   company outside the holdings (Amazon on AWS being sold out), check for its card
+   (`ls ~/notes/wiki/Investment/Micro\ fundamentals/*/<TICKER>/<TICKER>\ fundamentals.md`)
+   and, when one exists, route the fact to it exactly as to a holding, reading its card with
+   `PB status --tickers <TICKER> --compact`; when none exists, the `skipped` entry says
+   "no baseline card". The routing rule (one holding's card → watch
    item; a shared premise → premise evidence; a ledger claim → claim evidence; every one
    that applies), the significance bar and the fact-level redundancy check are
    owned by `portfolio-brief` Step 5 (`~/projects/stock_picker/skills/portfolio-brief/SKILL.md`);
