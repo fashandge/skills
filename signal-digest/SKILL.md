@@ -1,6 +1,6 @@
 ---
 name: signal-digest
-description: Power-law digest of the user's information feeds for two goals — investment return with controlled risk, and AI technology and industry trends for learning and startup ideas. Digests the default feeds (X For You and Following, an X search for chip and cloud CEO talks, the Reddit home feed, the AI-news daily brief, X's Today's News) or any inputs the user names (a notes folder, a JSONL list, a fetched X search or subreddit). A script collects and prefilters with TypeSafe's Jev; the agent picks the vital few (at most three a day), verifies them, writes a short report and proposes stock_picker log entries. Use for "my digest", "what matters in my feeds today", "filter my feeds", "signal vs noise from my sources", a cross-source summary of the feeds, or "digest" / "find what matters in" any set of posts or notes. To fetch or summarize one X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
+description: Power-law digest of the user's information feeds for two goals — investment return with controlled risk, and AI technology and industry trends for learning and startup ideas. Digests the default feeds (X For You and Following, an X search for chip and cloud CEO talks, the vendors' own release feeds, the Reddit home feed, the AI-news daily brief, X's Today's News) or any inputs the user names (a notes folder, a JSONL list, a fetched X search or subreddit). A script collects and prefilters with TypeSafe's Jev; the agent picks the vital few (at most three a day), verifies them, writes a short report and proposes stock_picker log entries. Use for "my digest", "what matters in my feeds today", "filter my feeds", "signal vs noise from my sources", a cross-source summary of the feeds, or "digest" / "find what matters in" any set of posts or notes. To fetch or summarize one X query or one subreddit, use fetch-x-posts / fetch-reddit-posts instead.
 ---
 
 # signal-digest
@@ -53,7 +53,7 @@ only when a rule seems wrong for the case in front of you.
 cd ~/projects && /opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python -m news.src.signal_digest.run run
 ```
 
-With no arguments it collects the six default sources, filters with Jev, and
+With no arguments it collects the seven default sources, filters with Jev, and
 prints one JSON object with `run_dir`, per-source counts and errors, and the
 `shortlist` path. It takes a few minutes (X and Reddit drive a browser), so run
 it with `run_in_background` and wait for the notification. `-h` on the module
@@ -352,6 +352,19 @@ candidate and cite the one closest to the words. A talk the search brings in
 from two or three days back that no earlier run carried is new to the user,
 whatever its date.
 
+Launches have the same gap: a vendor's announcement on its own blog reached the
+feeds only when someone wrote it up, days later. The `vendor_releases` source
+reads the vendors' own RSS feeds (PyTorch, NVIDIA, OpenAI, Google, AWS, Meta,
+AMD, Microsoft; list, title filters and the 48-hour window in
+`src/signal_digest/vendor_feeds.py`), so the primary arrives on the day. Its
+entries are the primary to cite when coverage of the same launch shows up
+elsewhere in the haul. The feed text is often a one-line summary (OpenAI's
+always is): open the URL before picking or dismissing a short one. Each post
+sits in about four runs over two days, and a post an earlier day's run carried
+is old news under the rule above, so grep `items.jsonl` before treating one as
+new on its second day. Most entries are customer stories and partner
+announcements; the regret test is unchanged.
+
 A leader's remark on a story already picked is a development in two
 cases: it discloses a figure, a decision or guidance of the leader's own
 company, or the speaker's own stake changes what the known facts mean (the
@@ -479,8 +492,9 @@ turn out wrong the same day. The user applies the ones they approve with
 1. **Candidates**: each investing pick, each Near-misses line on a holding or a
    premise, and each pick or Near-misses line on either goal that states an industry-level
    fact about the AI build-out or its adoption. A watch item goes to any ticker with a
-   baseline card in the vault, not only to `reader.holdings`: when a pick's subject is a
-   company outside the holdings (Amazon on AWS being sold out), check for its card
+   baseline card in the vault, not only to `reader.holdings`: for every company outside
+   the holdings whose own fact a pick reports (Amazon on AWS being sold out; both vendors
+   of a two-vendor launch, so AWS's TorchNeuron beside Google's TorchTPU), check for its card
    (`ls ~/notes/wiki/Investment/Micro\ fundamentals/*/<TICKER>/<TICKER>\ fundamentals.md`)
    and, when one exists, route the fact to it exactly as to a holding, reading its card with
    `PB status --tickers <TICKER> --compact`; when none exists, the `skipped` entry says
@@ -572,7 +586,8 @@ weights in `src/signal_digest/jev_filter.py` need retuning.
   `render.py` the shortlist, its story folding, the investing index and the
   most-posted subjects line, `lint.py` the report
   checks, `profile.py` reader context, `leaders.py` the leader handles and
-  the names, words and window behind the `leader_talks` search, `run_daily.py`
+  the names, words and window behind the `leader_talks` search, `vendor_feeds.py`
+  the feeds, title filters and window behind `vendor_releases`, `run_daily.py`
   the 9:00 and 15:45 LaunchAgent entry point).
 - Data: `~/projects/news/data/signal_digest/runs/<run id>/` (deleted after
   10 days; keep it that long so a week-later review can compare report.md against the

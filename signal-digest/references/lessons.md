@@ -113,3 +113,10 @@ seems wrong for the case in front of you. Newest last.
   largely sold out" pick yielded P2, MEM-1 and GEN-1 evidence and no AMZN entry or skip, because
   the proposal step read only `reader.holdings`; the vault holds an AMZN baseline and the user
   wrote the watch item the same day.
+- **2026-10-24 · vendors' own release feeds are a source.** Google's TorchTPU and AWS's
+  TorchNeuron (native PyTorch on TPU and Trainium, 10-20) were the 10-24 AI pick and an applied
+  NVDA watch item, yet no run carried them until jiqizhixin's Zhihu write-up four days later; the
+  only earlier trace was a @PhotonCap headline roll (20261019_0900 #44). The PyTorch blog and AWS
+  What's New had both the same morning, and `vendor_releases` replayed at 10-20 22:45 UTC
+  returns both. The same pick's proposals had no AMZN entry or skip for TorchNeuron: the
+  any-ticker-with-a-card rule read "a pick's subject" as one company.
