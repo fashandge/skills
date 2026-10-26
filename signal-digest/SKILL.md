@@ -487,7 +487,8 @@ turn out wrong the same day. The user applies the ones they approve with
    and, when one exists, route the fact to it exactly as to a holding, reading its card with
    `PB status --tickers <TICKER> --compact`; when none exists, the `skipped` entry says
    "no baseline card". The routing rule (one holding's card → watch
-   item; a shared premise → premise evidence; a ledger claim → claim evidence; every one
+   item, or a `watch_update` when the fact is a new number or confirmation on one of the
+   ticker's open items; a shared premise → premise evidence; a ledger claim → claim evidence; every one
    that applies), the significance bar and the fact-level redundancy check are
    owned by `portfolio-brief` Step 5 (`~/projects/stock_picker/skills/portfolio-brief/SKILL.md`);
    apply them as written there. The formats are in `~/projects/stock_picker/docs/attention-layer.md`
@@ -496,7 +497,9 @@ turn out wrong the same day. The user applies the ones they approve with
 2. **Read the current state first.** `PB status --compact` gives each holding's
    `open_watch` and `baseline.path`; read that baseline's `## Thesis card` so `bears_on`
    names a specific assumption, trigger, scenario or premise and `test_at` names the next
-   print (its `Next re-test`). Read each touched premise's **Claim** and evidence in the
+   print (its `Next re-test`). A fact that develops an open item (the stalled deal has
+   closed; the rumoured number is now confirmed) is a `watch_update` on it, not a second
+   item and not a `skipped` entry asking the user to amend the item by hand. Read each touched premise's **Claim** and evidence in the
    register, its newest bullets most carefully: the user's own same-day entries land there
    too (an earnings-call summary arrives the same afternoon), and a fact a bullet already
    records, whoever wrote it, is not proposed again; the dry run's `already_present` catches
@@ -511,7 +514,9 @@ turn out wrong the same day. The user applies the ones they approve with
    not proposed again, approved or not.
 3. **Write `proposed_log.json`** into the run directory: `run_id`, `proposals` (each with
    `kind`, `pick` as `invest:<item id>`, `ai:<item id>` or `near-miss`, and `args`), and `skipped` (one
-   `{what, why}` per candidate declined). The pick's verification sentence sets
+   `{what, why}` per candidate declined). A `watch_update`'s `args` are `ticker`, `match` (a
+   substring of the open item's title that picks only it) and `update` (the new fact in one
+   line with its link; the command writes the `Update <date>:` prefix itself). The pick's verification sentence sets
    `source_type` (for claim evidence, the ledger's set: `news`, `sell-side`, `trade blog`,
    `investor post`, `forum`, …, with the caveat in `qualifier`) and the caveats that go into
    `item`, `claim` or `evidence`; `date` is the evidence's
@@ -525,7 +530,8 @@ turn out wrong the same day. The user applies the ones they approve with
    failed proposal; one that comes back `already_present` is logged already, so drop it.
 5. **Append `## Proposed log`** at the end of `report.md`: one line per proposal in file
    order, `N. watch TICKER · <direction> — <title>`, `N. premise Pn · <direction> — <claim
-   in a dozen words>` or `N. claim <ID> · <direction> — <evidence in a dozen words>` (add
+   in a dozen words>`, `N. update TICKER · <the open item's title> — <the new fact in a dozen
+   words>` or `N. claim <ID> · <direction> — <evidence in a dozen words>` (add
    `· status → <new>` when it proposes one), or `None.` The numbers are what the user approves by.
 
 ## Check the report, then log the picks

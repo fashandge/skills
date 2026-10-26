@@ -25,7 +25,8 @@ directories to review, each with `report.md`, `shortlist.md`, `discarded.md`,
    user's own marks on earlier picks (`[x]` useful, `[-]` not). Their judgment
    outranks yours; when a mark disagrees with your score, say so and defer.
 5. Each run's `proposed_log.json`, and which of its proposals the user applied: a watch
-   item's title in `~/notes/wiki/Investment/Investment system/Watch Items.md`, or an
+   item's title in `~/notes/wiki/Investment/Investment system/Watch Items.md`, a watch
+   update's `Update <date>:` sentence on its item in the ticker's `<TICKER> Watch Items.md`, or an
    evidence bullet's date and source in `Portfolio Premise Register.md` beside it, or a
    claim-evidence bullet's date and text under its claim id in the AI industry claims files
    (`~/notes/wiki/Investment/Micro fundamentals/AI Industry Claims/`). An
@@ -70,7 +71,7 @@ Answer every point in one or two sentences, with the item linked.
 7. **Log proposals.** The rules are the routing rule, significance bar and redundancy
    check in `~/projects/stock_picker/skills/portfolio-brief/SKILL.md` Step 5; judge against
    those, not your own taste. Per run: is each proposal routed right (one holding's card →
-   watch item, a shared premise → premise evidence, an AI industry claim → claim evidence;
+   watch item, or a watch update when it develops one of that card's open items; a shared premise → premise evidence, an AI industry claim → claim evidence;
    the right premise or claim, `for`/`against` relative to its **Claim** line), above the bar, not a re-proposal of an earlier run's,
    and framed as the verified primary source says rather than the feed post? A pick on a
    holding or premise with neither a proposal nor a `skipped` entry is a miss. Run

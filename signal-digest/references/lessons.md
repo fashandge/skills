@@ -124,3 +124,8 @@ seems wrong for the case in front of you. Newest last.
   default source matched no same-day run (the signature compared source lists for equality), so
   `--same-day new` judged the morning's 58 items as new and the agent set them aside by hand. The
   signature now accepts an earlier run whose sources are a subset of this run's.
+- **2026-10-25 15:45 · a development of an open item is an update, not a skip.** Musk said the
+  stalled $40B GPU debt had closed; NVDA already had the 10-23 "SPV stalls on pricing" item, so
+  the run could only skip it and ask for a hand amendment, which never came while its three other
+  proposals were applied. A `watch_update` proposal (`update-ticker-watch-item`) now appends the
+  dated sentence portfolio-brief's redundancy check already called for.
