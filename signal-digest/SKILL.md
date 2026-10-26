@@ -68,7 +68,8 @@ and on each subcommand is the authority on flags; don't restate them here.
 
 Every run gets its own directory (`YYYYMMDD_HHMM`), and nothing is overwritten.
 `--same-day` decides what a run does with today's earlier runs that had the same
-inputs:
+inputs (the same `--input` targets; an earlier run that lacked a built-in source
+added since still counts, so a new default source does not split the day):
 
 - "my digest", or a rerun with no qualifier: `union` (the default), the day's
   best-of as of now. Items already reported today are marked
@@ -114,7 +115,11 @@ shortlist header repeats all of this as a `Collection:` line when anything
 happened. Two things are yours:
 
 - **Repair once, then refetch once.** When a source still has an `error` or
-  zero items, read `collect.log` for the traceback. An operational cause (an
+  zero items, read `collect.log` for the traceback. A zero whose manifest
+  entry says `empty_ok` is genuine (`vendor_releases` at a weekend: every feed
+  parsed, nothing posted in the window, `newest` says when the last post was);
+  the runner neither retries nor refetches it, and neither do you: the
+  Collection line carries the clause and that is all. An operational cause (an
   expired X or Reddit session, a fetcher that just needed another go) you fix
   directly. A bug in our own code (a traceback into `~/projects/news/src` or
   `~/skills`) you fix minimally, run that package's tests, and only when they

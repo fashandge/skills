@@ -120,3 +120,10 @@ seems wrong for the case in front of you. Newest last.
   What's New had both the same morning, and `vendor_releases` replayed at 10-20 22:45 UTC
   returns both. The same pick's proposals had no AMZN entry or skip for TorchNeuron: the
   any-ticker-with-a-card rule read "a pick's subject" as one company.
+- **2026-10-25 15:45 · an added source must not split the day, and a genuine empty is not a
+  failure.** The first run with `vendor_releases` matched no same-day run (the signature compared
+  source lists for equality), so `--same-day new` judged the morning's 58 items as new and the
+  agent set them aside by hand. The same run retried and refetched the source because it returned
+  0 items, though all 11 feeds had parsed and the newest post was Friday's: vendors post little at
+  weekends. The signature now tolerates a subset of sources, and the collector marks such an empty
+  `empty_ok`, which the runner, the refetch and the Collection line respect.
