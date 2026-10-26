@@ -113,17 +113,14 @@ seems wrong for the case in front of you. Newest last.
   largely sold out" pick yielded P2, MEM-1 and GEN-1 evidence and no AMZN entry or skip, because
   the proposal step read only `reader.holdings`; the vault holds an AMZN baseline and the user
   wrote the watch item the same day.
-- **2026-10-24 · vendors' own release feeds are a source.** Google's TorchTPU and AWS's
-  TorchNeuron (native PyTorch on TPU and Trainium, 10-20) were the 10-24 AI pick and an applied
-  NVDA watch item, yet no run carried them until jiqizhixin's Zhihu write-up four days later; the
-  only earlier trace was a @PhotonCap headline roll (20261019_0900 #44). The PyTorch blog and AWS
-  What's New had both the same morning, and `vendor_releases` replayed at 10-20 22:45 UTC
-  returns both. The same pick's proposals had no AMZN entry or skip for TorchNeuron: the
-  any-ticker-with-a-card rule read "a pick's subject" as one company.
-- **2026-10-25 15:45 · an added source must not split the day, and a genuine empty is not a
-  failure.** The first run with `vendor_releases` matched no same-day run (the signature compared
-  source lists for equality), so `--same-day new` judged the morning's 58 items as new and the
-  agent set them aside by hand. The same run retried and refetched the source because it returned
-  0 items, though all 11 feeds had parsed and the newest post was Friday's: vendors post little at
-  weekends. The signature now tolerates a subset of sources, and the collector marks such an empty
-  `empty_ok`, which the runner, the refetch and the Collection line respect.
+- **2026-10-24 · vendor release feeds, tried and withdrawn.** Google's TorchTPU and AWS's
+  TorchNeuron (10-20) reached no run until a Zhihu write-up on 10-24. A `vendor_releases` RSS
+  source (eleven feeds from eight hand-picked vendors) ran once, 20261025_1545, and was removed the
+  same day: a short vendor list chosen by which blogs had a working feed is arbitrary, and the
+  source needs a systematic list before it comes back. The same pick's proposals had no AMZN entry
+  for TorchNeuron: the any-ticker-with-a-card rule now names every company whose own fact a pick
+  reports.
+- **2026-10-25 15:45 · an added source must not split the day.** The first run with a new
+  default source matched no same-day run (the signature compared source lists for equality), so
+  `--same-day new` judged the morning's 58 items as new and the agent set them aside by hand. The
+  signature now accepts an earlier run whose sources are a subset of this run's.
