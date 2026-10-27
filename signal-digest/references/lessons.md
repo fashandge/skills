@@ -129,3 +129,21 @@ seems wrong for the case in front of you. Newest last.
   the run could only skip it and ask for a hand amendment, which never came while its three other
   proposals were applied. A `watch_update` proposal (`update-ticker-watch-item`) now appends the
   dated sentence portfolio-brief's redundancy check already called for.
+- **2026-10-26 15:45 · the best AI candidate needs a Near-misses line too.** Anthropic's "How
+  the Claude Code team does code review" (shortlist #3, learn; PRs doubled, reverts down 40%)
+  lost to the Cohere pick under a full three-pick day and appeared nowhere, while Near misses
+  spent lines on Microsoft's buyout (not held) and a model's price step. Only Investing had a
+  named-runner-up rule.
+- **2026-10-26 09:00 · a caveat about the source must be checked against the source.** GEN-8's
+  claim evidence from Anthropic's S-1 carried the qualifier "operating income, not cash flow"
+  against the claim's "cash-flow negative", while the S-1 reports H1 operating cash flow of
+  +$3.93B, the claim's own test.
+- **2026-10-26 · a primary-document weight in Jev, replayed and rejected.** The review proposed
+  boosting company documents (Meta's FWP at invest #24, Celestica's 2027 outlook #50 of 64). A
+  Noul question ("figures from a company's own filing, results release, guidance or announced
+  deal") asked of all 3,455 items in the 21 stored runs (10-17 to 10-27) answered about 0.95 for
+  Carrio's quote posts and every S-1 commentary thread alike (Meta's FWP post 0.78, Celestica
+  0.63). Multiplying invest by 1 + b·P moved the 26 investing picks down, not up: mean rank 13.5
+  at b = 0 against 13.7, 14.4 and 15.1 at b = 0.3, 0.5 and 1.0, and 16 → 14 inside the top-12
+  index at 0.5. A company document is read off the shortlist (the index's holding and
+  most-posted entries, the subject grep), not ranked up by Jev.

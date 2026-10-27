@@ -426,6 +426,12 @@ Rules:
   count; the lint rejects it). Walk the "Top investing candidates" index from
   the top: the first item you did not pick is the one to name, with its index
   rank, unless you say why a lower one is the stronger candidate.
+- Whenever AI has fewer than two picks, a Near-misses line likewise names the
+  best AI candidate not picked and why it lost: the first `learn` entry from the
+  top of the shortlist you did not pick, with its rank. A full day's cap is a
+  reason it lost, not a reason to leave it out; when Near misses is full, it
+  displaces the weakest line (a ticker the user does not hold, a known price
+  curve), not the other way round.
 - **An event at a holding itself is named whether or not it is picked.** An
   index entry marked `holding` that reports something happening to the company
   (a lawsuit, a contract, guidance, a price change, a management change, a
@@ -523,7 +529,11 @@ turn out wrong the same day. The user applies the ones they approve with
    over-limit field. The pick's verification sentence sets
    `source_type` (for claim evidence, the ledger's set: `news`, `sell-side`, `trade blog`,
    `investor post`, `forum`, …, with the caveat in `qualifier`) and the caveats that go into
-   `item`, `claim` or `evidence`; `date` is the evidence's
+   `item`, `claim` or `evidence`. A caveat that the evidence falls short of the claim's own
+   test ("operating income, not cash flow" against a claim worded on cash flow) is itself a
+   claim about the source: look for the test's measure in the document first (the S-1's
+   cash-flow statement), and when it is there, the evidence states it and the caveat goes.
+   `date` is the evidence's
    date. `item`, `claim` and `evidence` carry only facts the report states or a page you opened for
    this run says; a fact you remember (what the CEO said at the last call) stays out until
    you open and link where it was said. Link every source: a watch item's `source` and an evidence entry's `links` each need
