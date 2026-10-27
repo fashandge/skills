@@ -515,8 +515,12 @@ turn out wrong the same day. The user applies the ones they approve with
 3. **Write `proposed_log.json`** into the run directory: `run_id`, `proposals` (each with
    `kind`, `pick` as `invest:<item id>`, `ai:<item id>` or `near-miss`, and `args`), and `skipped` (one
    `{what, why}` per candidate declined). A `watch_update`'s `args` are `ticker`, `match` (a
-   substring of the open item's title that picks only it) and `update` (the new fact in one
-   line with its link; the command writes the `Update <date>:` prefix itself). The pick's verification sentence sets
+   substring of the open item's title that picks only it), `direction` (`for`, `against` or
+   `mixed` relative to the thesis; `mixed` when the news both deepens and eases the item's
+   concern) and `update` (the new fact in one line of at most 50 words with its link; the
+   command writes the `<date> · <direction>:` prefix itself). Watch-item, register and
+   ledger fields follow *Writing for the reader* in `attention-layer.md`; the lint refuses an
+   over-limit field. The pick's verification sentence sets
    `source_type` (for claim evidence, the ledger's set: `news`, `sell-side`, `trade blog`,
    `investor post`, `forum`, …, with the caveat in `qualifier`) and the caveats that go into
    `item`, `claim` or `evidence`; `date` is the evidence's
