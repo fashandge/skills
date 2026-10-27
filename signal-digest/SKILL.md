@@ -519,7 +519,8 @@ turn out wrong the same day. The user applies the ones they approve with
    any `proposed_log.json` from today's earlier runs: what they proposed is
    not proposed again, approved or not.
 3. **Write `proposed_log.json`** into the run directory: `run_id`, `proposals` (each with
-   `kind`, `pick` as `invest:<item id>`, `ai:<item id>` or `near-miss`, and `args`), and `skipped` (one
+   `kind`, `pick` as `invest:<item id>`, `ai:<item id>` or `near-miss`, `label` (its step-5
+   report line without the number), and `args`), and `skipped` (one
    `{what, why}` per candidate declined). A `watch_update`'s `args` are `ticker`, `match` (a
    substring of the open item's title that picks only it), `direction` (`for`, `against` or
    `mixed` relative to the thesis; `mixed` when the news both deepens and eases the item's
@@ -543,10 +544,11 @@ turn out wrong the same day. The user applies the ones they approve with
 4. **Validate**: `PB apply-proposals <run dir>/proposed_log.json --dry-run`. Fix every
    failed proposal; one that comes back `already_present` is logged already, so drop it.
 5. **Append `## Proposed log`** at the end of `report.md`: one line per proposal in file
-   order, `N. watch TICKER · <direction> — <title>`, `N. premise Pn · <direction> — <claim
-   in a dozen words>`, `N. update TICKER · <the open item's title> — <the new fact in a dozen
-   words>` or `N. claim <ID> · <direction> — <evidence in a dozen words>` (add
-   `· status → <new>` when it proposes one), or `None.` The numbers are what the user approves by.
+   order, `N. <label>`, the label in one of these shapes: `watch TICKER · <direction> — <title>`, `premise Pn · <direction> — <claim
+   in a dozen words>`, `update TICKER · <the open item's title> — <the new fact in a dozen
+   words>` or `claim <ID> · <direction> — <evidence in a dozen words>` (add
+   `· status → <new>` when it proposes one), or `None.` The numbers are what the user approves by;
+   the lint checks each line against its proposal's `label`, which the market-pulse dashboard shows.
 
 ## Check the report, then log the picks
 
