@@ -97,7 +97,7 @@ what's installed). Quota fallbacks use the route-specific thresholds below:
 | Genuinely hard coding (nuanced, multi-file, or history-rewriting) — hard only; most coding stays on the opus-medium row above | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-6-astra, low effort (`--agent codex --model gpt-6-astra --effort low`) when Claude's overall session or weekly quota is ≥95% used or opus is unavailable |
 | Simple judgment or summary, not coding and not wiki writing (summarize news, social-media review/summary research — "summarize what X users say about model Y", "what does Reddit/Zhihu say about Z") | claude, opus, medium effort (`--model opus --effort medium`) | none; no quota check |
 | Writing wiki notes (`/wiki`, "write a wiki on X") or absorbing a note or article into the wiki (`/absorb`, "absorb this", "promote this raw note") | claude, opus, high effort (`--model opus --effort high`) | none; no quota check |
-| Taste-heavy or judgment-heavy work: skill creation or edits (global `~/skills` or project-local `skills/`, always, regardless of gauged difficulty), an original argument (a research article, an investment thesis), or research into the user's own notes vault (`/research-notes`, even when largely synthesis) | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`) when Claude's overall session or weekly quota is ≥95% used or opus is unavailable |
+| Taste-heavy or judgment-heavy work: skill creation or edits (global `~/skills` or project-local `skills/`, always, regardless of gauged difficulty), an original argument (a research article, an investment thesis), research into the user's own notes vault (`/research-notes`, even when largely synthesis), or running stock_picker's `/portfolio-brief` (the brief, or any of its logging entry points — always, even when it looks like a summary or a mechanical log) | claude, opus, high effort (`--model opus --effort high`) | codex, gpt-6-astra, high effort (`--agent codex --model gpt-6-astra --effort high`) when Claude's overall session or weekly quota is ≥95% used or opus is unavailable |
 | Final fresh-context review (attended only) | prefer the strongest model from a *different family* than both the implementers and the orchestrator — codex gpt-6-astra high when the implementers were Claude, pi, or DeepSeek, claude Fable medium when they were codex; a same-family model is also fine when it is strictly stronger than both orchestrator and workers (e.g. claude Fable medium over opus workers) | none |
 
 Every spawn passes the row's flags explicitly, even where they match a
@@ -105,7 +105,8 @@ script default, so this table stays the only authority; `--help` owns the
 defaults, and spawn-worker §2 owns per-agent mechanics (dsh's profile
 overlay, pi's model, explicit-only agents). The dedicated skill-editing,
 wiki/absorb, and judgment/research rows take precedence over the trivial-task
-row. Two Claude CLI gotchas: the Fable model value is `fable` (`fable-5` is
+row, and `/portfolio-brief` stays on opus high over the simple-summary row.
+Two Claude CLI gotchas: the Fable model value is `fable` (`fable-5` is
 rejected at startup), and the script gives bare-`opus` workers the Concise
 output style on its own while Fable workers keep the default.
 
