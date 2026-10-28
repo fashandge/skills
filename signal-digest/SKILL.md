@@ -479,7 +479,8 @@ about the AI build-out and its adoption, `~/notes/wiki/Investment/Micro fundamen
 Industry Claims/`). This skill only *proposes* entries and never writes
 any of them, because nobody reviews an unattended run before it lands and a framing can
 turn out wrong the same day. The user applies the ones they approve with
-`/portfolio-brief log the digest proposals`.
+`/portfolio-brief log the digest proposals <run dir>/proposed_log.json`; give that full path
+whenever you suggest the command, since portfolio-brief does not know where this skill keeps its runs.
 
 `PB` below is `/opt/homebrew/Caskroom/miniconda/base/envs/ml/bin/python ~/projects/stock_picker/skills/portfolio-brief/portfolio_brief.py`.
 
