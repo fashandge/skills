@@ -88,7 +88,9 @@ has no review pass to catch it.
 ## 2. Route by difficulty
 
 Gauge each task and pick the worker tier (defaults that have worked; adjust to
-what's installed). Quota fallbacks use the route-specific thresholds below:
+what's installed). Quota fallbacks apply only when the quota check is on
+(off by default — see **Quota gate** below) and use the route-specific
+thresholds below:
 
 | Task shape | Worker | Fallback |
 |---|---|---|
@@ -111,8 +113,9 @@ rejected at startup), and the script gives bare-`opus` workers the Concise
 output style on its own while Fable workers keep the default.
 
 **Unavailable** means the selected worker cannot run: its executable or
-profile is missing, its quota is exhausted, or a known startup or
-authentication failure prevents its use. Choose the next fallback before
+profile is missing, its quota is exhausted (checked up front only when the
+quota gate is on), or a known startup or authentication failure prevents its
+use. Choose the next fallback before
 spawning; never start a replacement alongside a worker that may still be
 editing (§4, §9). Kimi has no subscription at the moment and is not a
 fallback for anything. **gemini** and **muse** sit outside this table on
@@ -120,7 +123,12 @@ purpose: never route a task to them by difficulty — spawn them only when the
 user names them, for the tasks they name (or the whole batch if that is what
 they asked), with no quota gate.
 
-**Quota gate.** Before each spawn on a row whose fallback is conditioned on
+**Quota gate.** Off by default: skip `claude-quota` entirely, assume quota
+is sufficient, and spawn each row's first choice. Turn it on only when the
+user asks — `/orchestrate-workers check-quota …`, "check quota", "watch the
+quota", or the same as a `/start-orchestrator` standing instruction — and it
+stays on for that invocation (or the standing session) until they turn it off.
+When on, before each spawn on a row whose fallback is conditioned on
 Claude's quota — the two opus coding rows and the opus-high taste/judgment
 row — run `claude-quota --json` standalone, never batched with another
 command and never after a worker has already failed. Do not use `--check`;
