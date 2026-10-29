@@ -26,7 +26,7 @@ directories to review, each with `report.md`, `shortlist.md`, `discarded.md`,
    outranks yours; when a mark disagrees with your score, say so and defer.
 5. Each run's `proposed_log.json`, and which of its proposals the user applied: a watch
    item's title in `~/notes/wiki/Investment/Investment system/Watch Items.md`, a watch
-   update's `Update <date>:` sentence on its item in the ticker's `<TICKER> Watch Items.md`, or an
+   update's `Update <date>:` sentence on its item in the ticker's `<TICKER> Thesis.md`, or an
    evidence bullet's date and source in `Portfolio Premise Register.md` beside it, or a
    claim-evidence bullet's date and text under its claim id in the AI industry claims files
    (`~/notes/wiki/Investment/Micro fundamentals/AI Industry Claims/`). An

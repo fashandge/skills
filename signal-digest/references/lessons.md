@@ -147,3 +147,18 @@ seems wrong for the case in front of you. Newest last.
   at b = 0 against 13.7, 14.4 and 15.1 at b = 0.3, 0.5 and 1.0, and 16 → 14 inside the top-12
   index at 0.5. A company document is read off the shortlist (the index's holding and
   most-posted entries, the subject grep), not ranked up by Jev.
+- **2026-10-28 09:00 · a carded non-holding's own news sat outside the index.** Vertiv's Q3 beat
+  (sales 12% above the top of its guide, organic orders doubled), the investing pick, ranked #49
+  (invest 0.51) and was in none of the index's lists, because VRT has a card but is not held and
+  $VRT was in 7 posts, below the most-posted line of 10. The agent found it anyway. The 10-27
+  review's primary-domain link boost would not have caught it: the post links only itself. The
+  index now adds the best entry whose only cashtag is a carded non-holding (`card $VRT`),
+  read from stock_picker's `thesis_files`; replayed on 10-18 to 10-28 it adds 0–3 lines a run.
+  Indexing every entry that names a carded ticker would add 16–23, nearly all cashtag rolls.
+  The link boost itself was replayed and rejected: X posts carry only t.co links, so 2 of 2,854
+  stored X items show a primary domain, against 45 of 190 ai_news articles.
+- **2026-10-28 09:00 · a theme already picked is not a story already picked.** Axiom's agents
+  formalized the classification of finite simple groups in Lean in 24 days and found a ~40-year
+  gap; it went to Near misses "because machine-checked proof was the AI pick on 10-22 and 10-27",
+  with AI at one pick and the day under the cap. No rule said so: the restatement rule covers
+  the same story only.

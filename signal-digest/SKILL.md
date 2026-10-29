@@ -149,7 +149,8 @@ picked on earlier days this week; a "Top investing candidates" index of the top
 cashtag, or the bare ticker in a title) whatever its rank, each marked
 `holding $INTC` and `VERIFY` where that applies, plus the best entry on each
 most-posted cashtag (`$SPCX in 21 posts`, counted on a `Most-posted subjects:`
-line above the index); then the survivors by Jev value, with VERIFY, UNCERTAIN
+line above the index), plus the best entry on each non-holding with a baseline
+card whose only cashtag is that ticker (`card $VRT`); then the survivors by Jev value, with VERIFY, UNCERTAIN
 and UNSCORED items last. The keep line is per
 track (the top 35 by invest and the top 35 by learn both pass) and an entry
 naming a holding's ticker passes whatever its rank (`HOLDING`). The overall
@@ -158,7 +159,9 @@ items carry full article bodies, so long Zhihu articles out-rank a two-line X
 post on a holding by length alone. For investing, read the index, the
 tickers and the most-posted subjects, not the rank; every investing pick
 through 10-19 sat inside the index, and the one that did not (SpaceX's call,
-10-20, entry #32) is why the index now carries the most-posted cashtags. Then:
+10-20, entry #32) is why the index now carries the most-posted cashtags, and
+Vertiv's Q3 beat (10-28, #49, a carded name the user does not hold) why it
+carries the card entries. Then:
 
 - **One entry per story, where the pipeline can tell.** Retweets and quotes of
   one root post are folded under the story's best original post as `also:`
@@ -216,7 +219,10 @@ through 10-19 sat inside the index, and the one that did not (SpaceX's call,
   and neither is another commentator's take on facts already reported, nor the
   same person's longer version of a take already picked (the talk behind a
   thread, the slides, an essay). A story picked on two earlier days needs its
-  first sentence to say what changed.
+  first sentence to say what changed. A theme picked before is not a story
+  picked before: a new result on it (a second machine-checked proof, by another
+  team, of another theorem) is judged on its own, and the third of its kind is
+  written as the concept, linking the earlier picks, never dropped for repeating.
 - **Old news is usually known.** The user runs these tools daily, so a launch,
   price change or deal from a major lab or vendor that is more than two days old
   is assumed known. Check whether the feed carried it earlier
@@ -473,8 +479,8 @@ Rules:
 ## Propose log entries for the portfolio
 
 Picks are also evidence for the user's research logs in `stock_picker`: a
-**watch item** per holding (news a thesis card's next print must settle), the
-**portfolio premise register**, and the **AI industry claims ledger** (revisable claims
+**watch item** under one premise of a ticker's thesis file (news that premise's next print
+must settle), the **portfolio premise register**, and the **AI industry claims ledger** (revisable claims
 about the AI build-out and its adoption, `~/notes/wiki/Investment/Micro fundamentals/AI
 Industry Claims/`). This skill only *proposes* entries and never writes
 any of them, because nobody reviews an unattended run before it lands and a framing can
@@ -487,14 +493,15 @@ whenever you suggest the command, since portfolio-brief does not know where this
 1. **Candidates**: each investing pick, each Near-misses line on a holding or a
    premise, and each pick or Near-misses line on either goal that states an industry-level
    fact about the AI build-out or its adoption. A watch item goes to any ticker with a
-   baseline card in the vault, not only to `reader.holdings`: for every company outside
-   the holdings whose own fact a pick reports (Amazon on AWS being sold out; both vendors
-   of a two-vendor launch, so AWS's TorchNeuron beside Google's TorchTPU), check for its card
-   (`ls ~/notes/wiki/Investment/Micro\ fundamentals/*/<TICKER>/<TICKER>\ fundamentals.md`)
-   and, when one exists, route the fact to it exactly as to a holding, reading its card with
-   `PB status --tickers <TICKER> --compact`; when none exists, the `skipped` entry says
-   "no baseline card". The routing rule (one holding's card → watch
-   item, or a `watch_update` when the fact is a new number or confirmation on one of the
+   thesis file in the vault (`reader.card_tickers`, from `thesis_files.tickers`), not only
+   to `reader.holdings`: for every company outside the holdings whose own fact a pick
+   reports (Amazon on AWS being sold out; both vendors of a two-vendor launch, so AWS's
+   TorchNeuron beside Google's TorchTPU), check for its thesis file
+   (`ls ~/notes/wiki/Investment/Micro\ fundamentals/*/<TICKER>/<TICKER>\ Thesis.md`)
+   and, when one exists, route the fact to it exactly as to a holding, reading its premises
+   with `PB status --tickers <TICKER> --compact`; when none exists, the `skipped` entry says
+   "no thesis file". The routing rule (one of a ticker's premises → watch item naming that
+   `premise`, or a `watch_update` when the fact is a new number or confirmation on one of the
    ticker's open items; a shared premise → premise evidence; a ledger claim → claim evidence; every one
    that applies), the significance bar and the fact-level redundancy check are
    owned by `portfolio-brief` Step 5 (`~/projects/stock_picker/skills/portfolio-brief/SKILL.md`);
@@ -502,9 +509,12 @@ whenever you suggest the command, since portfolio-brief does not know where this
    (*Watch items*, *Premise register*, *Industry claims ledger*, *Proposal files*). Zero
    proposals is a normal run.
 2. **Read the current state first.** `PB status --compact` gives each holding's
-   `open_watch` and `baseline.path`; read that baseline's `## Thesis card` so `bears_on`
-   names a specific assumption, trigger, scenario or premise and `test_at` names the next
-   print (its `Next re-test`). A fact that develops an open item (the stalled deal has
+   `open_watch` and `thesis.premises` (id, title, status, *Where it stands*, `next_test`);
+   pick the `premise` the fact tests by its claim (`--full` shows each premise's `claim`,
+   `moves` and `refuted_if`), write `bears_on` as one plain sentence on why it matters to
+   that premise, and take `test_at` from the premise's `next_test`. A fact that bears on
+   none of a ticker's premises is `skipped` as "no premise", never forced onto one. A fact
+   that develops an open item (the stalled deal has
    closed; the rumoured number is now confirmed) is a `watch_update` on it, not a second
    item and not a `skipped` entry asking the user to amend the item by hand. Read each touched premise's **Claim** and evidence in the
    register, its newest bullets most carefully: the user's own same-day entries land there
