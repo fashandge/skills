@@ -511,8 +511,9 @@ whenever you suggest the command, since portfolio-brief does not know where this
 2. **Read the current state first.** `PB status --compact` gives each holding's
    `open_watch` and `thesis.premises` (id, title, status, *Where it stands*, `next_test`);
    pick the `premise` the fact tests by its claim (`--full` shows each premise's `claim`,
-   `moves` and `refuted_if`), write `bears_on` as one plain sentence on why it matters to
-   that premise, and take `test_at` from the premise's `next_test`. A fact that bears on
+   `moves` and `refuted_if`), end `item` with one plain sentence on why it matters to that
+   premise (`bears_on` is deprecated: still accepted, never written, so leave it out), and
+   take `test_at` from the premise's `next_test`. A fact that bears on
    none of a ticker's premises is `skipped` as "no premise", never forced onto one. A fact
    that develops an open item (the stalled deal has
    closed; the rumoured number is now confirmed) is a `watch_update` on it, not a second
