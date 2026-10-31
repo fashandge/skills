@@ -376,6 +376,15 @@ was actually said. Headline accounts (Polymarket, zerohedge) routinely reframe;
 a verified-but-reframed claim may move from investing to AI or drop out. State
 the result in one sentence with the primary source linked. The heading and the
 TL;DR then carry what the primary source says, not the feed post's paraphrase.
+A reversal, a first or an absence ("no agency has rated it yet", "its first
+downgrade", "nothing signed") is a claim about the prior state, and the prior
+state is the pick's counter-evidence: search for it before the heading sizes
+the move, and measure the move from the standing state found, never from the
+one the post implies. Blackstone's double-B expectation for Anthropic read as
+investment grade to junk until a search found KBRA's June rating one notch
+below investment grade, which made it a notch. The verification sentence
+states the prior state with its link; one asserted from memory is the error
+the daily review catches.
 
 ## Report
 
@@ -537,7 +546,21 @@ whenever you suggest the command, since portfolio-brief does not know where this
    substring of the open item's title that picks only it), `direction` (`for`, `against` or
    `mixed` relative to the thesis; `mixed` when the news both deepens and eases the item's
    concern) and `update` (the new fact in one line of at most 50 words with its link; the
-   command writes the `<date> · <direction>:` prefix itself). Watch-item, register and
+   command writes the `<date> · <direction>:` prefix itself). Before writing any `item` or
+   `update`, run portfolio-brief Step 5c's counter-evidence check on that one fact: what in
+   the evidence eases the concern it deepens? Three places hold the answer: the pick's own
+   source and the subject grep of today's shortlist and discarded log; the premise's newest
+   bullets and the ticker's open items, which record the state the fact moves from; and, for
+   a market gauge (a credit-default-swap spread, a yield, a multiple, a price), the same
+   gauge for the ticker's peers over the same window, because a move the whole group made is
+   the easing half (5-year CDS spreads for the AI borrowers and chipmakers sit in the
+   investment DB's `cds_spreads_daily`, queried as stock_picker's `docs/investment-db.md`
+   shows and cited as DTCC-inferred). The easing fact goes into `item` or `update` as one
+   clause beginning `Eased:` with its link, inside the word limit (trim the deepening half
+   before dropping the easing one), and `direction` is `mixed` when it changes the lean. An
+   item proposed on the deepening half alone is a half-item the user finishes by hand: Intel's
+   record CDS on 10-30 was applied only after "Eased: chipmaker spreads widened together in
+   October; Nvidia's went from 85 to 126 bp" was added from that table. Watch-item, register and
    ledger fields follow *Writing for the reader* in `attention-layer.md`; the lint refuses an
    over-limit field. The pick's verification sentence sets
    `source_type` (for claim evidence, the ledger's set: `news`, `sell-side`, `trade blog`,

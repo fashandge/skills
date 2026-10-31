@@ -162,3 +162,13 @@ seems wrong for the case in front of you. Newest last.
   gap; it went to Near misses "because machine-checked proof was the AI pick on 10-22 and 10-27",
   with AI at one pick and the day under the cap. No rule said so: the restatement rule covers
   the same story only.
+- **2026-10-30 · a watch item needs its easing half, and a prior state needs a search.** The
+  09:00 run's INTC-3 and AVGO-3 items carried only the record 5-year CDS spreads (123.5 bp and
+  175.4 bp); the user applied both after adding "Eased: chipmaker spreads widened together in
+  October; Nvidia's went from 85 to 126 bp" from the investment DB's DTCC-inferred
+  `cds_spreads_daily`. portfolio-brief Step 5c had the counter-evidence check all along, but
+  the proposal step named it only by reference. The 15:45 Blackstone pick had the same gap as a
+  pick: its verification sentence said "no agency has rated Anthropic yet" without a search,
+  while KBRA had rated Anthropic one notch below investment grade in June, so the double-B
+  expectation was a notch, not investment grade to junk, and the GEN-8 proposal called it a
+  reversal.
